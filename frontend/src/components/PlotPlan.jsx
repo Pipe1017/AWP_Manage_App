@@ -13,7 +13,6 @@ const HATCH_COLORS = {
 };
 const allColors = [...HATCH_COLORS.primary, ...HATCH_COLORS.secondary, ...HATCH_COLORS.earth];
 
-
 // Hook para cargar la imagen de Konva
 const useImageLoader = (src) => {
   const [image, setImage] = useState(null);
@@ -39,16 +38,6 @@ function Toolbar({ activeTool, setActiveTool, color, setColor, onZoom, onClear, 
     { id: 'circle', name: 'Círculo', icon: '●' },
     { id: 'polygon', name: 'Polígono', icon: '▲' },
   ];
-  
-  const getToolName = (tool) => {
-    switch (tool) {
-      case 'rect': return 'Rectángulo';
-      case 'circle': return 'Círculo';
-      case 'polygon': return 'Polígono';
-      case 'pan': return '✋ Seleccionar/Mover';
-      default: return '';
-    }
-  };
   
   return (
     <div className="p-3 bg-gradient-to-r from-gray-800 to-gray-700 border-b-2 border-blue-900/50 flex justify-between items-center shadow-lg">
@@ -143,7 +132,7 @@ function Toolbar({ activeTool, setActiveTool, color, setColor, onZoom, onClear, 
 }
 
 
-function PlotPlan({ plotPlan, cwaToAssociate, setCwaToAssociate }) {
+function PlotPlan({ plotPlan, cwaToAssociate, onShapeSaved }) {
   const { image, error } = useImageLoader(plotPlan.image_url);
   const containerRef = useRef(null);
   const stageRef = useRef(null);
@@ -160,7 +149,41 @@ function PlotPlan({ plotPlan, cwaToAssociate, setCwaToAssociate }) {
   const startPoint = useRef({ x: 0, y: 0 });
   const [stage, setStage] = useState({ scale: 1, x: 0, y: 0 });
   const [selectedShapeKey, setSelectedShapeKey] = useState(null);
-  // const [cwaToAssociate, setCwaToAssociate] = useState(null); // <-- Esto ya viene de props, no es estado local aquí
+
+  // ✨ NUEVO: Cargar formas existentes desde la BD
+  useEffect(() => {
+    const loadShapesFromDB = async () => {
+      if (!plotPlan || !plotPlan.cwas) return;
+      
+      console.log("🔵 [PlotPlan] Cargando formas guardadas desde BD...");
+      const loadedShapes = [];
+      
+      // Iterar sobre todas las CWAs del plot plan
+      plotPlan.cwas.forEach(cwa => {
+        // Iterar sobre los CWPs de cada CWA
+        cwa.cwps.forEach(cwp => {
+          if (cwp.shape_type && cwp.shape_data) {
+            // Reconstruir la forma con los datos guardados
+            const shape = {
+              type: cwp.shape_type,
+              color: cwp.shape_data.color || HATCH_COLORS.primary[0],
+              key: cwp.id,
+              cwpId: cwp.id,
+              codigo: cwp.codigo,
+              nombre: cwp.nombre,
+              ...cwp.shape_data // Incluye x, y, width, height, radius, o points
+            };
+            loadedShapes.push(shape);
+          }
+        });
+      });
+      
+      setShapes(loadedShapes);
+      console.log(`✅ [PlotPlan] ${loadedShapes.length} formas cargadas desde BD`);
+    };
+    
+    loadShapesFromDB();
+  }, [plotPlan]);
 
   // Manejo de resize
   useEffect(() => {
@@ -246,12 +269,11 @@ function PlotPlan({ plotPlan, cwaToAssociate, setCwaToAssociate }) {
         const newPoints = [...polygonPoints, pos.x, pos.y];
         setPolygonPoints(newPoints);
         
-        if (polygonPoints.length > 4) { // Cierra polígono si se hace clic cerca del primer punto
+        if (polygonPoints.length > 4) {
           const firstPoint = { x: polygonPoints[0], y: polygonPoints[1] };
           const dist = Math.sqrt(Math.pow(firstPoint.x - pos.x, 2) + Math.pow(firstPoint.y - pos.y, 2));
           if (dist < 15 / stage.scale) {
             setIsDrawingPolygon(false);
-            // Guarda la forma final y la asocia
             handleSaveShape({ type: 'polygon', color: currentColor, key: shapes.length, points: [...polygonPoints] }); 
             setPolygonPoints([]);
           }
@@ -282,8 +304,7 @@ function PlotPlan({ plotPlan, cwaToAssociate, setCwaToAssociate }) {
     
     if ((activeTool === 'rect' || activeTool === 'circle') && newShape) {
       if ((newShape.width > 5 || newShape.radius > 5)) {
-        // Llama a la función de guardado
-        handleSaveShape({ ...newShape, key: shapes.length, cwaId: cwaToAssociate?.id || null });
+        handleSaveShape({ ...newShape, key: shapes.length });
       }
       setNewShape(null);
     }
@@ -295,33 +316,97 @@ function PlotPlan({ plotPlan, cwaToAssociate, setCwaToAssociate }) {
     }
   };
   
-  const handleWheel = (e) => { /* ... */ };
-  const handleDragEnd = (e) => { /* ... */ };
-  
-  // --- ¡LÓGICA DE GUARDADO Y ASOCIACIÓN! ---
-  const handleSaveShape = (finalShape) => {
+  // --- ✨ LÓGICA DE GUARDADO EN BD ---
+  const handleSaveShape = async (finalShape) => {
     if (!cwaToAssociate) {
         alert("¡ADVERTENCIA! Debes seleccionar un CWA (Área de Construcción) en la tabla inferior para asociar esta forma.");
         return;
     }
 
-    // 1. Guarda la forma en la lista local de React
-    setShapes(prev => [ ...prev, finalShape ]); 
-    
-    // 2. Aquí llamaremos a la API para guardar las coordenadas (Paso 19.2)
-    const shapeData = {
-        type: finalShape.type,
-        color: finalShape.color,
-        data: finalShape.type === 'polygon' ? finalShape.points : {x: finalShape.x, y: finalShape.y, w: finalShape.width, h: finalShape.height, r: finalShape.radius}
-    };
+    // ✨ NUEVO: Validar que el CWA pertenece al Plot Plan actual
+    const cwaPertenecePlotPlan = plotPlan.cwas.some(cwa => cwa.id === cwaToAssociate.id);
+    if (!cwaPertenecePlotPlan) {
+        alert("❌ El CWA seleccionado no pertenece a este Plot Plan. Por favor selecciona otro.");
+        return;
+    }
 
-    console.log("Listo para guardar en BD: ", shapeData);
+    // 1. Preparar datos de geometría según el tipo de forma
+    let shapeData = {};
+    if (finalShape.type === 'polygon') {
+        shapeData = {
+            points: finalShape.points,
+            color: finalShape.color
+        };
+    } else if (finalShape.type === 'rect') {
+        shapeData = {
+            x: finalShape.x,
+            y: finalShape.y,
+            width: finalShape.width,
+            height: finalShape.height,
+            color: finalShape.color
+        };
+    } else if (finalShape.type === 'circle') {
+        shapeData = {
+            x: finalShape.x,
+            y: finalShape.y,
+            radius: finalShape.radius,
+            color: finalShape.color
+        };
+    }
+
+    // 2. Crear CWP con la geometría
+    try {
+        console.log("🔵 [PlotPlan] Creando CWP para la forma...");
+        
+        // Generar código único para el CWP
+        const cwpCode = `${cwaToAssociate.codigo}-CWP${Date.now().toString().slice(-4)}`;
+        const cwpName = `Area ${finalShape.type} ${shapes.length + 1}`;
+        
+        // Crear el CWP con la geometría
+        const cwpResponse = await axios.post(
+            `${API_URL}/api/v1/awp/cwa/${cwaToAssociate.id}/cwp/`,
+            {
+                nombre: cwpName,
+                codigo: cwpCode,
+                shape_type: finalShape.type,
+                shape_data: shapeData
+            }
+        );
+        
+        console.log("✅ [PlotPlan] CWP creado con geometría:", cwpResponse.data);
+        
+        // 3. Actualizar la forma local con el ID del CWP
+        const shapeWithCwpId = {
+            ...finalShape,
+            cwpId: cwpResponse.data.id,
+            codigo: cwpCode,
+            nombre: cwpName
+        };
+        
+        // 4. Guardar en el estado local
+        setShapes(prev => [...prev, shapeWithCwpId]);
+        
+        // 5. Notificar al padre para actualizar la lista de CWPs en AWPEstructura
+        if (onShapeSaved) {
+            onShapeSaved(cwaToAssociate.id, cwpResponse.data);
+        }
+        
+        alert(`✅ Área "${cwpName}" guardada correctamente en ${cwaToAssociate.nombre}`);
+        
+    } catch (error) {
+        console.error("🔥 [PlotPlan] Error guardando forma:", error);
+        alert("Error al guardar la forma: " + (error.response?.data?.detail || error.message));
+    }
   };
   
   // --- RENDERIZADO ---
   const renderCanvas = () => {
-    if (error) { /* Error */ }
-    if (!image) { /* Loading */ }
+    if (error) { 
+      return <div className="flex items-center justify-center h-full text-red-400">Error cargando imagen</div>;
+    }
+    if (!image) { 
+      return <div className="flex items-center justify-center h-full text-gray-400">Cargando imagen...</div>;
+    }
     
     const pos = activeTool === 'polygon' && isDrawingPolygon && stageRef.current ? stageRef.current.getPointerPosition() : null;
     let previewPolyPoints = polygonPoints;
@@ -331,31 +416,28 @@ function PlotPlan({ plotPlan, cwaToAssociate, setCwaToAssociate }) {
     }
     
     return (
-      <Stage ref={stageRef} width={size.width} height={size.height} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onWheel={handleWheel} draggable={activeTool === 'pan'} onDragEnd={handleDragEnd} scaleX={stage.scale} scaleY={stage.scale} x={stage.x} y={stage.y}>
+      <Stage ref={stageRef} width={size.width} height={size.height} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} draggable={activeTool === 'pan'} scaleX={stage.scale} scaleY={stage.scale} x={stage.x} y={stage.y}>
         <Layer>
           <Image image={image} width={size.width} height={size.height} listening={false} />
           
           {shapes.map(shape => {
-            const isSelected = shape.key === selectedShapeKey;
+            const isSelected = shape.key === selectedShapeKey || shape.cwpId === selectedShapeKey;
             
-            // PROPIEDADES COMUNES (SIN KEY)
             const commonProps = {
                 fill: `${shape.color}60`,
                 stroke: isSelected ? '#00FFFF' : shape.color,
                 strokeWidth: isSelected ? (5 / stage.scale) : (3 / stage.scale),
-                onClick: () => handleShapeClick(shape.key),
-                onTap: () => handleShapeClick(shape.key),
+                onClick: () => handleShapeClick(shape.key || shape.cwpId),
+                onTap: () => handleShapeClick(shape.key || shape.cwpId),
                 cursor: activeTool === 'pan' ? 'pointer' : 'default',
                 shadowColor: 'black',
                 shadowBlur: isSelected ? 10 : 5,
                 shadowOpacity: isSelected ? 0.6 : 0.3,
-                'data-shape-id': shape.key, 
             };
             
-            // RENDERIZADO CON KEY DIRECTO
-            if (shape.type === 'rect') { return <Rect key={shape.key} {...commonProps} x={shape.x} y={shape.y} width={shape.width} height={shape.height} />; }
-            if (shape.type === 'circle') { return <Circle key={shape.key} {...commonProps} x={shape.x} y={shape.y} radius={shape.radius} />; }
-            if (shape.type === 'polygon') { return <Line key={shape.key} {...commonProps} points={shape.points} closed={true} />; }
+            if (shape.type === 'rect') { return <Rect key={shape.cwpId || shape.key} {...commonProps} x={shape.x} y={shape.y} width={shape.width} height={shape.height} />; }
+            if (shape.type === 'circle') { return <Circle key={shape.cwpId || shape.key} {...commonProps} x={shape.x} y={shape.y} radius={shape.radius} />; }
+            if (shape.type === 'polygon') { return <Line key={shape.cwpId || shape.key} {...commonProps} points={shape.points} closed={true} />; }
             return null;
           })}
           
@@ -387,8 +469,8 @@ function PlotPlan({ plotPlan, cwaToAssociate, setCwaToAssociate }) {
         color={currentColor}
         setColor={setCurrentColor}
         onZoom={handleZoom}
-        onClear={shapes.length > 0 ? handleClear : null} // Deshabilita si no hay formas
-        onUndo={history.length > 0 ? handleUndo : null} // Deshabilita si no hay historial
+        onClear={shapes.length > 0 ? handleClear : null}
+        onUndo={history.length > 0 ? handleUndo : null}
       />
       
       {/* --- UI DE ASOCIACIÓN --- */}

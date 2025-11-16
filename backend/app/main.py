@@ -1,3 +1,5 @@
+# backend/app/main.py
+
 from fastapi import FastAPI
 from . import models
 from .database import engine
@@ -6,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 import os
 
 # Importa AMBOS routers
-from .routers import proyectos, awp 
+from .routers import awp, proyectos 
 
 # Crea las tablas de la BD
 models.Base.metadata.create_all(bind=engine)

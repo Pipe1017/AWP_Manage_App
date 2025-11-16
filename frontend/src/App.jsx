@@ -14,6 +14,7 @@ function App() {
   const [currentView, setCurrentView] = useState('general');
   const [error, setError] = useState(null);
   const [selectedPlotPlanId, setSelectedPlotPlanId] = useState(null);
+  const [selectedCWA, setSelectedCWA] = useState(null); // ✨ NUEVO: CWA seleccionado
 
   axios.defaults.baseURL = API_URL;
 
@@ -37,7 +38,7 @@ function App() {
     try {
       console.log("🕵️‍♂️ [App] Creando proyecto:", { nombre: nombreProyecto });
       const response = await axios.post('/proyectos/', { nombre: nombreProyecto });
-      console.log("👍 [App] Proyecto creado. ID:", response.data.id); // Log Restaurado
+      console.log("👍 [App] Proyecto creado. ID:", response.data.id);
       const nuevoProyecto = {...response.data, disciplinas: [], plot_plans: []};
       setProyectos([...proyectos, nuevoProyecto]);
       setSelectedProyecto(nuevoProyecto);
@@ -50,7 +51,7 @@ function App() {
   };
   
   const handleSelectProyecto = (proyecto) => {
-    console.log(`[App] Seleccionando proyecto ID: ${proyecto.id}`); // Log Restaurado
+    console.log(`[App] Seleccionando proyecto ID: ${proyecto.id}`);
     axios.get(`/proyectos/${proyecto.id}`)
       .then(response => {
         const nuevoProyecto = response.data;
@@ -60,13 +61,13 @@ function App() {
         } else {
           setSelectedPlotPlanId(null);
         }
-        console.log("✅ [App] Proyecto seleccionado:", nuevoProyecto); // Log Restaurado
+        console.log("✅ [App] Proyecto seleccionado:", nuevoProyecto);
       })
       .catch(err => console.error("🔥 [App] ERROR cargando proyecto:", err));
   };
 
   const handleDisciplinaCreada = (nuevaDisciplina) => {
-    console.log("✅ [App] handleDisciplinaCreada FUE LLAMADA con:", nuevaDisciplina); // Log Restaurado
+    console.log("✅ [App] handleDisciplinaCreada FUE LLAMADA con:", nuevaDisciplina);
     const proyectoActualizado = { ...selectedProyecto, disciplinas: [...selectedProyecto.disciplinas, nuevaDisciplina] };
     setSelectedProyecto(proyectoActualizado);
     const listaProyectosActualizada = proyectos.map(p => p.id === proyectoActualizado.id ? proyectoActualizado : p);
@@ -74,7 +75,7 @@ function App() {
   };
 
   const handleTipoEntregableCreado = (disciplinaId, nuevoTipo) => {
-    console.log("✅ [App] handleTipoEntregableCreado FUE LLAMADA con:", nuevoTipo); // Log Restaurado
+    console.log("✅ [App] handleTipoEntregableCreado FUE LLAMADA con:", nuevoTipo);
     const disciplinasActualizadas = selectedProyecto.disciplinas.map(d => {
       if (d.id === disciplinaId) { return { ...d, tipos_entregables: [...d.tipos_entregables, nuevoTipo] }; }
       return d;
@@ -86,7 +87,7 @@ function App() {
   };
 
   const handleCWACreada = (plotPlanId, nuevaCWA) => {
-    console.log("✅ [App] handleCWACreada FUE LLAMADA con:", nuevaCWA); // Log Restaurado
+    console.log("✅ [App] handleCWACreada FUE LLAMADA con:", nuevaCWA);
     const cwaConHijos = { ...nuevaCWA, cwps: [] };
     const plotPlansActualizados = selectedProyecto.plot_plans.map(pp => {
       if (pp.id === plotPlanId) { return { ...pp, cwas: [...pp.cwas, cwaConHijos] }; }
@@ -99,7 +100,7 @@ function App() {
   };
 
   const handleCWPCreado = (cwaId, nuevoCWP) => {
-    console.log("✅ [App] handleCWPCreado FUE LLAMADA con:", nuevoCWP); // Log Restaurado
+    console.log("✅ [App] handleCWPCreado FUE LLAMADA con:", nuevoCWP);
     const plotPlansActualizados = selectedProyecto.plot_plans.map(pp => {
       const cwasActualizados = pp.cwas.map(cwa => {
         if (cwa.id === cwaId) { return { ...cwa, cwps: [...cwa.cwps, nuevoCWP] }; }
@@ -113,8 +114,15 @@ function App() {
     setProyectos(listaProyectosActualizada);
   };
 
+  // ✨ NUEVO: Handler para cuando se guarda una forma en el PlotPlan
+  const handleShapeSaved = (cwaId, nuevoCWP) => {
+    console.log("✅ [App] handleShapeSaved - Forma guardada como CWP:", nuevoCWP);
+    handleCWPCreado(cwaId, nuevoCWP);
+    setSelectedCWA(null); // ✨ Deseleccionar CWA después de guardar
+  };
+
   const handlePlotPlanUploaded = (nuevoPlotPlan) => {
-    console.log("✅ [App] handlePlotPlanUploaded FUE LLAMADA con:", nuevoPlotPlan); // Log Restaurado
+    console.log("✅ [App] handlePlotPlanUploaded FUE LLAMADA con:", nuevoPlotPlan);
     const plotPlanConHijos = { ...nuevoPlotPlan, cwas: [] };
     const proyectoActualizado = {
       ...selectedProyecto,
@@ -125,8 +133,14 @@ function App() {
     setProyectos(listaProyectosActualizada);
     setSelectedPlotPlanId(nuevoPlotPlan.id); 
   };
+
+  // ✨ NUEVO: Handler para seleccionar CWA
+  const handleSelectCWA = (cwa) => {
+    console.log("✅ [App] CWA seleccionado:", cwa);
+    setSelectedCWA(cwa);
+  };
   
-  // --- Renderizado del Contenido Principal (El resto del código es igual) ---
+  // --- Renderizado del Contenido Principal ---
   const renderMainContent = () => {
     if (!selectedProyecto) {
       return <div className="p-10 text-gray-400">Por favor, selecciona o crea un proyecto para comenzar.</div>;
@@ -173,12 +187,18 @@ function App() {
             {/* 3. El Lienzo y la Tabla AWP */}
             {currentPlotPlan ? (
               <div className="mt-6" key={currentPlotPlan.id}> 
-                <PlotPlan plotPlan={currentPlotPlan} />
+                <PlotPlan 
+                  plotPlan={currentPlotPlan} 
+                  cwaToAssociate={selectedCWA}
+                  onShapeSaved={handleShapeSaved}
+                />
                 
                 <AWPEstructura
                   plotPlan={currentPlotPlan}
                   onCWACreada={handleCWACreada}
                   onCWPCreado={handleCWPCreado}
+                  selectedCWA={selectedCWA}
+                  onSelectCWA={handleSelectCWA}
                 />
               </div>
             ) : (
@@ -189,12 +209,13 @@ function App() {
           </div>
         )}
 
-        {/* --- VISTA CONFIGURACIÓN (Sin cambios) --- */}
+        {/* --- VISTA CONFIGURACIÓN --- */}
         {currentView === 'configuracion' && (
           <ProyectoDetalle
             proyecto={selectedProyecto}
             onDisciplinaCreada={handleDisciplinaCreada}
             onTipoEntregableCreado={handleTipoEntregableCreado}
+            onCWACreada={handleCWACreada}
           />
         )}
       </div>
