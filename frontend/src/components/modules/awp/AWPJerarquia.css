@@ -1,0 +1,432 @@
+/* AWPJerarquia.css */
+
+.awp-jerarquia {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  margin-top: 20px;
+}
+
+.awp-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  background: linear-gradient(90deg, #334155 0%, #1e293b 100%);
+  border-bottom: 2px solid #475569;
+}
+
+.awp-header h3 {
+  margin: 0;
+  color: #e2e8f0;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.awp-refresh-btn {
+  padding: 8px 16px;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.awp-refresh-btn:hover {
+  background: #2563eb;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+.awp-loading,
+.awp-error,
+.awp-empty {
+  padding: 40px;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 1.1rem;
+}
+
+.awp-error {
+  color: #f87171;
+  background: #7f1d1d;
+}
+
+/* TABLA */
+.awp-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.awp-table thead {
+  background: #1e293b;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.awp-table th {
+  padding: 16px 12px;
+  text-align: left;
+  color: #cbd5e1;
+  font-weight: 600;
+  border-bottom: 2px solid #475569;
+  background: linear-gradient(90deg, #1e293b 0%, #0f172a 100%);
+}
+
+.awp-table td {
+  padding: 14px 12px;
+  border-bottom: 1px solid #334155;
+  color: #e2e8f0;
+}
+
+/* FILAS POR NIVEL */
+.row-cwa {
+  background: #1e293b;
+}
+
+.row-cwa:hover {
+  background: #334155;
+}
+
+.row-cwp {
+  background: #0f172a;
+}
+
+.row-cwp:hover {
+  background: #1e293b;
+}
+
+.row-ewp {
+  background: #1e293b;
+}
+
+.row-ewp:hover {
+  background: #334155;
+}
+
+.row-pwp {
+  background: #0f172a;
+}
+
+.row-pwp:hover {
+  background: #1e293b;
+}
+
+.row-iwp {
+  background: #0f172a;
+}
+
+.row-iwp:hover {
+  background: #1e293b;
+}
+
+.row-entregable {
+  background: #0f172a;
+  opacity: 0.85;
+}
+
+.row-entregable:hover {
+  background: #1e293b;
+}
+
+.row-transversal-ref {
+  background: #1e293b;
+  border-top: 2px solid #3b82f6;
+}
+
+/* COLUMNAS */
+.col-expand {
+  width: 60px;
+}
+
+.col-codigo {
+  width: 150px;
+}
+
+.col-nombre {
+  width: 280px;
+}
+
+.col-tipo {
+  width: 100px;
+}
+
+.col-estado {
+  width: 120px;
+}
+
+.col-completitud {
+  width: 150px;
+}
+
+.col-duracion {
+  width: 100px;
+}
+
+.col-acciones {
+  width: 100px;
+}
+
+/* CELDAS */
+.cell-expand {
+  text-align: center;
+}
+
+.expand-btn {
+  background: none;
+  border: none;
+  color: #60a5fa;
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  font-weight: 500;
+}
+
+.expand-btn:hover {
+  background: #334155;
+  color: #93c5fd;
+}
+
+.cell-codigo {
+  font-family: 'Courier New', monospace;
+  color: #60a5fa;
+  font-weight: 600;
+}
+
+.cell-nombre {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.icon-cwa,
+.icon-cwp,
+.icon-ewp,
+.icon-pwp,
+.icon-iwp,
+.icon-entregable {
+  font-size: 1.1rem;
+}
+
+.badge-transversal {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  background: #8b5cf6;
+  color: white;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* BADGES */
+.badge-estado {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.badge-no_iniciado {
+  background: #64748b;
+  color: #e2e8f0;
+}
+
+.badge-en_progreso {
+  background: #f59e0b;
+  color: #000;
+}
+
+.badge-completado {
+  background: #10b981;
+  color: #e2e8f0;
+}
+
+.badge-pausado {
+  background: #ef4444;
+  color: #e2e8f0;
+}
+
+.badge-borrador {
+  background: #6b7280;
+  color: #e2e8f0;
+}
+
+.badge-revisión {
+  background: #f97316;
+  color: white;
+}
+
+.badge-aprobado {
+  background: #06b6d4;
+  color: white;
+}
+
+.badge-archivado {
+  background: #64748b;
+  color: #e2e8f0;
+}
+
+.badge-info {
+  display: inline-block;
+  padding: 6px 12px;
+  background: #3b82f6;
+  color: white;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin-right: 12px;
+}
+
+/* BARRA DE PROGRESO */
+.progress-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 24px;
+  background: #1e293b;
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+
+.progress-fill {
+  height: 100%;
+  transition: width 0.3s ease;
+  border-radius: 0 4px 4px 0;
+}
+
+.progress-text {
+  position: absolute;
+  width: 100%;
+  text-align: center;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #e2e8f0;
+  z-index: 2;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* BOTONES DE ACCIÓN */
+.cell-acciones {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+}
+
+.btn-action {
+  background: none;
+  border: 1px solid #475569;
+  color: #cbd5e1;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  font-size: 1rem;
+}
+
+.btn-action:hover {
+  border-color: #64748b;
+  background: #334155;
+  transform: scale(1.1);
+}
+
+.btn-edit:hover {
+  color: #60a5fa;
+  border-color: #60a5fa;
+}
+
+.btn-delete:hover {
+  color: #ef4444;
+  border-color: #ef4444;
+}
+
+.btn-view:hover {
+  color: #10b981;
+  border-color: #10b981;
+}
+
+/* REFERENCIAS TRANSVERSALES */
+.transversal-references {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 8px 0;
+}
+
+.ref-status {
+  display: inline-block;
+  padding: 4px 10px;
+  background: #334155;
+  color: #cbd5e1;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  border-left: 3px solid #64748b;
+}
+
+.ref-status.completed {
+  border-left-color: #10b981;
+  background: #064e3b;
+  color: #86efac;
+}
+
+.ref-status.pending {
+  border-left-color: #f59e0b;
+  background: #78350f;
+  color: #fbbf24;
+}
+
+/* RESPONSIVE */
+@media (max-width: 1024px) {
+  .awp-table {
+    font-size: 0.85rem;
+  }
+
+  .col-nombre {
+    width: 200px;
+  }
+
+  .col-completitud {
+    width: 120px;
+  }
+
+  .cell-nombre {
+    font-size: 0.9rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .awp-header {
+    flex-direction: column;
+    gap: 12px;
+    text-align: center;
+  }
+
+  .awp-table {
+    font-size: 0.8rem;
+  }
+
+  .cell-acciones {
+    gap: 4px;
+  }
+
+  .btn-action {
+    width: 28px;
+    height: 28px;
+    font-size: 0.9rem;
+  }
+}
