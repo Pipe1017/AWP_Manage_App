@@ -4,7 +4,6 @@ import Sidebar from './components/Sidebar.jsx';
 import ProyectoDetalle from './components/ProyectoDetalle.jsx'; 
 import AWPEstructura from './components/AWPEstructura.jsx';
 import PlotPlan from './components/PlotPlan.jsx';
-// Importa el nuevo componente
 import UploadPlotPlanForm from './components/UploadPlotPlanForm.jsx'; 
 
 const API_URL = 'http://localhost:8000/api/v1';
@@ -18,18 +17,116 @@ function App() {
 
   axios.defaults.baseURL = API_URL;
 
-  const fetchProyectos = async () => { /* ... (código igual) ... */ };
+  const fetchProyectos = async () => {
+    console.log("🔄 [App] Cargando todos los proyectos...");
+    try {
+      const response = await axios.get('/proyectos/');
+      setProyectos(response.data);
+      console.log("✅ [App] Proyectos cargados:", response.data);
+      setError(null);
+    } catch (err) {
+      console.error("🔥 [App] ERROR cargando proyectos:", err);
+      setError("No se pudieron cargar los proyectos. Revisa la consola del backend.");
+    }
+  };
+  
   useEffect(() => { fetchProyectos(); }, []);
 
-  const handleAddProyecto = async (nombreProyecto) => { /* ... (código igual) ... */ };
-  const handleSelectProyecto = (proyecto) => { /* ... (código igual) ... */ };
-  const handleDisciplinaCreada = (nuevaDisciplina) => { /* ... (código igual) ... */ };
-  const handleTipoEntregableCreado = (disciplinaId, nuevoTipo) => { /* ... (código igual) ... */ };
-  const handleCWACreada = (plotPlanId, nuevaCWA) => { /* ... (código igual) ... */ };
-  const handleCWPCreado = (cwaId, nuevoCWP) => { /* ... (código igual) ... */ };
-  const handlePlotPlanUploaded = (nuevoPlotPlan) => { /* ... (código igual) ... */ };
+  // --- Handlers (Lógica de Estado) ---
+  const handleAddProyecto = async (nombreProyecto) => {
+    try {
+      console.log("🕵️‍♂️ [App] Creando proyecto:", { nombre: nombreProyecto });
+      const response = await axios.post('/proyectos/', { nombre: nombreProyecto });
+      console.log("👍 [App] Proyecto creado. ID:", response.data.id); // Log Restaurado
+      const nuevoProyecto = {...response.data, disciplinas: [], plot_plans: []};
+      setProyectos([...proyectos, nuevoProyecto]);
+      setSelectedProyecto(nuevoProyecto);
+      setCurrentView('general');
+      setSelectedPlotPlanId(null);
+    } catch (err) {
+      console.error("🔥 [App] ERROR creando proyecto:", err);
+      alert("Error creando proyecto: " + (err.response?.data?.detail || err.message));
+    }
+  };
   
-  // --- Renderizado del Contenido Principal ---
+  const handleSelectProyecto = (proyecto) => {
+    console.log(`[App] Seleccionando proyecto ID: ${proyecto.id}`); // Log Restaurado
+    axios.get(`/proyectos/${proyecto.id}`)
+      .then(response => {
+        const nuevoProyecto = response.data;
+        setSelectedProyecto(nuevoProyecto);
+        if (nuevoProyecto.plot_plans && nuevoProyecto.plot_plans.length > 0) {
+          setSelectedPlotPlanId(nuevoProyecto.plot_plans[0].id);
+        } else {
+          setSelectedPlotPlanId(null);
+        }
+        console.log("✅ [App] Proyecto seleccionado:", nuevoProyecto); // Log Restaurado
+      })
+      .catch(err => console.error("🔥 [App] ERROR cargando proyecto:", err));
+  };
+
+  const handleDisciplinaCreada = (nuevaDisciplina) => {
+    console.log("✅ [App] handleDisciplinaCreada FUE LLAMADA con:", nuevaDisciplina); // Log Restaurado
+    const proyectoActualizado = { ...selectedProyecto, disciplinas: [...selectedProyecto.disciplinas, nuevaDisciplina] };
+    setSelectedProyecto(proyectoActualizado);
+    const listaProyectosActualizada = proyectos.map(p => p.id === proyectoActualizado.id ? proyectoActualizado : p);
+    setProyectos(listaProyectosActualizada);
+  };
+
+  const handleTipoEntregableCreado = (disciplinaId, nuevoTipo) => {
+    console.log("✅ [App] handleTipoEntregableCreado FUE LLAMADA con:", nuevoTipo); // Log Restaurado
+    const disciplinasActualizadas = selectedProyecto.disciplinas.map(d => {
+      if (d.id === disciplinaId) { return { ...d, tipos_entregables: [...d.tipos_entregables, nuevoTipo] }; }
+      return d;
+    });
+    const proyectoActualizado = { ...selectedProyecto, disciplinas: disciplinasActualizadas };
+    setSelectedProyecto(proyectoActualizado);
+    const listaProyectosActualizada = proyectos.map(p => p.id === proyectoActualizado.id ? proyectoActualizado : p);
+    setProyectos(listaProyectosActualizada);
+  };
+
+  const handleCWACreada = (plotPlanId, nuevaCWA) => {
+    console.log("✅ [App] handleCWACreada FUE LLAMADA con:", nuevaCWA); // Log Restaurado
+    const cwaConHijos = { ...nuevaCWA, cwps: [] };
+    const plotPlansActualizados = selectedProyecto.plot_plans.map(pp => {
+      if (pp.id === plotPlanId) { return { ...pp, cwas: [...pp.cwas, cwaConHijos] }; }
+      return pp;
+    });
+    const proyectoActualizado = { ...selectedProyecto, plot_plans: plotPlansActualizados };
+    setSelectedProyecto(proyectoActualizado);
+    const listaProyectosActualizada = proyectos.map(p => p.id === proyectoActualizado.id ? proyectoActualizado : p);
+    setProyectos(listaProyectosActualizada);
+  };
+
+  const handleCWPCreado = (cwaId, nuevoCWP) => {
+    console.log("✅ [App] handleCWPCreado FUE LLAMADA con:", nuevoCWP); // Log Restaurado
+    const plotPlansActualizados = selectedProyecto.plot_plans.map(pp => {
+      const cwasActualizados = pp.cwas.map(cwa => {
+        if (cwa.id === cwaId) { return { ...cwa, cwps: [...cwa.cwps, nuevoCWP] }; }
+        return cwa;
+      });
+      return { ...pp, cwas: cwasActualizados };
+    });
+    const proyectoActualizado = { ...selectedProyecto, plot_plans: plotPlansActualizados };
+    setSelectedProyecto(proyectoActualizado);
+    const listaProyectosActualizada = proyectos.map(p => p.id === proyectoActualizado.id ? proyectoActualizado : p);
+    setProyectos(listaProyectosActualizada);
+  };
+
+  const handlePlotPlanUploaded = (nuevoPlotPlan) => {
+    console.log("✅ [App] handlePlotPlanUploaded FUE LLAMADA con:", nuevoPlotPlan); // Log Restaurado
+    const plotPlanConHijos = { ...nuevoPlotPlan, cwas: [] };
+    const proyectoActualizado = {
+      ...selectedProyecto,
+      plot_plans: [...selectedProyecto.plot_plans, plotPlanConHijos]
+    };
+    setSelectedProyecto(proyectoActualizado);
+    const listaProyectosActualizada = proyectos.map(p => p.id === proyectoActualizado.id ? proyectoActualizado : p);
+    setProyectos(listaProyectosActualizada);
+    setSelectedPlotPlanId(nuevoPlotPlan.id); 
+  };
+  
+  // --- Renderizado del Contenido Principal (El resto del código es igual) ---
   const renderMainContent = () => {
     if (!selectedProyecto) {
       return <div className="p-10 text-gray-400">Por favor, selecciona o crea un proyecto para comenzar.</div>;
@@ -67,7 +164,7 @@ function App() {
               ))}
             </div>
 
-            {/* 2. Formulario de Subida de Plano (AHORA COMPONENTE EXTERNO) */}
+            {/* 2. Formulario de Subida de Plano */}
             <UploadPlotPlanForm 
               proyecto={selectedProyecto}
               onUploadSuccess={handlePlotPlanUploaded}

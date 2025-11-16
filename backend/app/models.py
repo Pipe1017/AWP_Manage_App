@@ -50,6 +50,8 @@ class CWP(Base):
     
     cwa_id = Column(Integer, ForeignKey("cwa.id"))
     cwa = relationship("CWA", back_populates="cwps")
+    shape_type = Column(String(15), nullable=True)     # Ej: 'rect', 'polygon', 'circle'
+    shape_data = Column(String, nullable=True)
 
 class Disciplina(Base):
     __tablename__ = "disciplinas"
