@@ -4,7 +4,7 @@ from datetime import datetime
 from .database import Base
 
 # ============================================================================
-# PROYECTO Y CONFIGURACIÓN
+# 1. PROYECTO Y CONFIGURACIÓN
 # ============================================================================
 
 class Proyecto(Base):
@@ -50,7 +50,7 @@ class TipoEntregable(Base):
 
 
 # ============================================================================
-# PLANTILLAS DE CODIFICACIÓN
+# 2. PLANTILLAS DE CODIFICACIÓN
 # ============================================================================
 
 class PlantillasCodificacion(Base):
@@ -68,7 +68,7 @@ class PlantillasCodificacion(Base):
 
 
 # ============================================================================
-# ESTRUCTURA AWP: PLOT PLAN -> CWA -> CWP -> EWP/PWP/IWP
+# 3. ESTRUCTURA AWP: PLOT PLAN -> CWA -> CWP -> EWP/PWP/IWP
 # ============================================================================
 
 class PlotPlan(Base):
@@ -89,43 +89,43 @@ class CWA(Base):
     __tablename__ = "cwa"
     id = Column(Integer, primary_key=True, index=True)
     nombre = Column(String, nullable=False)
-    codigo = Column(String(20), unique=True, index=True)  # ej: "CWA(Fijo)-037-01" o "CWA-0000"
+    codigo = Column(String(20), unique=True, index=True)
     descripcion = Column(Text, nullable=True)
-    es_transversal = Column(Boolean, default=False)  # True si es CWA-0000
+    es_transversal = Column(Boolean, default=False)
     
     plot_plan_id = Column(Integer, ForeignKey("plot_plans.id"))
     plot_plan = relationship("PlotPlan", back_populates="cwas")
     cwps = relationship("CWP", back_populates="cwa", cascade="all, delete-orphan")
     
     # GEOMETRÍA (para CWAs geográficas)
-    shape_type = Column(String(15), nullable=True)  # 'rect', 'circle', 'polygon'
+    shape_type = Column(String(15), nullable=True)
     shape_data = Column(JSON, nullable=True)
 
 
 class CWP(Base):
-    """Construction Work Package - Paquete de trabajo por disciplina"""
     __tablename__ = "cwp"
     id = Column(Integer, primary_key=True, index=True)
     nombre = Column(String, nullable=False)
-    codigo = Column(String(30), unique=True, index=True)  # Auto: CWP-037-01-INS-0001
+    codigo = Column(String(30), unique=True, index=True)
     descripcion = Column(Text, nullable=True)
     
     cwa_id = Column(Integer, ForeignKey("cwa.id"))
     cwa = relationship("CWA", back_populates="cwps")
     
-    # Relaciones con paquetes de trabajo
+    # CAMPOS IMPORTANTES PARA LA TABLA
+    secuencia = Column(Integer, default=0)
+    prioridad = Column(String(10), default="MEDIA") # (ALTA/MEDIA/BAJA)
+    
+    # Relaciones
     ewps = relationship("EWP", back_populates="cwp", cascade="all, delete-orphan")
     pwps = relationship("PWP", back_populates="cwp", cascade="all, delete-orphan")
     iwps = relationship("IWP", back_populates="cwp", cascade="all, delete-orphan")
-    
-    # Referencias a transversales
-    referencias_transversales = relationship("ReferenciaTransversal", back_populates="cwp_geografico", cascade="all, delete-orphan")
-    
-    # Asignaciones de disciplinas
+    referencias_transversales = relationship("ReferenciaTransversal", back_populates="cwp_geografico", foreign_keys="ReferenciaTransversal.cwp_geografico_id", cascade="all, delete-orphan")
     asignaciones_disciplina = relationship("AsignacionDisciplinaCWP", back_populates="cwp", cascade="all, delete-orphan")
     
-    # Dependencias
+    # DEPENDENCIAS
     dependencias = relationship("DependenciaCWP", foreign_keys="DependenciaCWP.cwp_origen_id", back_populates="cwp_origen")
+    dependencias_inversas = relationship("DependenciaCWP", foreign_keys="DependenciaCWP.cwp_destino_id", back_populates="cwp_destino")
     
     # CRONOGRAMA Y ESTADO
     duracion_dias = Column(Integer, nullable=True)
@@ -133,12 +133,12 @@ class CWP(Base):
     fecha_fin_prevista = Column(Date, nullable=True)
     fecha_inicio_real = Column(Date, nullable=True)
     fecha_fin_real = Column(Date, nullable=True)
-    porcentaje_completitud = Column(Float, default=0.0)  # 0-100
-    estado = Column(String(20), default="NO_INICIADO")  # NO_INICIADO, EN_PROGRESO, COMPLETADO, PAUSADO
+    porcentaje_completitud = Column(Float, default=0.0)
+    estado = Column(String(20), default="NO_INICIADO")
     
     # RESTRICCIONES
-    restricciones_levantadas = Column(Boolean, default=False)
-    restricciones_json = Column(JSON, nullable=True)  # {"restriccion": "descripción"}
+    restricciones_levantADAS = Column(Boolean, default=False)
+    restricciones_json = Column(JSON, nullable=True)
 
 
 class EWP(Base):
@@ -268,7 +268,7 @@ class EntregableEWP(Base):
 
 
 # ============================================================================
-# REFERENCIAS A TRANSVERSALES
+# 4. REFERENCIAS A TRANSVERSALES
 # ============================================================================
 
 class ReferenciaTransversal(Base):
@@ -288,11 +288,11 @@ class ReferenciaTransversal(Base):
     completado = Column(Boolean, default=False)
     observaciones = Column(Text, nullable=True)
     
-    cwp_geografico = relationship("CWP", back_populates="referencias_transversales")
+    cwp_geografico = relationship("CWP", back_populates="referencias_transversales", foreign_keys=[cwp_geografico_id])
 
 
 # ============================================================================
-# ASIGNACIONES DE DISCIPLINAS
+# 5. ASIGNACIONES DE DISCIPLINAS
 # ============================================================================
 
 class AsignacionDisciplinaCWP(Base):
@@ -327,7 +327,7 @@ class AsignacionDisciplinaEWP(Base):
 
 
 # ============================================================================
-# DEPENDENCIAS Y RELACIONES
+# 6. DEPENDENCIAS Y RELACIONES
 # ============================================================================
 
 class DependenciaCWP(Base):
@@ -343,3 +343,4 @@ class DependenciaCWP(Base):
     descripcion = Column(Text, nullable=True)
     
     cwp_origen = relationship("CWP", foreign_keys=[cwp_origen_id], back_populates="dependencias")
+    cwp_destino = relationship("CWP", foreign_keys=[cwp_destino_id], back_populates="dependencias_inversas")

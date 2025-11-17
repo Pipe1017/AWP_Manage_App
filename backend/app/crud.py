@@ -592,9 +592,23 @@ def obtener_jerarquia_completa(db: Session, plot_plan_id: int):
                 "id": cwp.id,
                 "nombre": cwp.nombre,
                 "codigo": cwp.codigo,
+                "descripcion": cwp.descripcion,
                 "duracion_dias": cwp.duracion_dias,
                 "estado": cwp.estado,
                 "porcentaje_completitud": cwp.porcentaje_completitud,
+                "prioridad": cwp.prioridad,
+                "secuencia": cwp.secuencia,
+                "fecha_inicio_prevista": str(cwp.fecha_inicio_prevista) if cwp.fecha_inicio_prevista else None,
+                "fecha_fin_prevista": str(cwp.fecha_fin_prevista) if cwp.fecha_fin_prevista else None,
+                "restricciones_levantadas": cwp.restricciones_levantadas,
+                "restricciones_json": cwp.restricciones_json,
+                "asignaciones_disciplina": [
+                    {
+                        "id": asig.id,
+                        "disciplina_id": asig.disciplina_id
+                    }
+                    for asig in cwp.asignaciones_disciplina
+                ],
                 "ewps": [],
                 "pwps": [],
                 "iwps": [],
@@ -608,8 +622,10 @@ def obtener_jerarquia_completa(db: Session, plot_plan_id: int):
                     "id": ewp.id,
                     "nombre": ewp.nombre,
                     "codigo": ewp.codigo,
+                    "descripcion": ewp.descripcion,
                     "estado": ewp.estado,
                     "porcentaje_completitud": ewp.porcentaje_completitud,
+                    "fecha_publicacion_prevista": str(ewp.fecha_publicacion_prevista) if ewp.fecha_publicacion_prevista else None,
                     "entregables": []
                 }
                 
@@ -633,9 +649,17 @@ def obtener_jerarquia_completa(db: Session, plot_plan_id: int):
                     "id": pwp.id,
                     "nombre": pwp.nombre,
                     "codigo": pwp.codigo,
+                    "descripcion": pwp.descripcion,
                     "estado": pwp.estado,
                     "porcentaje_completitud": pwp.porcentaje_completitud,
-                    "items": len(pwp.items_adquisicion) if pwp.items_adquisicion else 0
+                    "fecha_ros_prevista": str(pwp.fecha_ros_prevista) if pwp.fecha_ros_prevista else None,
+                    "items_adquisicion": [
+                        {
+                            "id": item.id,
+                            "nombre": item.nombre
+                        }
+                        for item in pwp.items_adquisicion
+                    ]
                 }
                 cwp_data["pwps"].append(pwp_data)
             
@@ -646,9 +670,18 @@ def obtener_jerarquia_completa(db: Session, plot_plan_id: int):
                     "id": iwp.id,
                     "nombre": iwp.nombre,
                     "codigo": iwp.codigo,
+                    "descripcion": iwp.descripcion,
                     "estado": iwp.estado,
                     "porcentaje_completitud": iwp.porcentaje_completitud,
-                    "items": len(iwp.items_instalacion) if iwp.items_instalacion else 0
+                    "fecha_inicio_prevista": str(iwp.fecha_inicio_prevista) if iwp.fecha_inicio_prevista else None,
+                    "fecha_fin_prevista": str(iwp.fecha_fin_prevista) if iwp.fecha_fin_prevista else None,
+                    "items_instalacion": [
+                        {
+                            "id": item.id,
+                            "nombre": item.nombre
+                        }
+                        for item in iwp.items_instalacion
+                    ]
                 }
                 cwp_data["iwps"].append(iwp_data)
             
@@ -670,3 +703,120 @@ def obtener_jerarquia_completa(db: Session, plot_plan_id: int):
         jerarquia["cwas"].append(cwa_data)
     
     return jerarquia
+
+# ============================================================================
+# SECUENCIACIÓN DE CWPs
+# ============================================================================
+
+def actualizar_secuencia_cwp(db: Session, cwp_id: int, nueva_secuencia: int):
+    """Actualizar la secuencia de un CWP"""
+    db_cwp = get_cwp(db, cwp_id)
+    if not db_cwp:
+        raise ValueError("CWP no encontrado")
+    
+    db_cwp.secuencia = nueva_secuencia
+    db.commit()
+    db.refresh(db_cwp)
+    return db_cwp
+
+
+def reordenar_cwps_por_cwa(db: Session, cwa_id: int, nuevas_secuencias: dict):
+    """
+    Reordena todos los CWPs de un CWA según un diccionario {cwp_id: secuencia}
+    Ejemplo: {1: 1, 2: 2, 3: 3}
+    """
+    for cwp_id, secuencia in nuevas_secuencias.items():
+        db_cwp = get_cwp(db, cwp_id)
+        if db_cwp and db_cwp.cwa_id == cwa_id:
+            db_cwp.secuencia = secuencia
+    
+    db.commit()
+    return True
+
+
+# ============================================================================
+# DEPENDENCIAS
+# ============================================================================
+
+def crear_dependencia(db: Session, dependencia: schemas.DependenciaCWPCreate, cwp_origen_id: int):
+    """Crear dependencia entre CWPs"""
+    db_cwp_origen = get_cwp(db, cwp_origen_id)
+    db_cwp_destino = get_cwp(db, dependencia.cwp_destino_id)
+    
+    if not db_cwp_origen or not db_cwp_destino:
+        raise ValueError("CWP origen o destino no encontrado")
+    
+    # Validar que no exista ciclo
+    if detectar_ciclo_dependencias(db, cwp_origen_id, dependencia.cwp_destino_id):
+        raise ValueError("Esta dependencia crearía un ciclo circular")
+    
+    db_dependencia = models.DependenciaCWP(
+        cwp_origen_id=cwp_origen_id,
+        cwp_destino_id=dependencia.cwp_destino_id,
+        tipo_dependencia=dependencia.tipo_dependencia,
+        duracion_lag_dias=dependencia.duracion_lag_dias,
+        descripcion=dependencia.descripcion
+    )
+    
+    db.add(db_dependencia)
+    db.commit()
+    db.refresh(db_dependencia)
+    return db_dependencia
+
+
+def detectar_ciclo_dependencias(db: Session, cwp_origen_id: int, cwp_destino_id: int) -> bool:
+    """
+    Detecta si agregar una dependencia CWP_origen -> CWP_destino crearía un ciclo.
+    Usa BFS para verificar si CWP_destino ya depende (directa o indirectamente) de CWP_origen.
+    """
+    visitados = set()
+    cola = [cwp_destino_id]
+    
+    while cola:
+        actual_id = cola.pop(0)
+        
+        if actual_id == cwp_origen_id:
+            return True  # Ciclo detectado
+        
+        if actual_id in visitados:
+            continue
+        
+        visitados.add(actual_id)
+        
+        # Obtener dependencias del actual
+        dependencias = db.query(models.DependenciaCWP).filter(
+            models.DependenciaCWP.cwp_origen_id == actual_id
+        ).all()
+        
+        for dep in dependencias:
+            cola.append(dep.cwp_destino_id)
+    
+    return False
+
+
+def get_dependencias_cwp(db: Session, cwp_id: int):
+    """Obtener todas las dependencias de un CWP (como origen)"""
+    return db.query(models.DependenciaCWP).filter(
+        models.DependenciaCWP.cwp_origen_id == cwp_id
+    ).all()
+
+
+def get_predecesores_cwp(db: Session, cwp_id: int):
+    """Obtener todos los CWPs que son predecesores (este CWP depende de ellos)"""
+    return db.query(models.DependenciaCWP).filter(
+        models.DependenciaCWP.cwp_destino_id == cwp_id
+    ).all()
+
+
+def eliminar_dependencia(db: Session, dependencia_id: int):
+    """Eliminar una dependencia"""
+    db_dependencia = db.query(models.DependenciaCWP).filter(
+        models.DependenciaCWP.id == dependencia_id
+    ).first()
+    
+    if not db_dependencia:
+        raise ValueError("Dependencia no encontrada")
+    
+    db.delete(db_dependencia)
+    db.commit()
+    return True

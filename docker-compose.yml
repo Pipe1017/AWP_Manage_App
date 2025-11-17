@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # 1. Servicio de Base de Datos (PostgreSQL)
   db:
@@ -10,7 +8,7 @@ services:
       - POSTGRES_PASSWORD=admin
       - POSTGRES_DB=awp_db
     ports:
-      - "5433:5432" # Expone la BD en el puerto 5433 de tu Mac
+      - "192.168.1.4:5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./.docker/db/init.sql:/docker-entrypoint-initdb.d/init.sql
@@ -19,30 +17,28 @@ services:
   backend:
     container_name: awp_backend
     build:
-      context: ./backend # Busca un Dockerfile en la carpeta ./backend
-      # (Nos aseguraremos de usar linux/amd64 al construir para producción)
+      context: ./backend
     ports:
-      - "8000192.168.1.4:8000"
+      - "192.168.1.4:8000:8000"
     volumes:
-      - ./backend:/app # Sincroniza tu código local con el contenedor
+      - ./backend:/app
     depends_on:
-      - db # No intentes iniciar el backend hasta que la BD esté lista
+      - db
     environment:
       - DATABASE_URL=postgresql://admin:admin@db:5432/awp_db
 
-  # 3. Servicio de Frontend (React)
+  # 3. Servicio de Frontend (React / Vite)
   frontend:
     container_name: awp_frontend
     build:
-      context: ./frontend # Busca un Dockerfile en la carpeta ./frontend
+      context: ./frontend
     ports:
-      - "3000:5173"
+      - "192.168.1.4:3000:5173"
     volumes:
       - ./frontend:/app
-      - /app/node_modules # Evita que node_modules locales sobrescriban los del contenedor
+      - /app/node_modules
     depends_on:
       - backend
 
-# Volumen para persistir los datos de la BD
 volumes:
   postgres_data:

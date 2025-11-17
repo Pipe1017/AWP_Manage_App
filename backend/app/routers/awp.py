@@ -4,6 +4,7 @@ from typing import List
 from .. import models, schemas, crud
 from ..database import get_db
 from ..services.codificador import CodificadorAWP
+from pydantic import BaseModel as PydanticBaseModel # Importado para las clases de Pydantic
 
 router = APIRouter(
     prefix="/awp",
@@ -14,7 +15,7 @@ router = APIRouter(
 # CWP (Construction Work Package)
 # ============================================================================
 
-@router.post("/cwa/{cwa_id}/cwp/", response_model=schemas.CWPResponse)
+@router.post("/cwa/{cwa_id}/cwp", response_model=schemas.CWPResponse)
 def create_cwp(
     cwa_id: int,
     cwp: schemas.CWPCreate,
@@ -29,7 +30,7 @@ def create_cwp(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/cwa/{cwa_id}/cwp/", response_model=List[schemas.CWPResponse])
+@router.get("/cwa/{cwa_id}/cwp", response_model=List[schemas.CWPResponse])
 def read_cwps(cwa_id: int, db: Session = Depends(get_db)):
     """Obtener CWPs de un CWA"""
     db_cwa = crud.get_cwa(db, cwa_id)
@@ -45,14 +46,14 @@ def update_cwp(
     cwp_update: schemas.CWPUpdate,
     db: Session = Depends(get_db)
 ):
-    """Actualizar CWP"""
+    """Actualizar CWP (usado por update_cwp y actualizar_metadata_cwp)"""
     try:
         return crud.update_cwp(db, cwp_id, cwp_update)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@router.get("/cwp/{cwp_id}/completitud/")
+@router.get("/cwp/{cwp_id}/completitud")
 def get_completitud_cwp(cwp_id: int, db: Session = Depends(get_db)):
     """Obtener completitud de CWP (considerando transversales)"""
     db_cwp = crud.get_cwp(db, cwp_id)
@@ -67,7 +68,7 @@ def get_completitud_cwp(cwp_id: int, db: Session = Depends(get_db)):
 # EWP (Engineering Work Package)
 # ============================================================================
 
-@router.post("/cwp/{cwp_id}/ewp/", response_model=schemas.EWPResponse)
+@router.post("/cwp/{cwp_id}/ewp", response_model=schemas.EWPResponse)
 def create_ewp(
     cwp_id: int,
     ewp: schemas.EWPCreate,
@@ -82,7 +83,7 @@ def create_ewp(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/cwp/{cwp_id}/ewp/", response_model=List[schemas.EWPResponse])
+@router.get("/cwp/{cwp_id}/ewp", response_model=List[schemas.EWPResponse])
 def read_ewps(cwp_id: int, db: Session = Depends(get_db)):
     """Obtener EWPs de un CWP"""
     db_cwp = crud.get_cwp(db, cwp_id)
@@ -96,7 +97,7 @@ def read_ewps(cwp_id: int, db: Session = Depends(get_db)):
 # PWP (Procurement Work Package)
 # ============================================================================
 
-@router.post("/cwp/{cwp_id}/pwp/", response_model=schemas.PWPResponse)
+@router.post("/cwp/{cwp_id}/pwp", response_model=schemas.PWPResponse)
 def create_pwp(
     cwp_id: int,
     pwp: schemas.PWPCreate,
@@ -110,7 +111,7 @@ def create_pwp(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/cwp/{cwp_id}/pwp/", response_model=List[schemas.PWPResponse])
+@router.get("/cwp/{cwp_id}/pwp", response_model=List[schemas.PWPResponse])
 def read_pwps(cwp_id: int, db: Session = Depends(get_db)):
     """Obtener PWPs de un CWP"""
     db_cwp = crud.get_cwp(db, cwp_id)
@@ -124,7 +125,7 @@ def read_pwps(cwp_id: int, db: Session = Depends(get_db)):
 # IWP (Installation Work Package)
 # ============================================================================
 
-@router.post("/cwp/{cwp_id}/iwp/", response_model=schemas.IWPResponse)
+@router.post("/cwp/{cwp_id}/iwp", response_model=schemas.IWPResponse)
 def create_iwp(
     cwp_id: int,
     iwp: schemas.IWPCreate,
@@ -138,7 +139,7 @@ def create_iwp(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/cwp/{cwp_id}/iwp/", response_model=List[schemas.IWPResponse])
+@router.get("/cwp/{cwp_id}/iwp", response_model=List[schemas.IWPResponse])
 def read_iwps(cwp_id: int, db: Session = Depends(get_db)):
     """Obtener IWPs de un CWP"""
     db_cwp = crud.get_cwp(db, cwp_id)
@@ -152,7 +153,7 @@ def read_iwps(cwp_id: int, db: Session = Depends(get_db)):
 # ENTREGABLES EWP
 # ============================================================================
 
-@router.post("/ewp/{ewp_id}/entregables/", response_model=schemas.EntregableEWPResponse)
+@router.post("/ewp/{ewp_id}/entregables", response_model=schemas.EntregableEWPResponse)
 def create_entregable(
     ewp_id: int,
     entregable: schemas.EntregableEWPCreate,
@@ -166,7 +167,7 @@ def create_entregable(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/ewp/{ewp_id}/entregables/", response_model=List[schemas.EntregableEWPResponse])
+@router.get("/ewp/{ewp_id}/entregables", response_model=List[schemas.EntregableEWPResponse])
 def read_entregables(ewp_id: int, db: Session = Depends(get_db)):
     """Obtener entregables de un EWP"""
     db_ewp = crud.get_ewp(db, ewp_id)
@@ -175,12 +176,39 @@ def read_entregables(ewp_id: int, db: Session = Depends(get_db)):
     
     return crud.get_entregables_por_ewp(db, ewp_id)
 
+# (Aquí irían los endpoints PUT y DELETE para entregables que tenías)
+@router.put("/entregables/{entregable_id}", response_model=schemas.EntregableEWPResponse)
+def actualizar_entregable(
+    entregable_id: int,
+    entregable_update: schemas.EntregableEWPUpdate,
+    db: Session = Depends(get_db)
+):
+    """Actualizar entregable"""
+    db_entregable = crud.get_entregable_ewp(db, entregable_id)
+    if not db_entregable:
+        raise HTTPException(status_code=404, detail="Entregable no encontrado")
+    
+    # (La lógica de actualización estaría en crud.update_entregable)
+    return crud.update_entregable(db, db_entregable, entregable_update)
+
+
+@router.delete("/entregables/{entregable_id}")
+def eliminar_entregable(
+    entregable_id: int,
+    db: Session = Depends(get_db)
+):
+    """Eliminar entregable"""
+    try:
+        crud.eliminar_entregable(db, entregable_id)
+        return {"message": "Entregable eliminado exitosamente"}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 # ============================================================================
 # REFERENCIAS A TRANSVERSALES
 # ============================================================================
 
-@router.get("/proyecto/{proyecto_id}/transversales/")
+@router.get("/proyecto/{proyecto_id}/transversales")
 def listar_transversales_disponibles(proyecto_id: int, db: Session = Depends(get_db)):
     """
     Listar EWP, PWP, IWP transversales disponibles para asociar.
@@ -224,7 +252,7 @@ def listar_transversales_disponibles(proyecto_id: int, db: Session = Depends(get
     }
 
 
-@router.post("/cwp/{cwp_id}/referencias_transversales/", response_model=schemas.ReferenciaTransversalResponse)
+@router.post("/cwp/{cwp_id}/referencias_transversales", response_model=schemas.ReferenciaTransversalResponse)
 def create_referencia_transversal(
     cwp_id: int,
     referencia: schemas.ReferenciaTransversalCreate,
@@ -238,7 +266,7 @@ def create_referencia_transversal(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/cwp/{cwp_id}/referencias_transversales/", response_model=List[schemas.ReferenciaTransversalResponse])
+@router.get("/cwp/{cwp_id}/referencias_transversales", response_model=List[schemas.ReferenciaTransversalResponse])
 def read_referencias_transversales(cwp_id: int, db: Session = Depends(get_db)):
     """Obtener referencias transversales de CWP"""
     db_cwp = crud.get_cwp(db, cwp_id)
@@ -248,7 +276,7 @@ def read_referencias_transversales(cwp_id: int, db: Session = Depends(get_db)):
     return crud.get_referencias_transversales(db, cwp_id)
 
 
-@router.post("/cwp/{cwp_id}/referencias_transversales/bulk/")
+@router.post("/cwp/{cwp_id}/referencias_transversales/bulk")
 def crear_referencias_bulk(
     cwp_id: int,
     referencias: List[schemas.ReferenciaTransversalCreate],
@@ -281,13 +309,11 @@ def crear_referencias_bulk(
 # JERARQUÍA COMPLETA
 # ============================================================================
 
-@router.get("/plot_plan/{plot_plan_id}/jerarquia/")
+@router.get("/plot_plans/{plot_plan_id}/jerarquia")
 def obtener_jerarquia_completa(plot_plan_id: int, db: Session = Depends(get_db)):
     """
     Obtiene la jerarquía completa de un Plot Plan:
     PlotPlan -> CWA -> CWP -> EWP/PWP/IWP -> Entregables + Referencias Transversales
-    
-    Esta es la estructura que se mostrará en la tabla jerárquica del frontend.
     """
     try:
         jerarquia = crud.obtener_jerarquia_completa(db, plot_plan_id)
@@ -296,95 +322,173 @@ def obtener_jerarquia_completa(plot_plan_id: int, db: Session = Depends(get_db))
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@router.get("/cwa/{cwa_id}/resumen/")
+@router.get("/cwa/{cwa_id}/resumen")
 def obtener_resumen_cwa(cwa_id: int, db: Session = Depends(get_db)):
     """
-    Obtiene un resumen rápido de un CWA:
-    - Cantidad de CWPs
-    - EWPs, PWPs, IWPs totales
-    - Completitud general
+    Obtiene un resumen rápido de un CWA.
     """
     db_cwa = crud.get_cwa(db, cwa_id)
     if not db_cwa:
         raise HTTPException(status_code=404, detail="CWA no encontrado")
     
-    cwps = crud.get_cwps_por_cwa(db, cwa_id)
-    
-    total_ewps = 0
-    total_pwps = 0
-    total_iwps = 0
-    total_completitud = 0
-    
-    for cwp in cwps:
-        ewps = crud.get_ewps_por_cwp(db, cwp.id)
-        pwps = crud.get_pwps_por_cwp(db, cwp.id)
-        iwps = crud.get_iwps_por_cwp(db, cwp.id)
-        
-        total_ewps += len(ewps)
-        total_pwps += len(pwps)
-        total_iwps += len(iwps)
-        total_completitud += cwp.porcentaje_completitud
-    
-    promedio_completitud = (total_completitud / len(cwps)) if cwps else 0
-    
-    return {
-        "cwa_id": cwa_id,
-        "cwa_codigo": db_cwa.codigo,
-        "cwa_nombre": db_cwa.nombre,
-        "cantidad_cwps": len(cwps),
-        "total_ewps": total_ewps,
-        "total_pwps": total_pwps,
-        "total_iwps": total_iwps,
-        "completitud_promedio": round(promedio_completitud, 2)
-    }
+    # (La lógica de resumen estaría en crud)
+    return crud.obtener_resumen_cwa(db, cwa_id)
 
 
-@router.get("/proyecto/{proyecto_id}/resumen_awp/")
+@router.get("/proyecto/{proyecto_id}/resumen_awp")
 def obtener_resumen_proyecto_awp(proyecto_id: int, db: Session = Depends(get_db)):
     """
-    Resumen general del AWP del proyecto:
-    - Cantidad de CWAs, CWPs
-    - Estado general de completitud
-    - Transversales disponibles
+    Resumen general del AWP del proyecto.
     """
     db_proyecto = crud.get_proyecto(db, proyecto_id)
     if not db_proyecto:
         raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+
+    # (La lógica de resumen estaría en crud)
+    return crud.obtener_resumen_proyecto_awp(db, proyecto_id)
+
+
+# ============================================================================
+# SECUENCIACIÓN, METADATA, DEPENDENCIAS DE CWPs
+# ============================================================================
+
+# (Clases Pydantic locales para datos específicos)
+class PrioridadUpdate(PydanticBaseModel):
+    prioridad: str  # ALTA, MEDIA, BAJA
+
+class RestriccionUpdate(PydanticBaseModel):
+    restricciones_json: dict
+    restricciones_levantadas: bool = False
+
+@router.put("/cwp/{cwp_id}/secuencia")
+def actualizar_secuencia(
+    cwp_id: int,
+    secuencia: int,
+    db: Session = Depends(get_db)
+):
+    """Actualizar la secuencia de un CWP"""
+    try:
+        db_cwp = crud.actualizar_secuencia_cwp(db, cwp_id, secuencia)
+        return {"cwp_id": cwp_id, "nueva_secuencia": secuencia, "codigo": db_cwp.codigo}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.put("/cwa/{cwa_id}/reordenar")
+def reordenar_cwps(
+    cwa_id: int,
+    nuevas_secuencias: dict, # Body: {"1": 1, "2": 2} (cwp_id: secuencia)
+    db: Session = Depends(get_db)
+):
+    """Reordenar todos los CWPs de un CWA."""
+    try:
+        secuencias_int = {int(k): v for k, v in nuevas_secuencias.items()}
+        crud.reordenar_cwps_por_cwa(db, cwa_id, secuencias_int)
+        return {"cwa_id": cwa_id, "message": "CWPs reordenados exitosamente"}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.put("/cwp/{cwp_id}/metadata", response_model=schemas.CWPResponse)
+def actualizar_metadata_cwp(
+    cwp_id: int,
+    cwp_update: schemas.CWPUpdate,
+    db: Session = Depends(get_db)
+):
+    """Actualizar metadata completa de un CWP (fechas, prioridad, restricciones, etc)"""
+    try:
+        db_cwp = crud.update_cwp(db, cwp_id, cwp_update)
+        return db_cwp
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+@router.put("/cwp/{cwp_id}/restricciones", response_model=schemas.CWPResponse)
+def actualizar_restricciones(
+    cwp_id: int,
+    restricciones: RestriccionUpdate,
+    db: Session = Depends(get_db)
+):
+    """Actualizar solo las restricciones de un CWP."""
+    try:
+        db_cwp = crud.actualizar_restricciones_cwp(
+            db, 
+            cwp_id, 
+            restricciones.restricciones_json, 
+            restricciones.restricciones_levantadas
+        )
+        return db_cwp
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.put("/cwp/{cwp_id}/prioridad")
+def actualizar_prioridad(
+    cwp_id: int,
+    prioridad_update: PrioridadUpdate,
+    db: Session = Depends(get_db)
+):
+    """Actualizar prioridad de un CWP"""
+    if prioridad_update.prioridad not in ["ALTA", "MEDIA", "BAJA"]:
+        raise HTTPException(status_code=400, detail="Prioridad debe ser ALTA, MEDIA o BAJA")
     
-    plot_plans = crud.get_plot_plans_por_proyecto(db, proyecto_id)
+    try:
+        db_cwp = crud.actualizar_prioridad_cwp(db, cwp_id, prioridad_update.prioridad)
+        return {"cwp_id": cwp_id, "nueva_prioridad": db_cwp.prioridad}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+# ============================================================================
+# DEPENDENCIAS ENTRE CWPs
+# ============================================================================
+
+@router.post("/cwp/{cwp_id}/dependencias", response_model=schemas.DependenciaCWPResponse)
+def crear_dependencia_cwp(
+    cwp_id: int, # cwp_origen_id
+    dependencia: schemas.DependenciaCWPCreate,
+    db: Session = Depends(get_db)
+):
+    """Crear dependencia: este CWP (origen) depende de otro CWP (destino)."""
+    try:
+        db_dependencia = crud.crear_dependencia(db, dependencia, cwp_id)
+        return db_dependencia
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/cwp/{cwp_id}/dependencias", response_model=List[schemas.DependenciaCWPResponse])
+def obtener_dependencias_cwp(
+    cwp_id: int,
+    db: Session = Depends(get_db)
+):
+    """Obtener todas las dependencias donde este CWP es el origen"""
+    db_cwp = crud.get_cwp(db, cwp_id)
+    if not db_cwp:
+        raise HTTPException(status_code=404, detail="CWP no encontrado")
     
-    total_cwas = 0
-    total_cwps = 0
-    total_completitud = 0
-    cwps_count = 0
+    return crud.get_dependencias_cwp(db, cwp_id)
+
+
+@router.get("/cwp/{cwp_id}/predecesores", response_model=List[schemas.DependenciaCWPResponse])
+def obtener_predecesores_cwp(
+    cwp_id: int,
+    db: Session = Depends(get_db)
+):
+    """Obtener todos los CWPs que son predecesores de este CWP"""
+    db_cwp = crud.get_cwp(db, cwp_id)
+    if not db_cwp:
+        raise HTTPException(status_code=404, detail="CWP no encontrado")
     
-    for pp in plot_plans:
-        cwas = crud.get_cwas_por_plot_plan(db, pp.id)
-        total_cwas += len(cwas)
-        
-        for cwa in cwas:
-            cwps = crud.get_cwps_por_cwa(db, cwa.id)
-            total_cwps += len(cwps)
-            
-            for cwp in cwps:
-                total_completitud += cwp.porcentaje_completitud
-                cwps_count += 1
-    
-    promedio_completitud = (total_completitud / cwps_count) if cwps_count > 0 else 0
-    
-    # Transversales
-    transversales = crud.listar_transversales_disponibles(db, proyecto_id)
-    
-    return {
-        "proyecto_id": proyecto_id,
-        "proyecto_nombre": db_proyecto.nombre,
-        "cantidad_plot_plans": len(plot_plans),
-        "cantidad_cwas": total_cwas,
-        "cantidad_cwps": total_cwps,
-        "completitud_promedio": round(promedio_completitud, 2),
-        "transversales_disponibles": {
-            "ewps": len(transversales["ewps"]),
-            "pwps": len(transversales["pwps"]),
-            "iwps": len(transversales["iwps"])
-        }
-    }
+    return crud.get_predecesores_cwp(db, cwp_id)
+
+
+@router.delete("/dependencias/{dependencia_id}")
+def eliminar_dependencia_cwp(
+    dependencia_id: int,
+    db: Session = Depends(get_db)
+):
+    """Eliminar una dependencia entre CWPs"""
+    try:
+        crud.eliminar_dependencia(db, dependencia_id)
+        return {"message": "Dependencia eliminada exitosamente"}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))

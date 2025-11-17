@@ -45,7 +45,7 @@ class TipoEntregableResponse(BaseModel):
 
 
 # ============================================================================
-# CWP (Construction Work Package)
+# CWP (Construction Work Package) - CONSOLIDADO
 # ============================================================================
 
 class CWPCreate(BaseModel):
@@ -54,6 +54,8 @@ class CWPCreate(BaseModel):
     duracion_dias: Optional[int] = None
     fecha_inicio_prevista: Optional[date] = None
     fecha_fin_prevista: Optional[date] = None
+    secuencia: Optional[int] = None
+    prioridad: Optional[str] = "MEDIA"
 
 
 class CWPUpdate(BaseModel):
@@ -65,6 +67,9 @@ class CWPUpdate(BaseModel):
     porcentaje_completitud: Optional[float] = None
     estado: Optional[str] = None
     restricciones_levantadas: Optional[bool] = None
+    restricciones_json: Optional[dict] = None
+    secuencia: Optional[int] = None
+    prioridad: Optional[str] = None
 
 
 class CWPResponse(BaseModel):
@@ -81,6 +86,9 @@ class CWPResponse(BaseModel):
     restricciones_levantadas: bool
     shape_type: Optional[str] = None
     shape_data: Optional[dict] = None
+    restricciones_json: Optional[dict]
+    secuencia: int
+    prioridad: str
     
     class Config:
         from_attributes = True
