@@ -145,6 +145,21 @@ def get_cwas_transversales(db: Session, proyecto_id: int):
     ).all()
 
 
+def update_cwa_geometry(db: Session, cwa_id: int, shape_type: str, shape_data: dict):
+    """Actualizar geometría de un CWA"""
+    db_cwa = get_cwa(db, cwa_id)
+    if not db_cwa:
+        raise ValueError("CWA no encontrado")
+    
+    db_cwa.shape_type = shape_type
+    db_cwa.shape_data = shape_data
+    
+    db.commit()
+    db.refresh(db_cwa)
+    
+    return db_cwa
+
+
 # ============================================================================
 # CWP (Construction Work Package)
 # ============================================================================

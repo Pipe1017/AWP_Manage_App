@@ -19,9 +19,9 @@ app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # --- CORS ---
 origins = [
-    "http://localhost",
-    "http://localhost:3000",
-    "http://localhost:5173",
+    "http://",
+    "http://:3000",
+    "http://:5173",
     "http://127.0.0.1:3000",
     "http://127.0.0.1:5173",
 ]

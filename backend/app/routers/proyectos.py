@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Form, File, UploadFile
 import os
 import shutil
+import json
 from datetime import datetime
 from sqlalchemy.orm import Session
 from typing import List
@@ -25,16 +26,52 @@ def create_proyecto(proyecto: schemas.ProyectoCreate, db: Session = Depends(get_
 
 @router.get("/", response_model=List[schemas.ProyectoResponse])
 def read_proyectos(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    """Obtener todos los proyectos"""
-    return crud.get_proyectos(db, skip=skip, limit=limit)
+    """Obtener todos los proyectos con sus relaciones"""
+    proyectos = crud.get_proyectos(db, skip=skip, limit=limit)
+    
+    # Para cada proyecto, cargar disciplinas y plot_plans
+    resultado = []
+    for proyecto in proyectos:
+        # Cargar disciplinas
+        proyecto.disciplinas = crud.get_disciplinas_por_proyecto(db, proyecto.id)
+        
+        # Cargar plot plans
+        proyecto.plot_plans = crud.get_plot_plans_por_proyecto(db, proyecto.id)
+        
+        # Para cada plot plan, cargar sus CWAs
+        for plot_plan in proyecto.plot_plans:
+            plot_plan.cwas = crud.get_cwas_por_plot_plan(db, plot_plan.id)
+            
+            # Para cada CWA, cargar sus CWPs
+            for cwa in plot_plan.cwas:
+                cwa.cwps = crud.get_cwps_por_cwa(db, cwa.id)
+        
+        resultado.append(proyecto)
+    
+    return resultado
 
 
 @router.get("/{proyecto_id}", response_model=schemas.ProyectoResponse)
 def read_proyecto(proyecto_id: int, db: Session = Depends(get_db)):
-    """Obtener proyecto por ID"""
+    """Obtener proyecto por ID con todas sus relaciones"""
     db_proyecto = crud.get_proyecto(db, proyecto_id=proyecto_id)
     if db_proyecto is None:
         raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+    
+    # Cargar disciplinas
+    db_proyecto.disciplinas = crud.get_disciplinas_por_proyecto(db, proyecto_id)
+    
+    # Cargar plot plans
+    db_proyecto.plot_plans = crud.get_plot_plans_por_proyecto(db, proyecto_id)
+    
+    # Para cada plot plan, cargar sus CWAs
+    for plot_plan in db_proyecto.plot_plans:
+        plot_plan.cwas = crud.get_cwas_por_plot_plan(db, plot_plan.id)
+        
+        # Para cada CWA, cargar sus CWPs
+        for cwa in plot_plan.cwas:
+            cwa.cwps = crud.get_cwps_por_cwa(db, cwa.id)
+    
     return db_proyecto
 
 
@@ -181,13 +218,13 @@ def get_plot_plan_with_cwas(proyecto_id: int, plot_plan_id: int, db: Session = D
                 "nombre": cwa.nombre,
                 "codigo": cwa.codigo,
                 "es_transversal": cwa.es_transversal,
+                "shape_type": cwa.shape_type,
+                "shape_data": cwa.shape_data,
                 "cwps": [
                     {
                         "id": cwp.id,
                         "nombre": cwp.nombre,
-                        "codigo": cwp.codigo,
-                        "shape_type": cwp.shape_type,
-                        "shape_data": cwp.shape_data
+                        "codigo": cwp.codigo
                     }
                     for cwp in crud.get_cwps_por_cwa(db, cwa.id)
                 ]
@@ -245,3 +282,29 @@ def read_cwas(
         raise HTTPException(status_code=404, detail="Plot plan no encontrado")
     
     return db.query(models.CWA).filter(models.CWA.plot_plan_id == plot_plan_id).all()
+
+
+@router.put("/{proyecto_id}/plot_plans/{plot_plan_id}/cwa/{cwa_id}/geometry")
+def update_cwa_geometry(
+    proyecto_id: int,
+    plot_plan_id: int,
+    cwa_id: int,
+    shape_type: str = Form(...),
+    shape_data: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    """Actualizar geometría de un CWA"""
+    db_proyecto = crud.get_proyecto(db, proyecto_id)
+    if not db_proyecto:
+        raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+    
+    db_cwa = crud.get_cwa(db, cwa_id)
+    if not db_cwa or db_cwa.plot_plan_id != plot_plan_id:
+        raise HTTPException(status_code=404, detail="CWA no encontrado")
+    
+    try:
+        shape_data_dict = json.loads(shape_data)
+        updated_cwa = crud.update_cwa_geometry(db, cwa_id, shape_type, shape_data_dict)
+        return updated_cwa
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))

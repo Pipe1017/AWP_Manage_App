@@ -3,10 +3,10 @@ import axios from 'axios';
 import ProyectosLanding from './pages/ProyectosLanding';
 import ProyectoDashboard from './pages/ProyectoDashboard';
 
-const API_URL = 'http://localhost:8000/api/v1';
+const API_URL = 'http://192.168.1.4:8000/api/v1';
 
 function App() {
-  const [view, setView] = useState('landing'); // landing, dashboard
+  const [view, setView] = useState('landing');
   const [proyectos, setProyectos] = useState([]);
   const [selectedProyecto, setSelectedProyecto] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -21,7 +21,21 @@ function App() {
   const fetchProyectos = async () => {
     try {
       const response = await axios.get('/proyectos/');
-      setProyectos(response.data);
+      
+      // Cargar datos completos de cada proyecto
+      const proyectosCompletos = await Promise.all(
+        response.data.map(async (proyecto) => {
+          try {
+            const detalle = await axios.get(`/proyectos/${proyecto.id}`);
+            return detalle.data;
+          } catch (err) {
+            console.error(`Error cargando proyecto ${proyecto.id}:`, err);
+            return proyecto;
+          }
+        })
+      );
+      
+      setProyectos(proyectosCompletos);
       setError(null);
     } catch (err) {
       console.error("❌ Error cargando proyectos:", err);
@@ -37,9 +51,11 @@ function App() {
         nombre: nombreProyecto,
         descripcion: ""
       });
-      const nuevoProyecto = { ...response.data, disciplinas: [], plot_plans: [] };
-      setProyectos([...proyectos, nuevoProyecto]);
-      handleSelectProyecto(nuevoProyecto);
+      
+      // Cargar proyecto completo con relaciones
+      const proyectoCompleto = await axios.get(`/proyectos/${response.data.id}`);
+      setProyectos([...proyectos, proyectoCompleto.data]);
+      handleSelectProyecto(proyectoCompleto.data);
     } catch (err) {
       alert("Error: " + (err.response?.data?.detail || err.message));
     }
@@ -58,6 +74,7 @@ function App() {
   const handleBackToProyectos = () => {
     setView('landing');
     setSelectedProyecto(null);
+    fetchProyectos(); // Refrescar lista al volver
   };
 
   const handleProyectoUpdate = (updatedProyecto) => {

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import TipoEntregableForm from './TipoEntregableForm';
 
-const API_URL = 'http://localhost:8000/api/v1';
+const API_URL = 'http://192.168.1.4:8000/api/v1';
 
 function ProyectoDetalle({ proyecto, onDisciplinaCreada, onTipoEntregableCreado, onCWACreada }) {
   const [discNombre, setDiscNombre] = useState("");
@@ -40,27 +40,32 @@ function ProyectoDetalle({ proyecto, onDisciplinaCreada, onTipoEntregableCreado,
   };
 
   const handleCWASubmit = async (e) => {
-    e.preventDefault();
-    if (!cwaNombre || !cwaCodigo || !selectedPlotPlanId) {
-        alert("Por favor completa todos los campos de CWA y selecciona un Plot Plan.");
-        return;
-    }
-    console.log("🕵️‍♂️ [ProyectoDetalle] Creando CWA:", { nombre: cwaNombre, codigo: cwaCodigo });
-    try {
-      const response = await axios.post(
-        `${API_URL}/proyectos/${proyecto.id}/plot_plans/${selectedPlotPlanId}/cwa/`,
-        { nombre: cwaNombre, codigo: cwaCodigo }
-      );
-      console.log("👍 [ProyectoDetalle] CWA creada:", response.data);
-      onCWACreada(selectedPlotPlanId, response.data);
-      setCwaNombre("");
-      setCwaCodigo("");
-      alert(`✅ CWA "${response.data.nombre}" creada exitosamente`);
-    } catch (err) {
-      console.error("🔥 [ProyectoDetalle] ERROR creando CWA:", err);
-      alert("Error al crear CWA: " + (err.response?.data?.detail || err.message));
-    }
-  };
+  e.preventDefault();
+  if (!cwaNombre || !cwaCodigo || !selectedPlotPlanId) {
+    alert("Por favor completa todos los campos de CWA y selecciona un Plot Plan.");
+    return;
+  }
+  
+  console.log("🕵️‍♂️ [ProyectoDetalle] Creando CWA:", { nombre: cwaNombre, codigo: cwaCodigo });
+  
+  try {
+    const response = await axios.post(
+      `${API_URL}/proyectos/${proyecto.id}/plot_plans/${selectedPlotPlanId}/cwa/`,
+      { nombre: cwaNombre, codigo: cwaCodigo }
+    );
+    
+    console.log("👍 [ProyectoDetalle] CWA creada:", response.data);
+    onCWACreada(selectedPlotPlanId, response.data);
+    
+    setCwaNombre("");
+    setCwaCodigo("");
+    alert(`✅ CWA "${response.data.nombre}" creada exitosamente`);
+    
+  } catch (err) {
+    console.error("🔥 [ProyectoDetalle] ERROR creando CWA:", err);
+    alert("Error al crear CWA: " + (err.response?.data?.detail || err.message));
+  }
+};
 
   return (
     <div>

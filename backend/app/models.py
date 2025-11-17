@@ -97,7 +97,7 @@ class CWA(Base):
     plot_plan = relationship("PlotPlan", back_populates="cwas")
     cwps = relationship("CWP", back_populates="cwa", cascade="all, delete-orphan")
     
-    # GEOMETRÍA (solo para CWA geográficas)
+    # GEOMETRÍA (para CWAs geográficas)
     shape_type = Column(String(15), nullable=True)  # 'rect', 'circle', 'polygon'
     shape_data = Column(JSON, nullable=True)
 
@@ -119,7 +119,7 @@ class CWP(Base):
     iwps = relationship("IWP", back_populates="cwp", cascade="all, delete-orphan")
     
     # Referencias a transversales
-    referencias_transversales = relationship("ReferenciaTransversal", back_populates="cwp_geograico", cascade="all, delete-orphan")
+    referencias_transversales = relationship("ReferenciaTransversal", back_populates="cwp_geografico", cascade="all, delete-orphan")
     
     # Asignaciones de disciplinas
     asignaciones_disciplina = relationship("AsignacionDisciplinaCWP", back_populates="cwp", cascade="all, delete-orphan")
@@ -135,10 +135,6 @@ class CWP(Base):
     fecha_fin_real = Column(Date, nullable=True)
     porcentaje_completitud = Column(Float, default=0.0)  # 0-100
     estado = Column(String(20), default="NO_INICIADO")  # NO_INICIADO, EN_PROGRESO, COMPLETADO, PAUSADO
-    
-    # GEOMETRÍA (del plot plan visual)
-    shape_type = Column(String(15), nullable=True)
-    shape_data = Column(JSON, nullable=True)
     
     # RESTRICCIONES
     restricciones_levantadas = Column(Boolean, default=False)
@@ -292,7 +288,7 @@ class ReferenciaTransversal(Base):
     completado = Column(Boolean, default=False)
     observaciones = Column(Text, nullable=True)
     
-    cwp_geograico = relationship("CWP", back_populates="referencias_transversales")
+    cwp_geografico = relationship("CWP", back_populates="referencias_transversales")
 
 
 # ============================================================================

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 
-const API_URL = 'http://localhost:8000/api/v1';
+const API_URL = 'http://192.168.1.4:8000/api/v1';
 
 function UploadPlotPlanForm({ proyecto, onUploadSuccess }) {
   const [nombre, setNombre] = useState("");

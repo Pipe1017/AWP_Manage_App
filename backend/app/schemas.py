@@ -3,29 +3,7 @@ from typing import Optional, List
 from datetime import date, datetime
 
 # ============================================================================
-# PROYECTO
-# ============================================================================
-
-class ProyectoCreate(BaseModel):
-    nombre: str
-    descripcion: Optional[str] = None
-    fecha_inicio: Optional[date] = None
-    fecha_fin: Optional[date] = None
-
-
-class ProyectoResponse(BaseModel):
-    id: int
-    nombre: str
-    descripcion: Optional[str]
-    fecha_inicio: Optional[date]
-    fecha_fin: Optional[date]
-    
-    class Config:
-        from_attributes = True
-
-
-# ============================================================================
-# DISCIPLINAS
+# DISCIPLINAS (debe ir ANTES de ProyectoResponse)
 # ============================================================================
 
 class DisciplinaCreate(BaseModel):
@@ -67,50 +45,6 @@ class TipoEntregableResponse(BaseModel):
 
 
 # ============================================================================
-# PLOT PLAN
-# ============================================================================
-
-class PlotPlanCreate(BaseModel):
-    nombre: str
-    descripcion: Optional[str] = None
-    image_url: Optional[str] = None
-
-
-class PlotPlanResponse(BaseModel):
-    id: int
-    nombre: str
-    descripcion: Optional[str]
-    image_url: Optional[str]
-    proyecto_id: int
-    
-    class Config:
-        from_attributes = True
-
-
-# ============================================================================
-# CWA (Construction Work Area)
-# ============================================================================
-
-class CWACreate(BaseModel):
-    nombre: str
-    codigo: str  # Usuario proporciona (Ej: "CWA(Fijo)-037-01")
-    descripcion: Optional[str] = None
-    es_transversal: Optional[bool] = False
-
-
-class CWAResponse(BaseModel):
-    id: int
-    nombre: str
-    codigo: str
-    descripcion: Optional[str]
-    es_transversal: bool
-    plot_plan_id: int
-    
-    class Config:
-        from_attributes = True
-
-
-# ============================================================================
 # CWP (Construction Work Package)
 # ============================================================================
 
@@ -145,6 +79,99 @@ class CWPResponse(BaseModel):
     porcentaje_completitud: float
     estado: str
     restricciones_levantadas: bool
+    shape_type: Optional[str] = None
+    shape_data: Optional[dict] = None
+    
+    class Config:
+        from_attributes = True
+
+
+# ============================================================================
+# CWA (Construction Work Area)
+# ============================================================================
+
+class CWACreate(BaseModel):
+    nombre: str
+    codigo: str
+    descripcion: Optional[str] = None
+    es_transversal: Optional[bool] = False
+
+
+class CWAResponse(BaseModel):
+    id: int
+    nombre: str
+    codigo: str
+    descripcion: Optional[str]
+    es_transversal: bool
+    plot_plan_id: int
+    
+    class Config:
+        from_attributes = True
+
+
+class CWADetailResponse(BaseModel):
+    id: int
+    nombre: str
+    codigo: str
+    es_transversal: bool
+    cwps: List[CWPResponse] = []
+    
+    class Config:
+        from_attributes = True
+
+
+# ============================================================================
+# PLOT PLAN
+# ============================================================================
+
+class PlotPlanCreate(BaseModel):
+    nombre: str
+    descripcion: Optional[str] = None
+    image_url: Optional[str] = None
+
+
+class PlotPlanResponse(BaseModel):
+    id: int
+    nombre: str
+    descripcion: Optional[str]
+    image_url: Optional[str]
+    proyecto_id: int
+    
+    class Config:
+        from_attributes = True
+
+
+class PlotPlanDetailResponse(BaseModel):
+    id: int
+    nombre: str
+    descripcion: Optional[str]
+    image_url: Optional[str]
+    proyecto_id: int
+    cwas: List[CWADetailResponse] = []
+    
+    class Config:
+        from_attributes = True
+
+
+# ============================================================================
+# PROYECTO (debe ir DESPUÉS de DisciplinaResponse y PlotPlanDetailResponse)
+# ============================================================================
+
+class ProyectoCreate(BaseModel):
+    nombre: str
+    descripcion: Optional[str] = None
+    fecha_inicio: Optional[date] = None
+    fecha_fin: Optional[date] = None
+
+
+class ProyectoResponse(BaseModel):
+    id: int
+    nombre: str
+    descripcion: Optional[str]
+    fecha_inicio: Optional[date]
+    fecha_fin: Optional[date]
+    disciplinas: List[DisciplinaResponse] = []
+    plot_plans: List[PlotPlanDetailResponse] = []
     
     class Config:
         from_attributes = True
@@ -376,30 +403,6 @@ class DependenciaCWPResponse(BaseModel):
     tipo_dependencia: str
     duracion_lag_dias: int
     descripcion: Optional[str]
-    
-    class Config:
-        from_attributes = True
-
-
-        # backend/app/schemas.py - AGREGAR:
-
-class CWADetailResponse(BaseModel):
-    id: int
-    nombre: str
-    codigo: str
-    es_transversal: bool
-    cwps: List['CWPResponse'] = []
-    
-    class Config:
-        from_attributes = True
-
-class PlotPlanDetailResponse(BaseModel):
-    id: int
-    nombre: str
-    descripcion: Optional[str]
-    image_url: Optional[str]
-    proyecto_id: int
-    cwas: List[CWADetailResponse] = []
     
     class Config:
         from_attributes = True

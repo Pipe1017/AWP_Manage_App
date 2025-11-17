@@ -22,7 +22,7 @@ services:
       context: ./backend # Busca un Dockerfile en la carpeta ./backend
       # (Nos aseguraremos de usar linux/amd64 al construir para producción)
     ports:
-      - "8000:8000"
+      - "8000192.168.1.4:8000"
     volumes:
       - ./backend:/app # Sincroniza tu código local con el contenedor
     depends_on:

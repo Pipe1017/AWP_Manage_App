@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 
-const API_URL = 'http://localhost:8000';
+const API_URL = 'http://192.168.1.4:8000';
 
 function TipoEntregableForm({ disciplina, onTipoCreado }) {
   const [nombre, setNombre] = useState("");
