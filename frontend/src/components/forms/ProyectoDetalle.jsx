@@ -1,19 +1,14 @@
-// frontend/src/components/ProyectoDetalle.jsx
-
-
 import React, { useState } from 'react';
 import axios from 'axios';
 import TipoEntregableForm from './TipoEntregableForm';
 
-const API_URL = 'http://localhost:8000/api/v1'; // ✅ CORREGIDO: Incluye /api/v1
+const API_URL = 'http://localhost:8000/api/v1';
 
-// Este componente es para "Configuración"
 function ProyectoDetalle({ proyecto, onDisciplinaCreada, onTipoEntregableCreado, onCWACreada }) {
   const [discNombre, setDiscNombre] = useState("");
   const [discCodigo, setDiscCodigo] = useState("");
   const [selectedDiscId, setSelectedDiscId] = useState(null);
   
-  // ✨ NUEVO: Estados para crear CWA
   const [cwaNombre, setCwaNombre] = useState("");
   const [cwaCodigo, setCwaCodigo] = useState("");
   const [selectedPlotPlanId, setSelectedPlotPlanId] = useState(
@@ -44,7 +39,6 @@ function ProyectoDetalle({ proyecto, onDisciplinaCreada, onTipoEntregableCreado,
     }
   };
 
-  // ✨ NUEVO: Handler para crear CWA
   const handleCWASubmit = async (e) => {
     e.preventDefault();
     if (!cwaNombre || !cwaCodigo || !selectedPlotPlanId) {
@@ -54,7 +48,7 @@ function ProyectoDetalle({ proyecto, onDisciplinaCreada, onTipoEntregableCreado,
     console.log("🕵️‍♂️ [ProyectoDetalle] Creando CWA:", { nombre: cwaNombre, codigo: cwaCodigo });
     try {
       const response = await axios.post(
-        `${API_URL}/awp/plotplans/${selectedPlotPlanId}/cwa/`,
+        `${API_URL}/proyectos/${proyecto.id}/plot_plans/${selectedPlotPlanId}/cwa/`,
         { nombre: cwaNombre, codigo: cwaCodigo }
       );
       console.log("👍 [ProyectoDetalle] CWA creada:", response.data);
@@ -72,7 +66,7 @@ function ProyectoDetalle({ proyecto, onDisciplinaCreada, onTipoEntregableCreado,
     <div>
       <h2 className="text-3xl font-bold mb-6">Configuración del Proyecto: {proyecto.nombre}</h2>
       
-      {/* ✨ NUEVO: Sección de CWAs */}
+      {/* Sección de CWAs */}
       <div className="mb-8 p-6 bg-gradient-to-r from-blue-900/30 to-blue-800/20 border-2 border-blue-700 rounded-lg">
         <h3 className="text-xl font-bold mb-4 text-blue-300 flex items-center gap-2">
           <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -151,7 +145,7 @@ function ProyectoDetalle({ proyecto, onDisciplinaCreada, onTipoEntregableCreado,
                         <p className="font-medium text-white">{cwa.nombre}</p>
                         <p className="text-xs text-gray-400">{cwa.codigo}</p>
                         <p className="text-xs text-green-400 mt-1">
-                          {cwa.cwps?.length || 0} CWP(s)
+                          {(cwa.cwps || []).length} CWP(s)
                         </p>
                       </div>
                     ))}
@@ -196,8 +190,8 @@ function ProyectoDetalle({ proyecto, onDisciplinaCreada, onTipoEntregableCreado,
       <div className="p-6 bg-gray-800 rounded-lg border border-gray-700">
         <h3 className="text-xl font-bold mb-4 text-gray-300">Biblioteca de Entregables</h3>
         <ul>
-          {proyecto.disciplinas.length > 0 ? (
-            proyecto.disciplinas.map(disc => (
+          {(proyecto.disciplinas || []).length > 0 ? (
+            (proyecto.disciplinas || []).map(disc => (
               <li key={disc.id} className="bg-gray-900 my-2 rounded-md overflow-hidden border border-gray-700">
                 <div 
                   onClick={() => setSelectedDiscId(disc.id === selectedDiscId ? null : disc.id)} 
@@ -206,12 +200,12 @@ function ProyectoDetalle({ proyecto, onDisciplinaCreada, onTipoEntregableCreado,
                   <strong className="text-white">{disc.nombre}</strong>
                   <span className="ml-2 text-gray-400">({disc.codigo})</span>
                   <span className="ml-4 text-xs text-gray-500">
-                    {disc.tipos_entregables.length} tipo(s)
+                    {(disc.tipos_entregables || []).length} tipo(s)
                   </span>
                 </div>
                 
                 <ul className="px-8 pb-2 text-sm text-gray-300">
-                  {disc.tipos_entregables.map(tipo => (
+                  {(disc.tipos_entregables || []).map(tipo => (
                     <li key={tipo.id} className="my-1">
                       <span className="font-medium text-blue-300 mr-2">[{tipo.categoria_awp}]</span> 
                       {tipo.nombre} 

@@ -1,4 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Form, File, UploadFile
+import os
+import shutil
+from datetime import datetime
 from sqlalchemy.orm import Session
 from typing import List
 from .. import models, schemas, crud
@@ -111,15 +114,36 @@ def read_tipos_entregables(
 @router.post("/{proyecto_id}/plot_plans/", response_model=schemas.PlotPlanResponse)
 def create_plot_plan(
     proyecto_id: int,
-    plot_plan: schemas.PlotPlanCreate,
+    nombre: str = Form(...),
+    file: UploadFile = File(...),
     db: Session = Depends(get_db)
 ):
-    """Crear plot plan en proyecto"""
+    """Crear plot plan en proyecto con archivo de imagen"""
     db_proyecto = crud.get_proyecto(db, proyecto_id=proyecto_id)
     if db_proyecto is None:
         raise HTTPException(status_code=404, detail="Proyecto no encontrado")
     
-    return crud.create_plot_plan(db=db, plot_plan=plot_plan, proyecto_id=proyecto_id)
+    # Guardar archivo
+    os.makedirs("uploads", exist_ok=True)
+    
+    # Generar nombre único
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    file_name = f"{timestamp}_{file.filename}"
+    file_path = f"uploads/{file_name}"
+    
+    try:
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error guardando archivo: {str(e)}")
+    
+    # Crear plot plan en BD
+    plot_plan_data = schemas.PlotPlanCreate(
+        nombre=nombre,
+        image_url=f"/{file_path}"
+    )
+    
+    return crud.create_plot_plan(db=db, plot_plan=plot_plan_data, proyecto_id=proyecto_id)
 
 
 @router.get("/{proyecto_id}/plot_plans/", response_model=List[schemas.PlotPlanResponse])
@@ -130,6 +154,47 @@ def read_plot_plans(proyecto_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Proyecto no encontrado")
     
     return db.query(models.PlotPlan).filter(models.PlotPlan.proyecto_id == proyecto_id).all()
+
+
+@router.get("/{proyecto_id}/plot_plans/{plot_plan_id}", response_model=dict)
+def get_plot_plan_with_cwas(proyecto_id: int, plot_plan_id: int, db: Session = Depends(get_db)):
+    """Obtener Plot Plan con CWAs y sus CWPs"""
+    db_proyecto = crud.get_proyecto(db, proyecto_id)
+    if not db_proyecto:
+        raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+    
+    db_plot_plan = crud.get_plot_plan(db, plot_plan_id)
+    if not db_plot_plan or db_plot_plan.proyecto_id != proyecto_id:
+        raise HTTPException(status_code=404, detail="Plot Plan no encontrado")
+    
+    cwas = crud.get_cwas_por_plot_plan(db, plot_plan_id)
+    
+    return {
+        "id": db_plot_plan.id,
+        "nombre": db_plot_plan.nombre,
+        "descripcion": db_plot_plan.descripcion,
+        "image_url": db_plot_plan.image_url,
+        "proyecto_id": db_plot_plan.proyecto_id,
+        "cwas": [
+            {
+                "id": cwa.id,
+                "nombre": cwa.nombre,
+                "codigo": cwa.codigo,
+                "es_transversal": cwa.es_transversal,
+                "cwps": [
+                    {
+                        "id": cwp.id,
+                        "nombre": cwp.nombre,
+                        "codigo": cwp.codigo,
+                        "shape_type": cwp.shape_type,
+                        "shape_data": cwp.shape_data
+                    }
+                    for cwp in crud.get_cwps_por_cwa(db, cwa.id)
+                ]
+            }
+            for cwa in cwas
+        ]
+    }
 
 
 # --- Endpoints de CWA ---

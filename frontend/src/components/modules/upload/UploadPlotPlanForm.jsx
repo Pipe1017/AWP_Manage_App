@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 
-const API_URL = 'http://localhost:8000';
-const AWP_API_URL = `${API_URL}/api/v1/awp`;
+const API_URL = 'http://localhost:8000/api/v1';
 
 function UploadPlotPlanForm({ proyecto, onUploadSuccess }) {
   const [nombre, setNombre] = useState("");
@@ -20,20 +19,26 @@ function UploadPlotPlanForm({ proyecto, onUploadSuccess }) {
     setError(null);
 
     const formData = new FormData();
-    formData.append("file", file);
     formData.append("nombre", nombre);
+    formData.append("file", file);
+
+    console.log("🕵️ FormData contents:");
+    for (let pair of formData.entries()) {
+      console.log(pair[0] + ": " + pair[1]);
+    }
 
     try {
       const response = await axios.post(
-        `${AWP_API_URL}/proyectos/${proyecto.id}/plotplans/`,
-        formData,
-        { headers: { 'Content-Type': 'multipart/form-data' } }
+        `${API_URL}/proyectos/${proyecto.id}/plot_plans/`,
+        formData
       );
+      console.log("✅ Plot Plan creado:", response.data);
       onUploadSuccess(response.data);
       setFile(null);
       setNombre("");
     } catch (err) {
       console.error("🔥 [UploadForm] ERROR subiendo:", err);
+      console.error("Response:", err.response?.data);
       setError("Error al subir el plano: " + (err.response?.data?.detail || err.message));
     } finally {
       setLoading(false);

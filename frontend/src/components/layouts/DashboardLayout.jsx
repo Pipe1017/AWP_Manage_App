@@ -1,9 +1,9 @@
 import React from 'react';
 import DashboardHeader from '../common/DashboardHeader';
 import DashboardSidebar from '../common/DashboardSidebar';
-import ResumenTab from './ResumenTab';
-import CronogramaTab from './CronogramaTab';
-import ArbolTab from './ArbolTab';
+import ResumenTab from '../sections/ResumenTab';
+import CronogramaTab from '../sections/CronogramaSection';
+import ArbolTab from '../sections/ArbolSection';
 
 function ProyectoDashboardLayout({
   proyecto,

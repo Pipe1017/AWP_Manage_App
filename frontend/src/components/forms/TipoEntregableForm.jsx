@@ -24,7 +24,7 @@ function TipoEntregableForm({ disciplina, onTipoCreado }) {
     try {
       // ESTA ES LA URL CORREGIDA DEL 404
       const response = await axios.post(
-        `${API_URL}/proyectos/disciplinas/${disciplina.id}/tipos_entregables/`,
+        `${API_URL}/api/v1/proyectos/${disciplina.proyecto_id}/disciplinas/${disciplina.id}/tipos_entregables/`,
         {
           nombre: nombre,
           codigo: codigo,

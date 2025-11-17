@@ -4,7 +4,7 @@ import PlotPlan from '../modules/plotplan/PlotPlan';
 import AWPEstructura from '../modules/awp/AWPEstructura';
 import AWPJerarquia from '../modules/awp/AWPJerarquia';
 import ConfigPanel from '../forms/ConfigPanel';
-import UploadPlotPlanForm from '../forms/UploadPlotPlanForm';
+import UploadPlotPlanForm from '../modules/upload/UploadPlotPlanForm';
 
 const API_URL = 'http://localhost:8000/api/v1';
 
@@ -18,6 +18,30 @@ function ResumenTab({ proyecto, onProyectoUpdate }) {
       setSelectedPlotPlanId(proyecto.plot_plans[0].id);
     }
   }, [proyecto.plot_plans]);
+
+  useEffect(() => {
+    const loadPlotPlanWithCWAs = async () => {
+      if (!selectedPlotPlanId) return;
+      try {
+        const response = await axios.get(
+          `${API_URL}/proyectos/${proyecto.id}/plot_plans/${selectedPlotPlanId}`
+        );
+        
+        // Actualizar el proyecto con los datos completos del plot plan
+        const updatedProyecto = {
+          ...proyecto,
+          plot_plans: proyecto.plot_plans.map(pp =>
+            pp.id === selectedPlotPlanId ? response.data : pp
+          )
+        };
+        onProyectoUpdate(updatedProyecto);
+      } catch (err) {
+        console.error("Error cargando Plot Plan con CWAs:", err);
+      }
+    };
+    
+    loadPlotPlanWithCWAs();
+  }, [selectedPlotPlanId, proyecto.id]);
 
   const currentPlotPlan = proyecto.plot_plans?.find(pp => pp.id === selectedPlotPlanId);
 
@@ -47,18 +71,43 @@ function ResumenTab({ proyecto, onProyectoUpdate }) {
   };
 
   const handlePlotPlanUploaded = (nuevoPlotPlan) => {
-    const updatedProyecto = {
-      ...proyecto,
-      plot_plans: [...proyecto.plot_plans, { ...nuevoPlotPlan, cwas: [] }]
-    };
-    onProyectoUpdate(updatedProyecto);
-    setSelectedPlotPlanId(nuevoPlotPlan.id);
+  const updatedProyecto = {
+    ...proyecto,
+    plot_plans: [...(proyecto.plot_plans || []), { ...nuevoPlotPlan, cwas: [] }]
+  };
+  onProyectoUpdate(updatedProyecto);
+  setSelectedPlotPlanId(nuevoPlotPlan.id);
   };
 
   const handleDisciplinaCreada = (nuevaDisciplina) => {
     const updatedProyecto = {
       ...proyecto,
       disciplinas: [...proyecto.disciplinas, nuevaDisciplina]
+    };
+    onProyectoUpdate(updatedProyecto);
+  };
+
+  const handleCWPCreado = (cwaId, nuevoCWP) => {
+    console.log("✅ CWP creado, actualizando proyecto...");
+    const updatedProyecto = {
+      ...proyecto,
+      plot_plans: proyecto.plot_plans.map(pp => {
+        if (pp.id === selectedPlotPlanId) {
+          return {
+            ...pp,
+            cwas: pp.cwas.map(cwa => {
+              if (cwa.id === cwaId) {
+                return {
+                  ...cwa,
+                  cwps: [...(cwa.cwps || []), nuevoCWP]
+                };
+              }
+              return cwa;
+            })
+          };
+        }
+        return pp;
+      })
     };
     onProyectoUpdate(updatedProyecto);
   };
@@ -147,8 +196,9 @@ function ResumenTab({ proyecto, onProyectoUpdate }) {
               <div className="p-4">
                 <AWPEstructura
                   plotPlan={currentPlotPlan}
+                  proyecto={proyecto}
                   onCWACreada={() => {}}
-                  onCWPCreado={() => {}}
+                  onCWPCreado={handleCWPCreado}
                   selectedCWA={selectedCWA}
                   onSelectCWA={setSelectedCWA}
                 />

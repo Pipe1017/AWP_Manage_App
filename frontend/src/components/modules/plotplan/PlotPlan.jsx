@@ -3,7 +3,7 @@ import { Stage, Layer, Image, Rect, Circle, Line } from 'react-konva';
 import { GithubPicker } from 'react-color';
 import axios from 'axios';
 
-const API_URL = 'http://localhost:8000';
+const API_URL = 'http://localhost:8000/api/v1';
 
 // Paleta de colores HATCH para ingeniería
 const HATCH_COLORS = {
@@ -20,7 +20,7 @@ const useImageLoader = (src) => {
   useEffect(() => {
     if (!src) { setImage(null); setError(null); return; }
     const img = new window.Image();
-    const fullSrc = `${API_URL}${src}`;
+    const fullSrc = `http://localhost:8000${src}`;
     img.src = fullSrc;
     img.crossOrigin = "Anonymous";
     img.onload = () => { setImage(img); setError(null); };
@@ -133,7 +133,7 @@ function Toolbar({ activeTool, setActiveTool, color, setColor, onZoom, onClear, 
 
 
 function PlotPlan({ plotPlan, cwaToAssociate, onShapeSaved }) {
-  const { image, error } = useImageLoader(plotPlan.image_url);
+  const { image, error } = useImageLoader(plotPlan?.image_url);
   const containerRef = useRef(null);
   const stageRef = useRef(null);
   const [size, setSize] = useState({ width: 0, height: 500 });
@@ -150,7 +150,7 @@ function PlotPlan({ plotPlan, cwaToAssociate, onShapeSaved }) {
   const [stage, setStage] = useState({ scale: 1, x: 0, y: 0 });
   const [selectedShapeKey, setSelectedShapeKey] = useState(null);
 
-  // ✨ NUEVO: Cargar formas existentes desde la BD
+  // Cargar formas existentes desde la BD
   useEffect(() => {
     const loadShapesFromDB = async () => {
       if (!plotPlan || !plotPlan.cwas) return;
@@ -158,12 +158,9 @@ function PlotPlan({ plotPlan, cwaToAssociate, onShapeSaved }) {
       console.log("🔵 [PlotPlan] Cargando formas guardadas desde BD...");
       const loadedShapes = [];
       
-      // Iterar sobre todas las CWAs del plot plan
       plotPlan.cwas.forEach(cwa => {
-        // Iterar sobre los CWPs de cada CWA
         cwa.cwps.forEach(cwp => {
           if (cwp.shape_type && cwp.shape_data) {
-            // Reconstruir la forma con los datos guardados
             const shape = {
               type: cwp.shape_type,
               color: cwp.shape_data.color || HATCH_COLORS.primary[0],
@@ -171,7 +168,7 @@ function PlotPlan({ plotPlan, cwaToAssociate, onShapeSaved }) {
               cwpId: cwp.id,
               codigo: cwp.codigo,
               nombre: cwp.nombre,
-              ...cwp.shape_data // Incluye x, y, width, height, radius, o points
+              ...cwp.shape_data
             };
             loadedShapes.push(shape);
           }
@@ -195,7 +192,7 @@ function PlotPlan({ plotPlan, cwaToAssociate, onShapeSaved }) {
     }
   }, [containerRef.current]);
 
-  // Manejo de teclas (Delete/Backspace para borrar, Ctrl+Z para deshacer)
+  // Manejo de teclas
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.ctrlKey && e.key === 'z') {
@@ -203,7 +200,10 @@ function PlotPlan({ plotPlan, cwaToAssociate, onShapeSaved }) {
         handleUndo();
       }
       if ((e.key === 'Delete' || e.key === 'Backspace') && selectedShapeKey !== null) {
-        handleClear(); 
+        const newShapes = shapes.filter(s => (s.key || s.cwpId) !== selectedShapeKey);
+        setHistory([...history, shapes]);
+        setShapes(newShapes);
+        setSelectedShapeKey(null);
       }
     };
     document.addEventListener('keydown', handleKeyDown);
@@ -316,21 +316,20 @@ function PlotPlan({ plotPlan, cwaToAssociate, onShapeSaved }) {
     }
   };
   
-  // --- ✨ LÓGICA DE GUARDADO EN BD ---
   const handleSaveShape = async (finalShape) => {
     if (!cwaToAssociate) {
-        alert("¡ADVERTENCIA! Debes seleccionar un CWA (Área de Construcción) en la tabla inferior para asociar esta forma.");
+        alert("¡ADVERTENCIA! Debes seleccionar un CWA (Área de Construcción) para asociar esta forma.");
         return;
     }
 
-    // ✨ NUEVO: Validar que el CWA pertenece al Plot Plan actual
+    // Validar que el CWA pertenece al Plot Plan actual
     const cwaPertenecePlotPlan = plotPlan.cwas.some(cwa => cwa.id === cwaToAssociate.id);
     if (!cwaPertenecePlotPlan) {
         alert("❌ El CWA seleccionado no pertenece a este Plot Plan. Por favor selecciona otro.");
         return;
     }
 
-    // 1. Preparar datos de geometría según el tipo de forma
+    // Preparar datos de geometría según el tipo de forma
     let shapeData = {};
     if (finalShape.type === 'polygon') {
         shapeData = {
@@ -354,7 +353,6 @@ function PlotPlan({ plotPlan, cwaToAssociate, onShapeSaved }) {
         };
     }
 
-    // 2. Crear CWP con la geometría
     try {
         console.log("🔵 [PlotPlan] Creando CWP para la forma...");
         
@@ -362,9 +360,12 @@ function PlotPlan({ plotPlan, cwaToAssociate, onShapeSaved }) {
         const cwpCode = `${cwaToAssociate.codigo}-CWP${Date.now().toString().slice(-4)}`;
         const cwpName = `Area ${finalShape.type} ${shapes.length + 1}`;
         
+        // Usar disciplina_id = 1 por defecto
+        const disciplina_id = 1;
+        
         // Crear el CWP con la geometría
         const cwpResponse = await axios.post(
-            `${API_URL}/api/v1/awp/cwa/${cwaToAssociate.id}/cwp/`,
+            `${API_URL}/awp/cwa/${cwaToAssociate.id}/cwp/?disciplina_id=${disciplina_id}`,
             {
                 nombre: cwpName,
                 codigo: cwpCode,
@@ -375,7 +376,7 @@ function PlotPlan({ plotPlan, cwaToAssociate, onShapeSaved }) {
         
         console.log("✅ [PlotPlan] CWP creado con geometría:", cwpResponse.data);
         
-        // 3. Actualizar la forma local con el ID del CWP
+        // Actualizar la forma local con el ID del CWP
         const shapeWithCwpId = {
             ...finalShape,
             cwpId: cwpResponse.data.id,
@@ -383,10 +384,10 @@ function PlotPlan({ plotPlan, cwaToAssociate, onShapeSaved }) {
             nombre: cwpName
         };
         
-        // 4. Guardar en el estado local
+        // Guardar en el estado local
         setShapes(prev => [...prev, shapeWithCwpId]);
         
-        // 5. Notificar al padre para actualizar la lista de CWPs en AWPEstructura
+        // Notificar al padre
         if (onShapeSaved) {
             onShapeSaved(cwaToAssociate.id, cwpResponse.data);
         }
@@ -399,7 +400,7 @@ function PlotPlan({ plotPlan, cwaToAssociate, onShapeSaved }) {
     }
   };
   
-  // --- RENDERIZADO ---
+  // RENDERIZADO
   const renderCanvas = () => {
     if (error) { 
       return <div className="flex items-center justify-center h-full text-red-400">Error cargando imagen</div>;
@@ -473,7 +474,7 @@ function PlotPlan({ plotPlan, cwaToAssociate, onShapeSaved }) {
         onUndo={history.length > 0 ? handleUndo : null}
       />
       
-      {/* --- UI DE ASOCIACIÓN --- */}
+      {/* UI DE ASOCIACIÓN */}
       <div className="p-2 bg-gray-900 border-b border-gray-700 flex items-center gap-3">
           <span className="text-xs text-gray-400 font-medium">CWA Asignado:</span>
           {cwaToAssociate ? (

@@ -1,13 +1,20 @@
 import React, { useState } from 'react';
-import ProyectoDashboardLayout from '../components/layouts/ProyectoDashboardLayout';
+import DashboardLayout from '../components/layouts/DashboardLayout';
 
 function ProyectoDashboard({ proyecto, onBack, onProyectoUpdate }) {
+  // Asegurar valores por defecto
+  const safeProyecto = {
+    ...proyecto,
+    disciplinas: proyecto.disciplinas || [],
+    plot_plans: proyecto.plot_plans || [],
+  };
+
   const [selectedSection, setSelectedSection] = useState('resumen');
   const [sidebarExpanded, setSidebarExpanded] = useState(true);
 
   return (
-    <ProyectoDashboardLayout
-      proyecto={proyecto}
+    <DashboardLayout
+      proyecto={safeProyecto}
       selectedSection={selectedSection}
       setSelectedSection={setSelectedSection}
       sidebarExpanded={sidebarExpanded}

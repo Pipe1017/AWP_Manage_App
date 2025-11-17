@@ -5,26 +5,30 @@ const API_URL = 'http://localhost:8000';
 const AWP_API_URL = `${API_URL}/api/v1/awp`;
 
 // --- Formulario para CWP (Componente interno) ---
-function CWPForm({ cwaId, onCWPCreado }) {
+function CWPForm({ cwaId, onCWPCreado, disciplinas = [] }) {
   const [nombre, setNombre] = useState("");
-  const [codigo, setCodigo] = useState("");
+  const [disciplinaId, setDisciplinaId] = useState(disciplinas.length > 0 ? disciplinas[0].id : "");
   const [loading, setLoading] = useState(false);
   
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!nombre || !codigo) return alert("Nombre y Código son requeridos");
+    if (!nombre || !disciplinaId) {
+      alert("Nombre y Disciplina son requeridos");
+      return;
+    }
     
     setLoading(true);
     try {
-      const response = await axios.post(`${AWP_API_URL}/cwa/${cwaId}/cwp/`, { 
-        nombre, 
-        codigo,
-        shape_type: null,
-        shape_data: null
-      });
+      const response = await axios.post(
+        `${AWP_API_URL}/cwa/${cwaId}/cwp/?disciplina_id=${disciplinaId}`,
+        { 
+          nombre,
+          descripcion: ""
+        }
+      );
       onCWPCreado(cwaId, response.data);
       setNombre("");
-      setCodigo("");
+      setDisciplinaId(disciplinas.length > 0 ? disciplinas[0].id : "");
     } catch (err) {
       alert("Error al crear CWP: " + (err.response?.data?.detail || err.message));
     } finally {
@@ -34,9 +38,40 @@ function CWPForm({ cwaId, onCWPCreado }) {
 
   return (
     <form onSubmit={handleSubmit} className="p-4 bg-gray-700 rounded-b-md flex gap-2">
-      <input type="text" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Nombre CWP" className="px-2 py-1 rounded bg-gray-800 border border-gray-600 text-white flex-grow" required />
-      <input type="text" value={codigo} onChange={(e) => setCodigo(e.target.value)} placeholder="Código" className="w-20 px-2 py-1 rounded bg-gray-800 border border-gray-600 text-white" required />
-      <button type="submit" className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white font-bold rounded disabled:opacity-50" disabled={loading}>
+      <input 
+        type="text" 
+        value={nombre} 
+        onChange={(e) => setNombre(e.target.value)} 
+        placeholder="Nombre CWP" 
+        className="px-2 py-1 rounded bg-gray-800 border border-gray-600 text-white flex-grow" 
+        required 
+      />
+      
+      {disciplinas.length > 0 ? (
+        <select 
+          value={disciplinaId} 
+          onChange={(e) => setDisciplinaId(Number(e.target.value))}
+          className="px-2 py-1 rounded bg-gray-800 border border-gray-600 text-white"
+          required
+        >
+          <option value="">Selecciona disciplina</option>
+          {disciplinas.map(d => (
+            <option key={d.id} value={d.id}>
+              {d.codigo} - {d.nombre}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <div className="px-2 py-1 rounded bg-red-900 border border-red-700 text-red-200 text-sm">
+          Sin disciplinas
+        </div>
+      )}
+      
+      <button 
+        type="submit" 
+        className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white font-bold rounded disabled:opacity-50" 
+        disabled={loading || !disciplinaId}
+      >
         {loading ? "..." : "+ CWP"}
       </button>
     </form>
@@ -45,19 +80,19 @@ function CWPForm({ cwaId, onCWPCreado }) {
 
 
 // --- Componente Principal de AWP ---
-function AWPEstructura({ plotPlan, onCWACreada, onCWPCreado, selectedCWA, onSelectCWA }) {
+function AWPEstructura({ plotPlan, proyecto, onCWACreada, onCWPCreado, selectedCWA, onSelectCWA }) {
   const [selectedCWAId, setSelectedCWAId] = useState(null);
 
   // Esta función maneja la selección visual y funcional
   const handleSelectCWA = (cwa) => {
     setSelectedCWAId(cwa.id);
-    onSelectCWA(cwa); // Envía el objeto CWA al componente padre (App)
+    onSelectCWA(cwa); // Envía el objeto CWA al componente padre
   };
 
   return (
     <div className="mt-6 p-4 border-t border-gray-700 bg-gray-800 rounded-lg shadow-xl">
       <h3 className="text-lg font-semibold mb-4 text-blue-300">
-        📋 Estructura AWP - {plotPlan.nombre}
+        📋 Estructura AWP - {plotPlan?.nombre}
       </h3>
       
       {/* Instrucción visual */}
@@ -74,7 +109,7 @@ function AWPEstructura({ plotPlan, onCWACreada, onCWPCreado, selectedCWA, onSele
       
       {/* Lista de CWAs existentes */}
       <ul className="space-y-2">
-        {plotPlan.cwas.length > 0 ? (
+        {plotPlan?.cwas && plotPlan.cwas.length > 0 ? (
           plotPlan.cwas.map(cwa => (
             <li key={cwa.id} className={`
               bg-gray-700 my-1 rounded-md overflow-hidden border transition-all
@@ -94,10 +129,15 @@ function AWPEstructura({ plotPlan, onCWACreada, onCWPCreado, selectedCWA, onSele
                     <span className="ml-2 text-xs text-gray-400">
                       ({cwa.codigo})
                     </span>
+                    {cwa.es_transversal && (
+                      <span className="ml-2 px-2 py-0.5 bg-purple-700 text-purple-200 text-xs rounded">
+                        Transversal
+                      </span>
+                    )}
                   </div>
                 </div>
                 <span className="text-xs px-2 py-1 bg-gray-800 rounded text-gray-300">
-                    {cwa.cwps.length} CWP{cwa.cwps.length !== 1 ? 's' : ''}
+                    {cwa.cwps?.length || 0} CWP{cwa.cwps?.length !== 1 ? 's' : ''}
                 </span>
               </div>
               
@@ -109,30 +149,31 @@ function AWPEstructura({ plotPlan, onCWACreada, onCWPCreado, selectedCWA, onSele
                         Work Packages en esta área:
                       </p>
                       <ul className="text-sm text-gray-300 space-y-1">
-                        {cwa.cwps.map(cwp => (
-                          <li key={cwp.id} className="flex items-center gap-2 p-2 bg-gray-800 rounded">
-                            {/* Ícono según si tiene geometría o no */}
-                            {cwp.shape_type ? (
-                              <svg className="w-4 h-4 text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                              </svg>
-                            ) : (
-                              <svg className="w-4 h-4 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                              </svg>
-                            )}
-                            <span className="text-green-300 font-mono">
-                              [{cwp.codigo}]
-                            </span>
-                            <span>{cwp.nombre}</span>
-                            {cwp.shape_type && (
-                              <span className="ml-auto text-xs bg-green-900 text-green-200 px-2 py-1 rounded">
-                                {cwp.shape_type}
+                        {cwa.cwps?.length > 0 ? (
+                          cwa.cwps.map(cwp => (
+                            <li key={cwp.id} className="flex items-center gap-2 p-2 bg-gray-800 rounded">
+                              {/* Ícono según si tiene geometría o no */}
+                              {cwp.shape_type ? (
+                                <svg className="w-4 h-4 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                </svg>
+                              ) : (
+                                <svg className="w-4 h-4 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                </svg>
+                              )}
+                              <span className="text-green-300 font-mono text-xs">
+                                [{cwp.codigo}]
                               </span>
-                            )}
-                          </li>
-                        ))}
-                        {cwa.cwps.length === 0 && (
+                              <span className="flex-1">{cwp.nombre}</span>
+                              {cwp.shape_type && (
+                                <span className="ml-auto text-xs bg-green-900 text-green-200 px-2 py-1 rounded">
+                                  {cwp.shape_type}
+                                </span>
+                              )}
+                            </li>
+                          ))
+                        ) : (
                           <li className="text-gray-500 italic text-xs">
                             No hay CWPs todavía. Dibuja formas en el plano o créalos manualmente.
                           </li>
@@ -145,7 +186,11 @@ function AWPEstructura({ plotPlan, onCWACreada, onCWPCreado, selectedCWA, onSele
                       <p className="text-xs text-gray-400 px-4 pt-2">
                         O crea un CWP manualmente:
                       </p>
-                      <CWPForm cwaId={cwa.id} onCWPCreado={onCWPCreado} />
+                      <CWPForm 
+                        cwaId={cwa.id} 
+                        onCWPCreado={onCWPCreado}
+                        disciplinas={proyecto?.disciplinas || []}
+                      />
                     </div>
                 </div>
               )}

@@ -379,3 +379,27 @@ class DependenciaCWPResponse(BaseModel):
     
     class Config:
         from_attributes = True
+
+
+        # backend/app/schemas.py - AGREGAR:
+
+class CWADetailResponse(BaseModel):
+    id: int
+    nombre: str
+    codigo: str
+    es_transversal: bool
+    cwps: List['CWPResponse'] = []
+    
+    class Config:
+        from_attributes = True
+
+class PlotPlanDetailResponse(BaseModel):
+    id: int
+    nombre: str
+    descripcion: Optional[str]
+    image_url: Optional[str]
+    proyecto_id: int
+    cwas: List[CWADetailResponse] = []
+    
+    class Config:
+        from_attributes = True
