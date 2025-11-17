@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from . import models, schemas
 from .services.codificador import CodificadorAWP
+from datetime import datetime
 
 
 # ============================================================================
@@ -820,3 +821,119 @@ def eliminar_dependencia(db: Session, dependencia_id: int):
     db.delete(db_dependencia)
     db.commit()
     return True
+
+# ============================================================================
+# MÉTODOS QUE FALTA AGREGAR A backend/app/crud.py
+# ============================================================================
+
+# Agregar estos métodos al final del archivo crud.py:
+
+def update_entregable(db: Session, db_entregable: models.EntregableEWP, entregable_update: schemas.EntregableEWPUpdate):
+    """Actualizar entregable"""
+    update_data = entregable_update.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_entregable, key, value)
+    
+    db_entregable.fecha_ultima_modificacion = datetime.utcnow()
+    db.commit()
+    db.refresh(db_entregable)
+    return db_entregable
+
+
+def eliminar_entregable(db: Session, entregable_id: int):
+    """Eliminar entregable"""
+    db_entregable = get_entregable_ewp(db, entregable_id)
+    if not db_entregable:
+        raise ValueError("Entregable no encontrado")
+    
+    db.delete(db_entregable)
+    db.commit()
+    return True
+
+
+def obtener_resumen_cwa(db: Session, cwa_id: int):
+    """Obtener resumen rápido de un CWA"""
+    db_cwa = get_cwa(db, cwa_id)
+    if not db_cwa:
+        raise ValueError("CWA no encontrado")
+    
+    cwps = get_cwps_por_cwa(db, cwa_id)
+    
+    return {
+        "id": db_cwa.id,
+        "codigo": db_cwa.codigo,
+        "nombre": db_cwa.nombre,
+        "es_transversal": db_cwa.es_transversal,
+        "cwps_count": len(cwps),
+        "ewps_count": sum(len(c.ewps) for c in cwps),
+        "pwps_count": sum(len(c.pwps) for c in cwps),
+        "iwps_count": sum(len(c.iwps) for c in cwps),
+    }
+
+
+def obtener_resumen_proyecto_awp(db: Session, proyecto_id: int):
+    """Resumen general del AWP del proyecto"""
+    db_proyecto = get_proyecto(db, proyecto_id)
+    if not db_proyecto:
+        raise ValueError("Proyecto no encontrado")
+    
+    plot_plans = get_plot_plans_por_proyecto(db, proyecto_id)
+    
+    total_cwas = 0
+    total_cwps = 0
+    total_ewps = 0
+    total_pwps = 0
+    total_iwps = 0
+    
+    for pp in plot_plans:
+        cwas = get_cwas_por_plot_plan(db, pp.id)
+        total_cwas += len(cwas)
+        
+        for cwa in cwas:
+            cwps = get_cwps_por_cwa(db, cwa.id)
+            total_cwps += len(cwps)
+            
+            for cwp in cwps:
+                total_ewps += len(get_ewps_por_cwp(db, cwp.id))
+                total_pwps += len(get_pwps_por_cwp(db, cwp.id))
+                total_iwps += len(get_iwps_por_cwp(db, cwp.id))
+    
+    return {
+        "proyecto_id": proyecto_id,
+        "plot_plans": len(plot_plans),
+        "cwas": total_cwas,
+        "cwps": total_cwps,
+        "ewps": total_ewps,
+        "pwps": total_pwps,
+        "iwps": total_iwps,
+    }
+
+
+def actualizar_restricciones_cwp(db: Session, cwp_id: int, restricciones_json: dict, restricciones_levantadas: bool):
+    """Actualizar restricciones de un CWP"""
+    db_cwp = get_cwp(db, cwp_id)
+    if not db_cwp:
+        raise ValueError("CWP no encontrado")
+    
+    db_cwp.restricciones_json = restricciones_json
+    db_cwp.restricciones_levantadas = restricciones_levantadas
+    
+    db.commit()
+    db.refresh(db_cwp)
+    return db_cwp
+
+
+def actualizar_prioridad_cwp(db: Session, cwp_id: int, prioridad: str):
+    """Actualizar prioridad de un CWP"""
+    db_cwp = get_cwp(db, cwp_id)
+    if not db_cwp:
+        raise ValueError("CWP no encontrado")
+    
+    if prioridad not in ["ALTA", "MEDIA", "BAJA"]:
+        raise ValueError("Prioridad debe ser ALTA, MEDIA o BAJA")
+    
+    db_cwp.prioridad = prioridad
+    
+    db.commit()
+    db.refresh(db_cwp)
+    return db_cwp

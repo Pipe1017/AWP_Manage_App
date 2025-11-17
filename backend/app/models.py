@@ -136,8 +136,8 @@ class CWP(Base):
     porcentaje_completitud = Column(Float, default=0.0)
     estado = Column(String(20), default="NO_INICIADO")
     
-    # RESTRICCIONES
-    restricciones_levantADAS = Column(Boolean, default=False)
+    # ✅ CORREGIDO: restricciones_levantadas (no restricciones_levantADAS)
+    restricciones_levantadas = Column(Boolean, default=False)
     restricciones_json = Column(JSON, nullable=True)
 
 
