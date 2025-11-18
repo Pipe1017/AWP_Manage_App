@@ -588,9 +588,12 @@ def listar_transversales_disponibles(db: Session, proyecto_id: int):
 # JERARQUÍA COMPLETA
 # ============================================================================
 
+# backend/app/crud.py
+
 def obtener_jerarquia_completa(db: Session, plot_plan_id: int):
     """
-    Obtiene la jerarquía completa: PlotPlan -> CWA -> CWP -> EWP/PWP/IWP -> Entregables
+    Obtiene la jerarquía completa con la NUEVA estructura:
+    PlotPlan -> CWA -> CWP -> Paquete -> Item
     """
     db_plot_plan = get_plot_plan(db, plot_plan_id)
     if not db_plot_plan:
@@ -633,101 +636,68 @@ def obtener_jerarquia_completa(db: Session, plot_plan_id: int):
                 "fecha_fin_prevista": str(cwp.fecha_fin_prevista) if cwp.fecha_fin_prevista else None,
                 "restricciones_levantadas": cwp.restricciones_levantadas,
                 "restricciones_json": cwp.restricciones_json,
-                "asignaciones_disciplina": [
-                    {
-                        "id": asig.id,
-                        "disciplina_id": asig.disciplina_id
-                    }
-                    for asig in cwp.asignaciones_disciplina
-                ],
-                "ewps": [],
-                "pwps": [],
-                "iwps": [],
-                "referencias_transversales": []
+                "disciplina_id": cwp.disciplina_id,
+                
+                # ✨ NUEVO: Paquetes unificados en lugar de EWP/IWP/PWP separados
+                "paquetes": []
             }
             
-            # EWPs
-            ewps = get_ewps_por_cwp(db, cwp.id)
-            for ewp in ewps:
-                ewp_data = {
-                    "id": ewp.id,
-                    "nombre": ewp.nombre,
-                    "codigo": ewp.codigo,
-                    "descripcion": ewp.descripcion,
-                    "estado": ewp.estado,
-                    "porcentaje_completitud": ewp.porcentaje_completitud,
-                    "fecha_publicacion_prevista": str(ewp.fecha_publicacion_prevista) if ewp.fecha_publicacion_prevista else None,
-                    "entregables": []
+            # ✨ Obtener PAQUETES (nueva estructura)
+            paquetes = db.query(models.Paquete).filter(
+                models.Paquete.cwp_id == cwp.id
+            ).all()
+            
+            for paquete in paquetes:
+                paquete_data = {
+                    "id": paquete.id,
+                    "codigo": paquete.codigo,
+                    "nombre": paquete.nombre,
+                    "descripcion": paquete.descripcion,
+                    "tipo": paquete.tipo,  # EWP, IWP, PWP, DWP
+                    "responsable": paquete.responsable,
+                    "estado": paquete.estado,
+                    "porcentaje_completitud": paquete.porcentaje_completitud,
+                    "fecha_inicio_prevista": str(paquete.fecha_inicio_prevista) if paquete.fecha_inicio_prevista else None,
+                    "fecha_fin_prevista": str(paquete.fecha_fin_prevista) if paquete.fecha_fin_prevista else None,
+                    "metadata": paquete.metadata,
+                    "cwp_id": paquete.cwp_id,
+                    
+                    # ✨ NUEVO: Items dentro del paquete
+                    "items": []
                 }
                 
-                entregables = get_entregables_por_ewp(db, ewp.id)
-                for entregable in entregables:
-                    entregable_data = {
-                        "id": entregable.id,
-                        "nombre": entregable.nombre,
-                        "codigo": entregable.codigo,
-                        "estado_documento": entregable.estado_documento,
-                        "responsable": entregable.responsable
+                # Obtener ITEMS del paquete
+                items = db.query(models.Item).filter(
+                    models.Item.paquete_id == paquete.id
+                ).all()
+                
+                for item in items:
+                    # Obtener tipo de entregable
+                    tipo_entregable = db.query(models.TipoEntregable).filter(
+                        models.TipoEntregable.id == item.tipo_entregable_id
+                    ).first()
+                    
+                    item_data = {
+                        "id": item.id,
+                        "codigo": item.codigo,
+                        "nombre": item.nombre,
+                        "descripcion": item.descripcion,
+                        "responsable": item.responsable,
+                        "estado": item.estado,
+                        "porcentaje_completitud": item.porcentaje_completitud,
+                        "version": item.version,
+                        "tipo_entregable_id": item.tipo_entregable_id,
+                        "tipo_entregable_codigo": tipo_entregable.codigo if tipo_entregable else None,
+                        "tipo_entregable_nombre": tipo_entregable.nombre if tipo_entregable else None,
+                        "es_entregable_cliente": item.es_entregable_cliente,
+                        "requiere_aprobacion": item.requiere_aprobacion,
+                        "archivo_url": item.archivo_url,
+                        "metadata": item.metadata
                     }
-                    ewp_data["entregables"].append(entregable_data)
+                    
+                    paquete_data["items"].append(item_data)
                 
-                cwp_data["ewps"].append(ewp_data)
-            
-            # PWPs
-            pwps = get_pwps_por_cwp(db, cwp.id)
-            for pwp in pwps:
-                pwp_data = {
-                    "id": pwp.id,
-                    "nombre": pwp.nombre,
-                    "codigo": pwp.codigo,
-                    "descripcion": pwp.descripcion,
-                    "estado": pwp.estado,
-                    "porcentaje_completitud": pwp.porcentaje_completitud,
-                    "fecha_ros_prevista": str(pwp.fecha_ros_prevista) if pwp.fecha_ros_prevista else None,
-                    "items_adquisicion": [
-                        {
-                            "id": item.id,
-                            "nombre": item.nombre
-                        }
-                        for item in pwp.items_adquisicion
-                    ]
-                }
-                cwp_data["pwps"].append(pwp_data)
-            
-            # IWPs
-            iwps = get_iwps_por_cwp(db, cwp.id)
-            for iwp in iwps:
-                iwp_data = {
-                    "id": iwp.id,
-                    "nombre": iwp.nombre,
-                    "codigo": iwp.codigo,
-                    "descripcion": iwp.descripcion,
-                    "estado": iwp.estado,
-                    "porcentaje_completitud": iwp.porcentaje_completitud,
-                    "fecha_inicio_prevista": str(iwp.fecha_inicio_prevista) if iwp.fecha_inicio_prevista else None,
-                    "fecha_fin_prevista": str(iwp.fecha_fin_prevista) if iwp.fecha_fin_prevista else None,
-                    "items_instalacion": [
-                        {
-                            "id": item.id,
-                            "nombre": item.nombre
-                        }
-                        for item in iwp.items_instalacion
-                    ]
-                }
-                cwp_data["iwps"].append(iwp_data)
-            
-            # Referencias transversales
-            referencias = get_referencias_transversales(db, cwp.id)
-            cwp_data["referencias_transversales"] = [
-                {
-                    "id": ref.id,
-                    "ewp_id": ref.ewp_transversal_id,
-                    "pwp_id": ref.pwp_transversal_id,
-                    "iwp_id": ref.iwp_transversal_id,
-                    "completado": ref.completado
-                }
-                for ref in referencias
-            ]
+                cwp_data["paquetes"].append(paquete_data)
             
             cwa_data["cwps"].append(cwp_data)
         

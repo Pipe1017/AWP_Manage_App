@@ -55,10 +55,12 @@ class TipoEntregableResponse(BaseModel):
 class CWPCreate(BaseModel):
     nombre: str
     descripcion: Optional[str] = None
+    area_id: int  # ✨ NUEVO: ID del CWA (antes cwa_id implícito)
+    disciplina_id: int  # ✨ NUEVO: ID de disciplina directa
     duracion_dias: Optional[int] = None
     fecha_inicio_prevista: Optional[date] = None
     fecha_fin_prevista: Optional[date] = None
-    secuencia: Optional[int] = None
+    secuencia: Optional[int] = 0
     prioridad: Optional[str] = "MEDIA"
 
 
@@ -421,6 +423,127 @@ class DependenciaCWPResponse(BaseModel):
     tipo_dependencia: str
     duracion_lag_dias: int
     descripcion: Optional[str]
+    
+    class Config:
+        from_attributes = True
+
+ ============================================================================
+# ✨ NUEVOS SCHEMAS: PAQUETE
+# ============================================================================
+
+class PaqueteCreate(BaseModel):
+    nombre: str
+    descripcion: Optional[str] = None
+    tipo: str  # 'EWP', 'IWP', 'PWP', 'DWP'
+    responsable: str  # 'Firma' o 'Cliente'
+    fecha_inicio_prevista: Optional[date] = None
+    fecha_fin_prevista: Optional[date] = None
+    metadata: Optional[dict] = None
+
+
+class PaqueteUpdate(BaseModel):
+    nombre: Optional[str] = None
+    descripcion: Optional[str] = None
+    responsable: Optional[str] = None
+    fecha_inicio_prevista: Optional[date] = None
+    fecha_fin_prevista: Optional[date] = None
+    estado: Optional[str] = None
+    porcentaje_completitud: Optional[float] = None
+    metadata: Optional[dict] = None
+
+
+class PaqueteResponse(BaseModel):
+    id: int
+    codigo: str
+    nombre: str
+    descripcion: Optional[str]
+    tipo: str
+    responsable: str
+    cwp_id: int
+    fecha_inicio_prevista: Optional[date]
+    fecha_fin_prevista: Optional[date]
+    porcentaje_completitud: float
+    estado: str
+    metadata: Optional[dict]
+    fecha_creacion: datetime
+    fecha_actualizacion: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+# ============================================================================
+# ✨ NUEVOS SCHEMAS: ITEM
+# ============================================================================
+
+class ItemCreate(BaseModel):
+    nombre: str
+    descripcion: Optional[str] = None
+    tipo_entregable_id: int
+    responsable: str  # 'Firma' o 'Cliente'
+    es_entregable_cliente: Optional[bool] = False
+    requiere_aprobacion: Optional[bool] = True
+    metadata: Optional[dict] = None
+
+
+class ItemUpdate(BaseModel):
+    nombre: Optional[str] = None
+    descripcion: Optional[str] = None
+    responsable: Optional[str] = None
+    version: Optional[int] = None
+    estado: Optional[str] = None
+    porcentaje_completitud: Optional[float] = None
+    es_entregable_cliente: Optional[bool] = None
+    requiere_aprobacion: Optional[bool] = None
+    metadata: Optional[dict] = None
+
+
+class ItemResponse(BaseModel):
+    id: int
+    codigo: str
+    nombre: str
+    descripcion: Optional[str]
+    tipo_entregable_id: int
+    responsable: str
+    paquete_id: int
+    version: int
+    estado: str
+    porcentaje_completitud: float
+    archivo_url: Optional[str]
+    es_entregable_cliente: bool
+    requiere_aprobacion: bool
+    metadata: Optional[dict]
+    fecha_creacion: datetime
+    fecha_actualizacion: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+# ============================================================================
+# ✨ NUEVOS SCHEMAS: DEPENDENCIA
+# ============================================================================
+
+class DependenciaCreate(BaseModel):
+    tipo_origen: str  # 'CWP', 'PAQUETE', 'ITEM'
+    origen_id: int
+    tipo_destino: str
+    destino_id: int
+    tipo_dependencia: str = "FIN-INICIO"
+    lag_dias: Optional[int] = 0
+    descripcion: Optional[str] = None
+
+
+class DependenciaResponse(BaseModel):
+    id: int
+    tipo_origen: str
+    origen_id: int
+    tipo_destino: str
+    destino_id: int
+    tipo_dependencia: str
+    lag_dias: int
+    descripcion: Optional[str]
+    fecha_creacion: datetime
     
     class Config:
         from_attributes = True
