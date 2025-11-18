@@ -31,6 +31,8 @@ class TipoEntregableCreate(BaseModel):
     codigo: str
     categoria_awp: str  # CWE, CWI, etc
     descripcion: Optional[str] = None
+    disciplina_id: Optional[int] = None  # ✨ Ahora opcional
+    es_generico: Optional[bool] = False  # ✨ Nuevo
 
 
 class TipoEntregableResponse(BaseModel):
@@ -39,6 +41,8 @@ class TipoEntregableResponse(BaseModel):
     codigo: str
     categoria_awp: str
     descripcion: Optional[str]
+    disciplina_id: Optional[int]  # ✨ Ahora opcional
+    es_generico: bool  # ✨ Nuevo
     
     class Config:
         from_attributes = True
@@ -103,6 +107,12 @@ class CWACreate(BaseModel):
     codigo: str
     descripcion: Optional[str] = None
     es_transversal: Optional[bool] = False
+
+class CWAUpdate(BaseModel):
+    nombre: Optional[str] = None
+    descripcion: Optional[str] = None
+    codigo: Optional[str] = None
+    es_transversal: Optional[bool] = None
 
 
 class CWAResponse(BaseModel):

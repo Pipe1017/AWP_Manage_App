@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import PlotPlan from '../modules/plotplan/PlotPlan';
 import AWPTableConsolidada from '../modules/awp/AWPTableConsolidada';
-import ConfigPanel from '../forms/ConfigPanel';
+// import ConfigPanel from '../forms/ConfigPanel'; // <-- Eliminado
 import UploadPlotPlanForm from '../modules/upload/UploadPlotPlanForm';
 
 const API_URL = 'http://192.168.1.4:8000/api/v1';
@@ -11,7 +11,7 @@ function ResumenTab({ proyecto, onProyectoUpdate }) {
   const [selectedPlotPlanId, setSelectedPlotPlanId] = useState(null);
   const [selectedCWA, setSelectedCWA] = useState(null);
   const [filteredCWAId, setFilteredCWAId] = useState(null);
-  const [showConfig, setShowConfig] = useState(false);
+  // const [showConfig, setShowConfig] = useState(false); // <-- Eliminado
   const [isLoadingPlotPlan, setIsLoadingPlotPlan] = useState(false);
 
   // Inicializar con el primer plot plan
@@ -121,9 +121,9 @@ function ResumenTab({ proyecto, onProyectoUpdate }) {
     }, 100);
   };
 
-  const handleDisciplinaCreada = async (nuevaDisciplina) => {
-    await recargarProyecto();
-  };
+  // const handleDisciplinaCreada = async (nuevaDisciplina) => { // <-- Eliminado (ya no se usa)
+  //   await recargarProyecto();
+  // };
 
   const handleCWACreada = async () => {
     console.log("✅ CWA creado, recargando plot plan...");
@@ -230,33 +230,14 @@ function ResumenTab({ proyecto, onProyectoUpdate }) {
             </select>
           )}
 
-          {/* Botón Configuración */}
-          <button
-            onClick={() => setShowConfig(!showConfig)}
-            className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-xs font-medium flex items-center gap-2 transition-colors"
-          >
-            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            Config
-          </button>
+          {/* Botón Configuración <-- Eliminado */}
         </div>
       </div>
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
-        {/* Panel de Configuración (colapsable) */}
-        {showConfig && (
-          <div className="p-6 border-b border-gray-700 bg-gray-800/30">
-            <ConfigPanel
-              proyecto={proyecto}
-              onDisciplinaCreada={handleDisciplinaCreada}
-              selectedPlotPlanId={selectedPlotPlanId}
-            />
-          </div>
-        )}
-
+        {/* Panel de Configuración (colapsable) <-- Eliminado */}
+        
         {/* Upload Plot Plan */}
         <div className="p-6 border-b border-gray-700 bg-gray-800/20">
           <div className="flex items-center justify-between mb-4">

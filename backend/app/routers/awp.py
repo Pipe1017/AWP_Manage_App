@@ -492,3 +492,43 @@ def eliminar_dependencia_cwp(
         return {"message": "Dependencia eliminada exitosamente"}
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    
+# Mantener estructura actual pero mejorar lógica interna:
+
+@router.post("/cwp/")
+def create_cwp(
+    nombre: str,
+    area_id: int,  # Referencia a CWA
+    disciplina_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Auto-genera: CWP-{area.codigo}-{disciplina.codigo}-{consecutivo}
+    Ejemplo: CWP-005-01-CIV-0001
+    """
+    
+@router.post("/cwp/{cwp_id}/paquete")
+def create_paquete(
+    cwp_id: int,
+    nombre: str,
+    tipo_paquete: str,  # EWP, IWP, PWP, DWP
+    responsable: str,   # "Firma" o "Cliente"
+    db: Session = Depends(get_db)
+):
+    """
+    Auto-genera: {cwp.codigo}-{tipo}-{consecutivo}
+    Ejemplo: CWP-005-01-CIV-0001-DWP-001
+    """
+
+@router.post("/paquete/{paquete_id}/item")
+def create_item(
+    paquete_id: int,
+    nombre: str,
+    tipo_entregable_id: int,  # Del catálogo filtrado
+    responsable: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Auto-genera: {paquete.codigo}-{tipo.codigo}-{consecutivo}
+    Ejemplo: CWP-005-01-CIV-0001-DWP-001-PLN-001
+    """

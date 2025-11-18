@@ -1,9 +1,14 @@
-import React from 'react';
-import DashboardHeader from '../common/DashboardHeader';
-import DashboardSidebar from '../common/DashboardSidebar';
-import ResumenTab from '../sections/ResumenTab';
-import CronogramaTab from '../sections/CronogramaSection';
-import ArbolTab from '../sections/ArbolSection';
+// frontend/src/components/layouts/DashboardLayout.jsx
+
+// --- IMPORTACIONES EXISTENTES ---
+import ConfiguracionSection from '../sections/ConfiguracionSection';
+
+// --- IMPORTACIONES FALTANTES (AGREGAR ESTAS) ---
+import DashboardHeader from '../common/DashboardHeader'; // (Ajusta la ruta si es necesario)
+import DashboardSidebar from '../common/DashboardSidebar'; // (Ajusta la ruta si es necesario)
+import ResumenTab from '../sections/ResumenTab'; // (Probablemente en una carpeta 'sections')
+import CronogramaTab from '../sections/CronogramaSection'; // (Probablemente en una carpeta 'sections')
+import ArbolTab from '../sections/ArbolSection'; // (Probablemente en una carpeta 'sections')
 
 function ProyectoDashboardLayout({
   proyecto,
@@ -16,7 +21,6 @@ function ProyectoDashboardLayout({
 }) {
   return (
     <div className="bg-gray-900 text-white min-h-screen flex flex-col">
-      {/* Header */}
       <DashboardHeader
         proyecto={proyecto}
         onBack={onBack}
@@ -24,9 +28,7 @@ function ProyectoDashboardLayout({
         setSidebarExpanded={setSidebarExpanded}
       />
 
-      {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Sidebar */}
         <DashboardSidebar
           proyecto={proyecto}
           selectedSection={selectedSection}
@@ -34,7 +36,6 @@ function ProyectoDashboardLayout({
           isExpanded={sidebarExpanded}
         />
 
-        {/* Content Area */}
         <div className="flex-1 overflow-auto bg-gray-900">
           {selectedSection === 'resumen' && (
             <ResumenTab
@@ -49,6 +50,14 @@ function ProyectoDashboardLayout({
 
           {selectedSection === 'arbol' && (
             <ArbolTab proyecto={proyecto} />
+          )}
+
+          {/* ✨ NUEVA SECCIÓN */}
+          {selectedSection === 'configuracion' && (
+            <ConfiguracionSection
+              proyecto={proyecto}
+              onProyectoUpdate={onProyectoUpdate}
+            />
           )}
         </div>
       </div>

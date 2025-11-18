@@ -35,15 +35,22 @@ class Disciplina(Base):
     asignaciones_ewp = relationship("AsignacionDisciplinaEWP", back_populates="disciplina", cascade="all, delete-orphan")
 
 
+# backend/app/models.py
+
 class TipoEntregable(Base):
     """Tipos de entregables por disciplina (P&ID, CALC, PLANO, etc)"""
     __tablename__ = "tipos_entregables"
     id = Column(Integer, primary_key=True, index=True)
     nombre = Column(String, nullable=False)
-    codigo = Column(String(10), nullable=False)  # ej: "P&ID", "CALC", "PLANO"
+    codigo = Column(String(10), nullable=False)  # ej: "PLN", "CAL", "HDJ"
     categoria_awp = Column(String(10), nullable=False)  # CWE, CWI, etc
     descripcion = Column(Text, nullable=True)
-    disciplina_id = Column(Integer, ForeignKey("disciplinas.id"))
+    
+    # ✨ CAMBIO: Permitir NULL para tipos genéricos (GEN)
+    disciplina_id = Column(Integer, ForeignKey("disciplinas.id"), nullable=True)
+    
+    # ✨ NUEVO: Flag para indicar si es genérico
+    es_generico = Column(Boolean, default=False)
     
     disciplina = relationship("Disciplina", back_populates="tipos_entregables")
     entregables_ewp = relationship("EntregableEWP", back_populates="tipo_entregable")
@@ -344,3 +351,5 @@ class DependenciaCWP(Base):
     
     cwp_origen = relationship("CWP", foreign_keys=[cwp_origen_id], back_populates="dependencias")
     cwp_destino = relationship("CWP", foreign_keys=[cwp_destino_id], back_populates="dependencias_inversas")
+
+

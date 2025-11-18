@@ -65,11 +65,16 @@ def get_disciplinas_por_proyecto(db: Session, proyecto_id: int):
 # TIPOS DE ENTREGABLES
 # ============================================================================
 
-def create_tipo_entregable(db: Session, tipo: schemas.TipoEntregableCreate, disciplina_id: int):
+def create_tipo_entregable(db: Session, tipo: schemas.TipoEntregableCreate, disciplina_id: int = None):
     """Crear tipo de entregable"""
+    # ✨ CORREGIR: Manejar caso cuando disciplina_id es None (genéricos)
     db_tipo = models.TipoEntregable(
-        **tipo.model_dump(),
-        disciplina_id=disciplina_id
+        nombre=tipo.nombre,
+        codigo=tipo.codigo,
+        categoria_awp=tipo.categoria_awp,
+        descripcion=tipo.descripcion,
+        disciplina_id=disciplina_id,  # Puede ser None para genéricos
+        es_generico=tipo.es_generico if hasattr(tipo, 'es_generico') else False
     )
     db.add(db_tipo)
     db.commit()
@@ -159,6 +164,31 @@ def update_cwa_geometry(db: Session, cwa_id: int, shape_type: str, shape_data: d
     db.refresh(db_cwa)
     
     return db_cwa
+
+def update_cwa(db: Session, cwa_id: int, cwa_update: schemas.CWAUpdate):
+    """Actualizar CWA"""
+    db_cwa = get_cwa(db, cwa_id)
+    if not db_cwa:
+        raise ValueError("CWA no encontrado")
+    
+    update_data = cwa_update.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_cwa, key, value)
+    
+    db.commit()
+    db.refresh(db_cwa)
+    return db_cwa
+
+
+def delete_cwa(db: Session, cwa_id: int):
+    """Eliminar CWA (y cascada a sus CWPs)"""
+    db_cwa = get_cwa(db, cwa_id)
+    if not db_cwa:
+        raise ValueError("CWA no encontrado")
+    
+    db.delete(db_cwa)
+    db.commit()
+    return True
 
 
 # ============================================================================

@@ -113,14 +113,68 @@ def create_tipo_entregable(
     if db_proyecto is None:
         raise HTTPException(status_code=404, detail="Proyecto no encontrado")
     
-    db_disciplina = db.query(models.Disciplina).filter(
-        models.Disciplina.id == disciplina_id,
-        models.Disciplina.proyecto_id == proyecto_id
-    ).first()
-    if db_disciplina is None:
-        raise HTTPException(status_code=404, detail="Disciplina no encontrada")
+    # ✨ CAMBIO: Permitir disciplina_id NULL para genéricos
+    if not tipo.es_generico:
+        db_disciplina = db.query(models.Disciplina).filter(
+            models.Disciplina.id == disciplina_id,
+            models.Disciplina.proyecto_id == proyecto_id
+        ).first()
+        if db_disciplina is None:
+            raise HTTPException(status_code=404, detail="Disciplina no encontrada")
     
-    return crud.create_tipo_entregable(db=db, tipo=tipo, disciplina_id=disciplina_id)
+    return crud.create_tipo_entregable(db=db, tipo=tipo, disciplina_id=disciplina_id if not tipo.es_generico else None)
+
+# ✨ NUEVO: Endpoint para crear tipos genéricos
+@router.post("/{proyecto_id}/tipos_entregables_genericos/", response_model=schemas.TipoEntregableResponse)
+def create_tipo_entregable_generico(
+    proyecto_id: int,
+    tipo: schemas.TipoEntregableCreate,
+    db: Session = Depends(get_db)
+):
+    """Crear tipo de entregable genérico (no vinculado a disciplina)"""
+    db_proyecto = crud.get_proyecto(db, proyecto_id=proyecto_id)
+    if db_proyecto is None:
+        raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+    
+    tipo.es_generico = True
+    tipo.disciplina_id = None
+    
+    # Crear el tipo sin disciplina
+    db_tipo = models.TipoEntregable(
+        **tipo.model_dump(exclude={'disciplina_id'}),
+        disciplina_id=None
+    )
+    db.add(db_tipo)
+    db.commit()
+    db.refresh(db_tipo)
+    
+    return db_tipo
+
+
+# ✨ NUEVO: Obtener todos los tipos de entregable (incluidos genéricos)
+@router.get("/{proyecto_id}/tipos_entregables/", response_model=List[schemas.TipoEntregableResponse])
+def read_tipos_entregables_proyecto(
+    proyecto_id: int,
+    db: Session = Depends(get_db)
+):
+    """Obtener todos los tipos de entregables del proyecto (por disciplina y genéricos)"""
+    db_proyecto = crud.get_proyecto(db, proyecto_id=proyecto_id)
+    if db_proyecto is None:
+        raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+    
+    # Tipos de disciplinas del proyecto
+    tipos_disciplinas = db.query(models.TipoEntregable).join(
+        models.Disciplina
+    ).filter(
+        models.Disciplina.proyecto_id == proyecto_id
+    ).all()
+    
+    # Tipos genéricos (sin disciplina)
+    tipos_genericos = db.query(models.TipoEntregable).filter(
+        models.TipoEntregable.es_generico == True
+    ).all()
+    
+    return tipos_disciplinas + tipos_genericos
 
 
 @router.get("/{proyecto_id}/disciplinas/{disciplina_id}/tipos_entregables/", response_model=List[schemas.TipoEntregableResponse])
@@ -261,6 +315,60 @@ def create_cwa(
         raise HTTPException(status_code=400, detail="El código del CWA ya existe")
     
     return crud.create_cwa(db=db, cwa=cwa, plot_plan_id=plot_plan_id)
+
+@router.put("/{proyecto_id}/plot_plans/{plot_plan_id}/cwa/{cwa_id}", response_model=schemas.CWAResponse)
+def update_cwa(
+    proyecto_id: int,
+    plot_plan_id: int,
+    cwa_id: int,
+    cwa_update: schemas.CWAUpdate,
+    db: Session = Depends(get_db)
+):
+    """Actualizar CWA"""
+    db_proyecto = crud.get_proyecto(db, proyecto_id=proyecto_id)
+    if db_proyecto is None:
+        raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+    
+    db_cwa = crud.get_cwa(db, cwa_id)
+    if not db_cwa or db_cwa.plot_plan_id != plot_plan_id:
+        raise HTTPException(status_code=404, detail="CWA no encontrado en este plot plan")
+    
+    try:
+        updated_cwa = crud.update_cwa(db, cwa_id, cwa_update)
+        return updated_cwa
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.delete("/{proyecto_id}/plot_plans/{plot_plan_id}/cwa/{cwa_id}")
+def delete_cwa(
+    proyecto_id: int,
+    plot_plan_id: int,
+    cwa_id: int,
+    db: Session = Depends(get_db)
+):
+    """Eliminar CWA"""
+    db_proyecto = crud.get_proyecto(db, proyecto_id=proyecto_id)
+    if db_proyecto is None:
+        raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+    
+    db_cwa = crud.get_cwa(db, cwa_id)
+    if not db_cwa or db_cwa.plot_plan_id != plot_plan_id:
+        raise HTTPException(status_code=404, detail="CWA no encontrado en este plot plan")
+    
+    # Verificar si tiene CWPs asociados
+    cwps_count = len(crud.get_cwps_por_cwa(db, cwa_id))
+    if cwps_count > 0:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"No se puede eliminar. El CWA tiene {cwps_count} CWP(s) asociado(s)"
+        )
+    
+    try:
+        crud.delete_cwa(db, cwa_id)
+        return {"message": "CWA eliminado exitosamente"}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 
 @router.get("/{proyecto_id}/plot_plans/{plot_plan_id}/cwa/", response_model=List[schemas.CWAResponse])
