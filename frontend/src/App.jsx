@@ -3,7 +3,7 @@ import axios from 'axios';
 import ProyectosLanding from './pages/ProyectosLanding';
 import ProyectoDashboard from './pages/ProyectoDashboard';
 
-const API_URL = 'http://192.168.1.4:8000/api/v1';
+const API_URL = 'http://10.92.12.84:8000/api/v1';
 
 function App() {
   const [view, setView] = useState('landing');

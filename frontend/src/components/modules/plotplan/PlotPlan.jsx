@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Stage, Layer, Image, Rect, Circle, Line, Text, Tag, Label } from 'react-konva'; 
 import axios from 'axios';
 
-const API_URL = 'http://192.168.1.4:8000/api/v1';
+const API_URL = 'http://10.92.12.84:8000/api/v1';
 
 // Paleta de colores HATCH
 const HATCH_COLORS = {
@@ -25,7 +25,7 @@ const useImageLoader = (src) => {
     }
     
     const img = new window.Image();
-    const fullSrc = `http://192.168.1.4:8000${src}`;
+    const fullSrc = `http://10.92.12.84:8000${src}`;
     img.src = fullSrc;
     img.crossOrigin = "Anonymous";
     

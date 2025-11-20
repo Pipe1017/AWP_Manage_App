@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 
-const API_URL = 'http://192.168.1.4:8000';
+const API_URL = 'http://10.92.12.84:8000';
 const AWP_API_URL = `${API_URL}/api/v1/awp`;
 
 // --- Formulario para CWP (Componente interno) ---

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
-const API_URL = 'http://192.168.1.4:8000/api/v1';
+const API_URL = 'http://10.92.12.84:8000/api/v1';
 
 function AWPTableConsolidada({ plotPlanId, proyecto, filteredCWAId, onDataChange }) {
   const [jerarquia, setJerarquia] = useState(null);

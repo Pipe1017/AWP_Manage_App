@@ -17,19 +17,23 @@ app = FastAPI(title="AWP Management System")
 os.makedirs("uploads", exist_ok=True)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
-# --- CORS: CONFIGURACIÓN CORRECTA PARA MAC ---
-# ✅ Primero: permitir todos los orígenes en desarrollo
+# --- CORS: CONFIGURACIÓN ACTUALIZADA CON IP POR CABLE ---
+# Es necesario listar explícitamente los orígenes si allow_credentials=True.
 origins = [
-    "*",  # Permite TODO en desarrollo (CAMBIAR EN PRODUCCIÓN)
+    "http://localhost:3000",       # Acceso local (tú)
+    "http://127.0.0.1:3000",       # Alternativa de localhost
+    
+    # 🚨 NUEVA IP DE CABLE PARA COMPARTIR 🚨
+    "http://10.92.12.84:3000",   # Tu IP de la empresa (Frontend)
+    "http://10.92.12.84:8000",   # Tu IP de la empresa (Backend, si lo acceden directo)
+    
+    # Puerto interno de Vite
+    "http://localhost:5173",       
 ]
-
-# Si quieres ser más específico:
-origins_specific = [
-    ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,  # Usa origins para permitir TODO
+    allow_origins=origins,  # Usar la lista de orígenes específicos
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

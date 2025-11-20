@@ -8,7 +8,7 @@ services:
       - POSTGRES_PASSWORD=admin
       - POSTGRES_DB=awp_db
     ports:
-      - "192.168.1.4:5433:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./.docker/db/init.sql:/docker-entrypoint-initdb.d/init.sql
@@ -19,7 +19,7 @@ services:
     build:
       context: ./backend
     ports:
-      - "192.168.1.4:8000:8000"
+      - "8000:8000"
     volumes:
       - ./backend:/app
     depends_on:
@@ -33,12 +33,15 @@ services:
     build:
       context: ./frontend
     ports:
-      - "192.168.1.4:3000:5173"
+      - "3000:5173"
     volumes:
       - ./frontend:/app
       - /app/node_modules
     depends_on:
       - backend
+    environment:
+      # AÑADIDO: Esta variable es leída por React/Vite para saber dónde está el Backend
+      - VITE_API_URL=http://localhost:8000
 
 volumes:
   postgres_data:

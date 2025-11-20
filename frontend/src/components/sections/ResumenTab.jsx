@@ -5,7 +5,7 @@ import AWPTableConsolidada from '../modules/awp/AWPTableConsolidada';
 // import ConfigPanel from '../forms/ConfigPanel'; // <-- Eliminado
 import UploadPlotPlanForm from '../modules/upload/UploadPlotPlanForm';
 
-const API_URL = 'http://192.168.1.4:8000/api/v1';
+const API_URL = 'http://10.92.12.84:8000/api/v1';
 
 function ResumenTab({ proyecto, onProyectoUpdate }) {
   const [selectedPlotPlanId, setSelectedPlotPlanId] = useState(null);
