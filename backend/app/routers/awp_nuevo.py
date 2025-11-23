@@ -9,7 +9,7 @@ from ..database import get_db
 from ..crud_nuevo import (
     create_cwp_auto, update_cwp, delete_cwp,
     create_paquete_auto, create_item_simple,
-    smart_import_awp, link_items_from_source,
+    smart_import_awp, link_items_from_source, obtener_jerarquia_global,
     get_tipos_entregables_disponibles, get_paquete, get_paquetes_por_cwp, get_item, get_items_por_paquete
 )
 import pandas as pd
@@ -20,11 +20,8 @@ router = APIRouter(prefix="/awp-nuevo", tags=["AWP Nuevo"])
 # --- CWA (Update Prioridad) ---
 @router.put("/cwa/{cwa_id}", response_model=schemas.CWAResponse)
 def update_cwa_endpoint(cwa_id: int, cwa_update: schemas.CWAUpdate, db: Session = Depends(get_db)):
-    # Reutilizamos crud.update_cwa existente para actualizar prioridad
-    try:
-        return crud.update_cwa(db, cwa_id, cwa_update)
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    try: return crud.update_cwa(db, cwa_id, cwa_update)
+    except ValueError as e: raise HTTPException(status_code=404, detail=str(e))
 
 # --- CWP ---
 @router.post("/cwp", response_model=schemas.CWPResponse)
@@ -39,9 +36,7 @@ def update_cwp_endpoint(cwp_id: int, cwp_update: schemas.CWPUpdate, db: Session 
 
 @router.delete("/cwp/{cwp_id}")
 def delete_cwp_endpoint(cwp_id: int, db: Session = Depends(get_db)):
-    try:
-        delete_cwp(db, cwp_id)
-        return {"message": "CWP eliminado"}
+    try: delete_cwp(db, cwp_id); return {"message": "Eliminado"}
     except ValueError as e: raise HTTPException(status_code=404, detail=str(e))
 
 @router.get("/cwp/{cwp_id}/tipos-entregables-disponibles")
@@ -53,7 +48,7 @@ def get_tipos_disponibles(cwp_id: int, db: Session = Depends(get_db)):
 @router.post("/cwp/{cwp_id}/paquete", response_model=schemas.PaqueteResponse)
 def create_paquete(cwp_id: int, paquete: schemas.PaqueteCreate, db: Session = Depends(get_db)):
     try: return create_paquete_auto(db, paquete, cwp_id)
-    except ValueError as e: raise HTTPException(status_code=400, detail=str(e))
+    except ValueError as e: raise HTTPException(400, str(e))
 
 @router.get("/cwp/{cwp_id}/paquetes", response_model=List[schemas.PaqueteResponse])
 def read_paquetes(cwp_id: int, db: Session = Depends(get_db)): return get_paquetes_por_cwp(db, cwp_id)
@@ -68,10 +63,8 @@ def read_paquete(paquete_id: int, db: Session = Depends(get_db)):
 def update_paquete(paquete_id: int, p: schemas.PaqueteUpdate, db: Session = Depends(get_db)):
     db_p = get_paquete(db, paquete_id)
     if not db_p: raise HTTPException(404)
-    data = p.model_dump(exclude_unset=True)
-    for k, v in data.items(): setattr(db_p, k, v)
-    db.commit(); db.refresh(db_p)
-    return db_p
+    for k, v in p.model_dump(exclude_unset=True).items(): setattr(db_p, k, v)
+    db.commit(); db.refresh(db_p); return db_p
 
 @router.delete("/paquete/{paquete_id}")
 def delete_paquete_endpoint(paquete_id: int, db: Session = Depends(get_db)):
@@ -98,10 +91,8 @@ def read_item(item_id: int, db: Session = Depends(get_db)):
 def update_item(item_id: int, i: schemas.ItemUpdate, db: Session = Depends(get_db)):
     db_i = get_item(db, item_id)
     if not db_i: raise HTTPException(404)
-    data = i.model_dump(exclude_unset=True)
-    for k, v in data.items(): setattr(db_i, k, v)
-    db.commit(); db.refresh(db_i)
-    return db_i
+    for k, v in i.model_dump(exclude_unset=True).items(): setattr(db_i, k, v)
+    db.commit(); db.refresh(db_i); return db_i
 
 @router.delete("/item/{item_id}")
 def delete_item_endpoint(item_id: int, db: Session = Depends(get_db)):
@@ -109,23 +100,23 @@ def delete_item_endpoint(item_id: int, db: Session = Depends(get_db)):
     if not i: raise HTTPException(404)
     db.delete(i); db.commit(); return {"msg": "Deleted"}
 
-# --- VINCULACIÓN ---
+# --- LINKS ---
 @router.post("/paquete/{paquete_id}/vincular-items")
 def vincular_items(paquete_id: int, req: schemas.ItemLinkRequest, db: Session = Depends(get_db)):
-    try:
-        count = link_items_from_source(db, paquete_id, req.source_item_ids)
-        return {"mensaje": f"Vinculados {count}"}
+    try: return {"mensaje": f"Vinculados {link_items_from_source(db, paquete_id, req.source_item_ids)}"}
     except ValueError as e: raise HTTPException(400, str(e))
 
 @router.get("/proyectos/{proyecto_id}/items-disponibles")
 def get_available_items(proyecto_id: int, filter_type: str = "ALL", db: Session = Depends(get_db)):
     query = db.query(models.Item).join(models.Paquete).join(models.CWP).join(models.CWA).join(models.PlotPlan).filter(models.PlotPlan.proyecto_id == proyecto_id)
-    if filter_type == "TRANSVERSAL":
-        query = query.filter(models.CWA.es_transversal == True)
-    items = query.all()
-    return [{"id": i.id, "nombre": i.nombre, "paquete": i.paquete.codigo, "cwa": i.paquete.cwp.cwa.nombre, "es_transversal": i.paquete.cwp.cwa.es_transversal} for i in items]
+    if filter_type == "TRANSVERSAL": query = query.filter(models.CWA.es_transversal == True)
+    return [{"id": i.id, "nombre": i.nombre, "paquete": i.paquete.codigo, "cwa": i.paquete.cwp.cwa.nombre, "es_transversal": i.paquete.cwp.cwa.es_transversal} for i in query.all()]
 
-# --- IMPORT / EXPORT ---
+@router.get("/proyectos/{proyecto_id}/jerarquia-global")
+def get_jerarquia_global(proyecto_id: int, db: Session = Depends(get_db)):
+    return obtener_jerarquia_global(db, proyecto_id)
+
+# --- IMPORT/EXPORT ---
 @router.get("/exportar-csv/{proyecto_id}")
 def exportar_csv_proyecto(proyecto_id: int, db: Session = Depends(get_db)):
     proyecto = crud.get_proyecto(db, proyecto_id)
@@ -133,17 +124,11 @@ def exportar_csv_proyecto(proyecto_id: int, db: Session = Depends(get_db)):
     data_rows = []
     for pp in proyecto.plot_plans:
         for cwa in pp.cwas:
-            if not cwa.cwps:
-                data_rows.append({"ID_Item": "", "CWA": cwa.codigo, "CWP": "", "Tipo_Paquete": "", "Codigo_Paquete": "", "Tipo_Item_Codigo": "", "Nombre_Item": "", "Descripcion": "", "Forecast_Fin": ""})
-                continue
+            if not cwa.cwps: data_rows.append({"ID_Item": "", "CWA": cwa.codigo, "CWP": "", "Tipo_Paquete": "", "Codigo_Paquete": "", "Tipo_Item_Codigo": "", "Nombre_Item": "", "Descripcion": "", "Forecast_Fin": ""})
             for cwp in cwa.cwps:
-                if not cwp.paquetes:
-                    data_rows.append({"ID_Item": "", "CWA": cwa.codigo, "CWP": cwp.codigo, "Tipo_Paquete": "", "Codigo_Paquete": "", "Tipo_Item_Codigo": "", "Nombre_Item": "", "Descripcion": "", "Forecast_Fin": ""})
-                    continue
+                if not cwp.paquetes: data_rows.append({"ID_Item": "", "CWA": cwa.codigo, "CWP": cwp.codigo, "Tipo_Paquete": "", "Codigo_Paquete": "", "Tipo_Item_Codigo": "", "Nombre_Item": "", "Descripcion": "", "Forecast_Fin": ""})
                 for pkg in cwp.paquetes:
-                    if not pkg.items:
-                        data_rows.append({"ID_Item": "", "CWA": cwa.codigo, "CWP": cwp.codigo, "Tipo_Paquete": pkg.tipo, "Codigo_Paquete": pkg.codigo, "Tipo_Item_Codigo": "", "Nombre_Item": "", "Descripcion": "", "Forecast_Fin": ""})
-                        continue
+                    if not pkg.items: data_rows.append({"ID_Item": "", "CWA": cwa.codigo, "CWP": cwp.codigo, "Tipo_Paquete": pkg.tipo, "Codigo_Paquete": pkg.codigo, "Tipo_Item_Codigo": "", "Nombre_Item": "", "Descripcion": "", "Forecast_Fin": ""})
                     for item in pkg.items:
                         tipo = db.query(models.TipoEntregable).filter(models.TipoEntregable.id == item.tipo_entregable_id).first() if item.tipo_entregable_id else None
                         data_rows.append({"ID_Item": item.id, "CWA": cwa.codigo, "CWP": cwp.codigo, "Tipo_Paquete": pkg.tipo, "Codigo_Paquete": pkg.codigo, "Tipo_Item_Codigo": tipo.codigo if tipo else "", "Nombre_Item": item.nombre, "Descripcion": item.descripcion or "", "Forecast_Fin": str(item.forecast_fin) if item.forecast_fin else ""})

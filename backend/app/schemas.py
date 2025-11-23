@@ -2,9 +2,11 @@
 
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
-from datetime import date, datetime
+from datetime import date
 
-# --- 1. BASES SIMPLES ---
+# ============================================================================
+# 1. BASES SIMPLES
+# ============================================================================
 
 class DisciplinaBase(BaseModel):
     nombre: str
@@ -17,11 +19,15 @@ class DisciplinaCreate(DisciplinaBase):
 class DisciplinaResponse(DisciplinaBase):
     id: int
     proyecto_id: int
+    
     class Config:
         from_attributes = True
 
-# --- 2. ESTRUCTURA AWP ---
+# ============================================================================
+# 2. ESTRUCTURA AWP (CWA, CWP)
+# ============================================================================
 
+# --- CWA (ÁREA) ---
 class CWACreate(BaseModel):
     nombre: str
     codigo: str
@@ -29,15 +35,16 @@ class CWACreate(BaseModel):
     es_transversal: Optional[bool] = False
     shape_type: Optional[str] = None
     shape_data: Optional[Dict[str, Any]] = None
+    prioridad: Optional[str] = "MEDIA"
 
 class CWAUpdate(BaseModel):
     nombre: Optional[str] = None
     descripcion: Optional[str] = None
     codigo: Optional[str] = None
     es_transversal: Optional[bool] = None
+    prioridad: Optional[str] = None
 
-# --- CWP ---
-
+# --- CWP (CONSTRUCTION WORK PACKAGE) ---
 class CWPCreate(BaseModel):
     nombre: str
     descripcion: Optional[str] = None
@@ -47,23 +54,15 @@ class CWPCreate(BaseModel):
     fecha_inicio_prevista: Optional[date] = None
     fecha_fin_prevista: Optional[date] = None
     secuencia: Optional[int] = 0
-    prioridad: Optional[str] = "MEDIA"
     forecast_inicio: Optional[date] = None
     forecast_fin: Optional[date] = None
     metadata_json: Optional[Dict[str, Any]] = None
+    # Nota: Prioridad eliminada de aquí (es del Área)
 
-# ✅ NUEVO SCHEMA PARA ACTUALIZACIÓN PARCIAL (PATCH)
 class CWPUpdate(BaseModel):
     nombre: Optional[str] = None
     descripcion: Optional[str] = None
-    # area_id y disciplina_id no se suelen cambiar, pero los ponemos opcionales por si acaso
-    area_id: Optional[int] = None 
-    disciplina_id: Optional[int] = None
-    duracion_dias: Optional[int] = None
-    fecha_inicio_prevista: Optional[date] = None
-    fecha_fin_prevista: Optional[date] = None
     secuencia: Optional[int] = None
-    prioridad: Optional[str] = None
     forecast_inicio: Optional[date] = None
     forecast_fin: Optional[date] = None
     metadata_json: Optional[Dict[str, Any]] = None
@@ -73,13 +72,9 @@ class CWPResponse(BaseModel):
     nombre: str
     codigo: str
     descripcion: Optional[str]
-    duracion_dias: Optional[int]
-    fecha_inicio_prevista: Optional[date]
-    fecha_fin_prevista: Optional[date]
     porcentaje_completitud: float
     estado: str
     secuencia: Optional[int]
-    prioridad: Optional[str]
     forecast_inicio: Optional[date]
     forecast_fin: Optional[date]
     metadata_json: Optional[Dict[str, Any]] = None
@@ -96,11 +91,15 @@ class CWAResponse(BaseModel):
     plot_plan_id: int
     shape_type: Optional[str]
     shape_data: Optional[Dict[str, Any]]
+    prioridad: Optional[str]
     cwps: List[CWPResponse] = []
+    
     class Config:
         from_attributes = True
 
-# --- 3. PLOT PLAN ---
+# ============================================================================
+# 3. PLOT PLAN
+# ============================================================================
 
 class PlotPlanCreate(BaseModel):
     nombre: str
@@ -114,10 +113,13 @@ class PlotPlanResponse(BaseModel):
     image_url: Optional[str]
     proyecto_id: int
     cwas: List[CWAResponse] = []
+    
     class Config:
         from_attributes = True
 
-# --- 4. TIPOS ENTREGABLES ---
+# ============================================================================
+# 4. TIPOS & METADATA
+# ============================================================================
 
 class TipoEntregableCreate(BaseModel):
     nombre: str
@@ -135,10 +137,9 @@ class TipoEntregableResponse(BaseModel):
     descripcion: Optional[str]
     disciplina_id: Optional[int]
     es_generico: bool
+    
     class Config:
         from_attributes = True
-
-# --- 5. METADATOS CUSTOM ---
 
 class ColumnaCreate(BaseModel):
     nombre: str
@@ -151,10 +152,13 @@ class ColumnaResponse(BaseModel):
     tipo_dato: str
     proyecto_id: int
     opciones_json: Optional[List[str]] = [] 
+    
     class Config:
         from_attributes = True
 
-# --- 6. PROYECTO ---
+# ============================================================================
+# 5. PROYECTO
+# ============================================================================
 
 class ProyectoBase(BaseModel):
     nombre: str
@@ -169,10 +173,13 @@ class ProyectoResponse(ProyectoBase):
     id: int
     disciplinas: List[DisciplinaResponse] = []
     plot_plans: List[PlotPlanResponse] = []
+    
     class Config:
         from_attributes = True
 
-# --- PAQUETE & ITEM ---
+# ============================================================================
+# 6. PAQUETE & ITEM
+# ============================================================================
 
 class PaqueteCreate(BaseModel):
     nombre: str
@@ -241,8 +248,13 @@ class ItemResponse(BaseModel):
     requiere_aprobacion: bool
     source_item_id: Optional[int]
     forecast_fin: Optional[date]
+    
     class Config:
         from_attributes = True
+
+# ============================================================================
+# 7. VINCULOS & IMPORT
+# ============================================================================
 
 class ItemLinkRequest(BaseModel):
     source_item_ids: List[int]
@@ -256,3 +268,6 @@ class ItemImportRow(BaseModel):
     es_entregable_cliente: Optional[bool] = False
     requiere_aprobacion: Optional[bool] = True
     forecast_fin: Optional[date] = None
+
+# Actualizar referencias circulares (si las hubiera)
+PlotPlanResponse.update_forward_refs()
