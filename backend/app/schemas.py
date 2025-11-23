@@ -36,14 +36,54 @@ class CWAUpdate(BaseModel):
     codigo: Optional[str] = None
     es_transversal: Optional[bool] = None
 
+# --- CWP ---
+
+class CWPCreate(BaseModel):
+    nombre: str
+    descripcion: Optional[str] = None
+    area_id: int
+    disciplina_id: int
+    duracion_dias: Optional[int] = None
+    fecha_inicio_prevista: Optional[date] = None
+    fecha_fin_prevista: Optional[date] = None
+    secuencia: Optional[int] = 0
+    prioridad: Optional[str] = "MEDIA"
+    forecast_inicio: Optional[date] = None
+    forecast_fin: Optional[date] = None
+    metadata_json: Optional[Dict[str, Any]] = None
+
+# ✅ NUEVO SCHEMA PARA ACTUALIZACIÓN PARCIAL (PATCH)
+class CWPUpdate(BaseModel):
+    nombre: Optional[str] = None
+    descripcion: Optional[str] = None
+    # area_id y disciplina_id no se suelen cambiar, pero los ponemos opcionales por si acaso
+    area_id: Optional[int] = None 
+    disciplina_id: Optional[int] = None
+    duracion_dias: Optional[int] = None
+    fecha_inicio_prevista: Optional[date] = None
+    fecha_fin_prevista: Optional[date] = None
+    secuencia: Optional[int] = None
+    prioridad: Optional[str] = None
+    forecast_inicio: Optional[date] = None
+    forecast_fin: Optional[date] = None
+    metadata_json: Optional[Dict[str, Any]] = None
+
 class CWPResponse(BaseModel):
     id: int
     nombre: str
     codigo: str
     descripcion: Optional[str]
+    duracion_dias: Optional[int]
+    fecha_inicio_prevista: Optional[date]
+    fecha_fin_prevista: Optional[date]
     porcentaje_completitud: float
     estado: str
+    secuencia: Optional[int]
+    prioridad: Optional[str]
+    forecast_inicio: Optional[date]
+    forecast_fin: Optional[date]
     metadata_json: Optional[Dict[str, Any]] = None
+    
     class Config:
         from_attributes = True
 
@@ -98,23 +138,19 @@ class TipoEntregableResponse(BaseModel):
     class Config:
         from_attributes = True
 
-# ==========================================
-# 5. METADATOS CUSTOM (CORREGIDO)
-# ==========================================
+# --- 5. METADATOS CUSTOM ---
 
 class ColumnaCreate(BaseModel):
     nombre: str
-    tipo_dato: str # TEXTO, SELECCION
-    opciones: Optional[List[str]] = [] # Frontend envía "opciones"
+    tipo_dato: str 
+    opciones: Optional[List[str]] = [] 
 
 class ColumnaResponse(BaseModel):
     id: int
     nombre: str
     tipo_dato: str
     proyecto_id: int
-    # ✅ CORRECCIÓN: Mapeamos explícitamente el campo de la BD
     opciones_json: Optional[List[str]] = [] 
-    
     class Config:
         from_attributes = True
 
@@ -133,23 +169,10 @@ class ProyectoResponse(ProyectoBase):
     id: int
     disciplinas: List[DisciplinaResponse] = []
     plot_plans: List[PlotPlanResponse] = []
-    
     class Config:
         from_attributes = True
 
-# --- OTROS ---
-
-class CWPCreate(BaseModel):
-    nombre: str
-    descripcion: Optional[str] = None
-    area_id: int
-    disciplina_id: int
-    duracion_dias: Optional[int] = None
-    fecha_inicio_prevista: Optional[date] = None
-    fecha_fin_prevista: Optional[date] = None
-    secuencia: Optional[int] = 0
-    prioridad: Optional[str] = "MEDIA"
-    metadata_json: Optional[Dict[str, Any]] = None
+# --- PAQUETE & ITEM ---
 
 class PaqueteCreate(BaseModel):
     nombre: str
@@ -186,16 +209,15 @@ class PaqueteResponse(BaseModel):
 class ItemCreate(BaseModel):
     nombre: str
     descripcion: Optional[str] = None
-    # ✅ CAMBIO: Ahora es opcional
-    tipo_entregable_id: Optional[int] = None 
+    tipo_entregable_id: Optional[int] = None
     es_entregable_cliente: Optional[bool] = False
     requiere_aprobacion: Optional[bool] = True
     metadata_json: Optional[dict] = None
+    forecast_fin: Optional[date] = None
 
 class ItemUpdate(BaseModel):
     nombre: Optional[str] = None
     descripcion: Optional[str] = None
-    # ✅ CAMBIO: Permitimos actualizar el tipo
     tipo_entregable_id: Optional[int] = None
     version: Optional[int] = None
     estado: Optional[str] = None
@@ -203,12 +225,13 @@ class ItemUpdate(BaseModel):
     es_entregable_cliente: Optional[bool] = None
     requiere_aprobacion: Optional[bool] = None
     metadata_json: Optional[dict] = None
+    forecast_fin: Optional[date] = None
 
 class ItemResponse(BaseModel):
     id: int
     nombre: str
     descripcion: Optional[str]
-    tipo_entregable_id: Optional[int] # Ahora es Optional
+    tipo_entregable_id: Optional[int]
     paquete_id: int
     version: int
     estado: str
@@ -216,13 +239,13 @@ class ItemResponse(BaseModel):
     archivo_url: Optional[str]
     es_entregable_cliente: bool
     requiere_aprobacion: bool
-    source_item_id: Optional[int] # Nuevo campo
-    
+    source_item_id: Optional[int]
+    forecast_fin: Optional[date]
     class Config:
         from_attributes = True
 
 class ItemLinkRequest(BaseModel):
-    source_item_ids: List[int] # Lista de IDs de los items transversales a traer
+    source_item_ids: List[int]
 
 class ItemImportRow(BaseModel):
     id_item: Optional[int] = None
@@ -232,3 +255,4 @@ class ItemImportRow(BaseModel):
     descripcion: Optional[str] = None
     es_entregable_cliente: Optional[bool] = False
     requiere_aprobacion: Optional[bool] = True
+    forecast_fin: Optional[date] = None
