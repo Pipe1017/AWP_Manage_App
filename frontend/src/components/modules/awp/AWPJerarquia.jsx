@@ -1,8 +1,8 @@
+// frontend/src/components/modules/awp/AWPJerarquia.jsx
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import client from '../../../api/axios';
 import './AWPJerarquia.css';
 
-const API_URL = 'http://10.92.12.84:8000/api/v1';
 
 function AWPJerarquia({ plotPlanId, proyecto }) {
   const [jerarquia, setJerarquia] = useState(null);

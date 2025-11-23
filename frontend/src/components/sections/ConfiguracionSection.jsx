@@ -1,9 +1,10 @@
 // frontend/src/components/sections/ConfiguracionSection.jsx
 
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import React, { useState } from 'react';
+// 1. CAMBIO: Importamos el cliente centralizado
+import client from '../../api/axios';
 
-const API_URL = 'http://10.92.12.84:8000/api/v1';
+// ❌ BORRADO: const API_URL = ...
 
 function ConfiguracionSection({ proyecto, onProyectoUpdate }) {
   const [activeTab, setActiveTab] = useState('disciplinas');
@@ -20,7 +21,6 @@ function ConfiguracionSection({ proyecto, onProyectoUpdate }) {
     es_generico: false
   });
   
-  // ✨ NUEVO: Estados para CWA
   const [cwaForm, setCwaForm] = useState({
     nombre: '',
     codigo: '',
@@ -33,7 +33,8 @@ function ConfiguracionSection({ proyecto, onProyectoUpdate }) {
   // Recargar proyecto
   const recargarProyecto = async () => {
     try {
-      const response = await axios.get(`${API_URL}/proyectos/${proyecto.id}`);
+      // ✅ CAMBIO: client.get y ruta relativa
+      const response = await client.get(`/proyectos/${proyecto.id}`);
       onProyectoUpdate(response.data);
     } catch (err) {
       console.error("Error recargando proyecto:", err);
@@ -53,8 +54,9 @@ function ConfiguracionSection({ proyecto, onProyectoUpdate }) {
     
     setLoading(true);
     try {
-      await axios.post(
-        `${API_URL}/proyectos/${proyecto.id}/disciplinas/`,
+      // ✅ CAMBIO: client.post
+      await client.post(
+        `/proyectos/${proyecto.id}/disciplinas/`,
         disciplinaForm
       );
       
@@ -88,16 +90,18 @@ function ConfiguracionSection({ proyecto, onProyectoUpdate }) {
     setLoading(true);
     try {
       if (tipoEntregableForm.es_generico) {
-        await axios.post(
-          `${API_URL}/proyectos/${proyecto.id}/tipos_entregables_genericos/`,
+        // ✅ CAMBIO: client.post
+        await client.post(
+          `/proyectos/${proyecto.id}/tipos_entregables_genericos/`,
           {
             ...tipoEntregableForm,
             disciplina_id: null
           }
         );
       } else {
-        await axios.post(
-          `${API_URL}/proyectos/${proyecto.id}/disciplinas/${tipoEntregableForm.disciplina_id}/tipos_entregables/`,
+        // ✅ CAMBIO: client.post
+        await client.post(
+          `/proyectos/${proyecto.id}/disciplinas/${tipoEntregableForm.disciplina_id}/tipos_entregables/`,
           tipoEntregableForm
         );
       }
@@ -122,7 +126,7 @@ function ConfiguracionSection({ proyecto, onProyectoUpdate }) {
   };
 
   // ============================================================================
-  // ✨ NUEVO: CWA CRUD
+  // CWA CRUD
   // ============================================================================
   
   const handleCreateCWA = async (e) => {
@@ -135,8 +139,9 @@ function ConfiguracionSection({ proyecto, onProyectoUpdate }) {
     
     setLoading(true);
     try {
-      await axios.post(
-        `${API_URL}/proyectos/${proyecto.id}/plot_plans/${cwaForm.plot_plan_id}/cwa/`,
+      // ✅ CAMBIO: client.post
+      await client.post(
+        `/proyectos/${proyecto.id}/plot_plans/${cwaForm.plot_plan_id}/cwa/`,
         {
           nombre: cwaForm.nombre,
           codigo: cwaForm.codigo,
@@ -181,8 +186,9 @@ function ConfiguracionSection({ proyecto, onProyectoUpdate }) {
     
     setLoading(true);
     try {
-      await axios.put(
-        `${API_URL}/proyectos/${proyecto.id}/plot_plans/${editingCWA.plot_plan_id}/cwa/${editingCWA.id}`,
+      // ✅ CAMBIO: client.put
+      await client.put(
+        `/proyectos/${proyecto.id}/plot_plans/${editingCWA.plot_plan_id}/cwa/${editingCWA.id}`,
         {
           nombre: cwaForm.nombre,
           codigo: cwaForm.codigo,
@@ -216,8 +222,9 @@ function ConfiguracionSection({ proyecto, onProyectoUpdate }) {
     
     setLoading(true);
     try {
-      await axios.delete(
-        `${API_URL}/proyectos/${proyecto.id}/plot_plans/${plotPlanId}/cwa/${cwaId}`
+      // ✅ CAMBIO: client.delete
+      await client.delete(
+        `/proyectos/${proyecto.id}/plot_plans/${plotPlanId}/cwa/${cwaId}`
       );
       
       await recargarProyecto();
@@ -290,7 +297,6 @@ function ConfiguracionSection({ proyecto, onProyectoUpdate }) {
         {/* ========================================================= */}
         {activeTab === 'disciplinas' && (
           <div className="max-w-4xl">
-            {/* --- INICIO CÓDIGO PEGADO DE V1 --- */}
             <div className="bg-gray-800 rounded-lg border border-gray-700 p-6 mb-6">
               <h3 className="text-lg font-semibold text-white mb-4">➕ Crear Disciplina</h3>
               
@@ -357,7 +363,6 @@ function ConfiguracionSection({ proyecto, onProyectoUpdate }) {
                 </p>
               )}
             </div>
-            {/* --- FIN CÓDIGO PEGADO DE V1 --- */}
           </div>
         )}
 
@@ -366,7 +371,6 @@ function ConfiguracionSection({ proyecto, onProyectoUpdate }) {
         {/* ========================================================= */}
         {activeTab === 'tipos_entregables' && (
           <div className="max-w-4xl">
-            {/* --- INICIO CÓDIGO PEGADO DE V1 --- */}
             <div className="bg-gray-800 rounded-lg border border-gray-700 p-6 mb-6">
               <h3 className="text-lg font-semibold text-white mb-4">➕ Crear Tipo de Entregable</h3>
               
@@ -511,7 +515,6 @@ function ConfiguracionSection({ proyecto, onProyectoUpdate }) {
                 )
               ))}
             </div>
-            {/* --- FIN CÓDIGO PEGADO DE V1 --- */}
           </div>
         )}
 
@@ -520,7 +523,6 @@ function ConfiguracionSection({ proyecto, onProyectoUpdate }) {
         {/* ========================================================= */}
         {activeTab === 'areas' && (
           <div className="max-w-4xl">
-            {/* --- INICIO CÓDIGO NUEVO DE V2 --- */}
             <div className="bg-gray-800 rounded-lg border border-gray-700 p-6 mb-6">
               <h3 className="text-lg font-semibold text-white mb-4">
                 {editingCWA ? '✏️ Editar CWA' : '➕ Crear CWA'}
@@ -687,7 +689,6 @@ function ConfiguracionSection({ proyecto, onProyectoUpdate }) {
                 </div>
               ) : null}
             </div>
-            {/* --- FIN CÓDIGO NUEVO DE V2 --- */}
           </div>
         )}
       </div>

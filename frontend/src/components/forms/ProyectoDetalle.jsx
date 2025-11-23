@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
-import axios from 'axios';
+import client from '../../api/axios';
 import TipoEntregableForm from './TipoEntregableForm';
 
-const API_URL = 'http://10.92.12.84:8000/api/v1';
 
 function ProyectoDetalle({ proyecto, onDisciplinaCreada, onTipoEntregableCreado, onCWACreada }) {
   const [discNombre, setDiscNombre] = useState("");
@@ -25,8 +24,8 @@ function ProyectoDetalle({ proyecto, onDisciplinaCreada, onTipoEntregableCreado,
     }
     console.log("🕵️‍♂️ [ProyectoDetalle] Enviando disciplina:", { nombre: discNombre, codigo: discCodigo });
     try {
-      const response = await axios.post(
-        `${API_URL}/proyectos/${proyecto.id}/disciplinas/`,
+      const response = await client.post(
+        `/proyectos/${proyecto.id}/disciplinas/`,
         { nombre: discNombre, codigo: discCodigo }
       );
       console.log("👍 [ProyectoDetalle] Respuesta OK:", response.data);
@@ -49,8 +48,8 @@ function ProyectoDetalle({ proyecto, onDisciplinaCreada, onTipoEntregableCreado,
   console.log("🕵️‍♂️ [ProyectoDetalle] Creando CWA:", { nombre: cwaNombre, codigo: cwaCodigo });
   
   try {
-    const response = await axios.post(
-      `${API_URL}/proyectos/${proyecto.id}/plot_plans/${selectedPlotPlanId}/cwa/`,
+    const response = await client.post(
+      `/proyectos/${proyecto.id}/plot_plans/${selectedPlotPlanId}/cwa/`,
       { nombre: cwaNombre, codigo: cwaCodigo }
     );
     

@@ -1,3 +1,4 @@
+// frontend/src/components/modules/config/ConfigPanel.jsx
 import React from 'react';
 import ProyectoDetalle from './ProyectoDetalle';
 

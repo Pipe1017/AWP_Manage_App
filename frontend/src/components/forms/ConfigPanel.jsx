@@ -1,3 +1,4 @@
+// frontend/src/components/forms/ConfigPanel.jsx
 import React from 'react';
 import ProyectoDetalle from './ProyectoDetalle'; // Cambiar la ruta aquí
 

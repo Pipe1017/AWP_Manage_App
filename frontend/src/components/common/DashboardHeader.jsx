@@ -1,3 +1,4 @@
+// frontend/src/components/common/DashboardHeader.jsx
 import React from 'react';
 
 function DashboardHeader({ proyecto, onBack, sidebarExpanded, setSidebarExpanded }) {

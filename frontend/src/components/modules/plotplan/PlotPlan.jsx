@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Stage, Layer, Image, Rect, Circle, Line, Text, Tag, Label } from 'react-konva'; 
-import axios from 'axios';
+import client from '../../../api/axios';
 
-const API_URL = 'http://10.92.12.84:8000/api/v1';
+// === LÓGICA DE URL DINÁMICA ===
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+const SERVER_URL = API_BASE.replace('/api/v1', '');
 
-// Paleta de colores HATCH
+// Paleta de colores
 const HATCH_COLORS = {
   primary: [ '#E67E22', '#2E86C1', '#27AE60', '#C0392B' ],
   secondary: [ '#F39C12', '#8E44AD', '#16A085', '#D35400' ],
@@ -18,48 +20,27 @@ const useImageLoader = (src) => {
   const [error, setError] = useState(null);
   
   useEffect(() => {
-    if (!src) { 
-      setImage(null); 
-      setError(null); 
-      return; 
-    }
-    
+    if (!src) { setImage(null); return; }
     const img = new window.Image();
-    const fullSrc = `http://10.92.12.84:8000${src}`;
+    const fullSrc = src.startsWith('http') ? src : `${SERVER_URL}${src}`;
     img.src = fullSrc;
     img.crossOrigin = "Anonymous";
-    
-    img.onload = () => { 
-      console.log("🖼️ Imagen cargada:", { width: img.width, height: img.height });
-      setImage(img); 
-      setError(null); 
-    };
-    
-    img.onerror = (err) => { 
-      console.error("❌ Error cargando imagen:", fullSrc); 
-      setError(err); 
-    };
-    
-    return () => {
-      img.onload = null;
-      img.onerror = null;
-    };
+    img.onload = () => { setImage(img); setError(null); };
+    img.onerror = (err) => { console.error("❌ Error imagen:", fullSrc); setError(err); };
   }, [src]);
   
   return { image, error };
 };
 
-// Toolbar
+// Toolbar Component
 function Toolbar({ activeTool, setActiveTool, color, setColor, onZoom, onClear, onUndo }) { 
   const [showColorPicker, setShowColorPicker] = useState(false);
-  
   const tools = [
     { id: 'pan', name: 'Mover', icon: '✋' },
     { id: 'rect', name: 'Rectángulo', icon: '▭' },
     { id: 'circle', name: 'Círculo', icon: '●' },
     { id: 'polygon', name: 'Polígono', icon: '▲' },
   ];
-  
   return (
     <div className="p-2 bg-gradient-to-r from-gray-800 to-gray-700 border-b border-gray-600 flex justify-between items-center">
       <div className="flex items-center gap-2">
@@ -68,81 +49,27 @@ function Toolbar({ activeTool, setActiveTool, color, setColor, onZoom, onClear, 
             key={tool.id}
             onClick={() => setActiveTool(tool.id)}
             className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
-              activeTool === tool.id 
-                ? 'bg-blue-600 text-white' 
-                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              activeTool === tool.id ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
             }`}
           >
-            <span className="mr-1">{tool.icon}</span>
-            {tool.name}
+            <span className="mr-1">{tool.icon}</span>{tool.name}
           </button>
         ))}
       </div>
-      
       <div className="flex items-center gap-2">
-        {/* Zoom */}
-        <div className="flex items-center bg-gray-700 rounded overflow-hidden">
-          <button 
-            onClick={() => onZoom(1.2)} 
-            className="px-2 py-1 text-white hover:bg-gray-600 text-sm font-bold"
-          >
-            +
-          </button>
-          <span className="px-2 text-xs text-gray-400">Zoom</span>
-          <button 
-            onClick={() => onZoom(0.8)} 
-            className="px-2 py-1 text-white hover:bg-gray-600 text-sm font-bold"
-          >
-            -
-          </button>
-        </div>
-        
-        {onUndo && (
-          <button 
-            onClick={onUndo} 
-            className="px-2 py-1 bg-gray-700 text-gray-300 rounded hover:bg-gray-600 text-xs"
-          >
-            ↶
-          </button>
-        )}
-        
-        {onClear && (
-          <button 
-            onClick={onClear} 
-            className="px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-xs"
-          >
-            🗑️
-          </button>
-        )}
-        
-        {/* Color Picker */}
+        <button onClick={() => onZoom(1.2)} className="px-2 py-1 bg-gray-700 text-white text-xs font-bold rounded">+</button>
+        <button onClick={() => onZoom(0.8)} className="px-2 py-1 bg-gray-700 text-white text-xs font-bold rounded">-</button>
+        {onUndo && <button onClick={onUndo} className="px-2 py-1 bg-gray-700 text-gray-300 rounded text-xs">↶</button>}
+        {onClear && <button onClick={onClear} className="px-2 py-1 bg-red-600 text-white rounded text-xs">🗑️</button>}
         <div className="relative">
-          <button 
-            onClick={() => setShowColorPicker(!showColorPicker)} 
-            className="flex items-center gap-1 px-2 py-1 bg-gray-700 rounded hover:bg-gray-600"
-          >
+          <button onClick={() => setShowColorPicker(!showColorPicker)} className="flex items-center gap-1 px-2 py-1 bg-gray-700 rounded">
             <div className="w-4 h-4 rounded border border-white" style={{ backgroundColor: color }} />
-            <span className="text-xs text-gray-300">Color</span>
           </button>
-          
           {showColorPicker && (
-            <div className="absolute right-0 top-full mt-1 bg-gray-800 p-2 rounded shadow-xl border border-gray-700 z-50">
-              <div className="grid grid-cols-4 gap-1 mb-2">
-                {allColors.map((c, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => { setColor(c); setShowColorPicker(false); }}
-                    className={`w-6 h-6 rounded border ${color === c ? 'border-white ring-1 ring-blue-400' : 'border-gray-600'}`}
-                    style={{ backgroundColor: c }}
-                  />
-                ))}
-              </div>
-              <input 
-                type="color" 
-                value={color} 
-                onChange={(e) => setColor(e.target.value)} 
-                className="w-full h-6 rounded cursor-pointer" 
-              />
+            <div className="absolute right-0 top-full mt-1 bg-gray-800 p-2 rounded shadow-xl border border-gray-700 z-50 grid grid-cols-4 gap-1">
+              {allColors.map((c, idx) => (
+                <button key={idx} onClick={() => { setColor(c); setShowColorPicker(false); }} className="w-6 h-6 rounded border border-gray-600" style={{ backgroundColor: c }} />
+              ))}
             </div>
           )}
         </div>
@@ -151,7 +78,7 @@ function Toolbar({ activeTool, setActiveTool, color, setColor, onZoom, onClear, 
   );
 }
 
-// Componente Principal
+// === COMPONENTE PRINCIPAL ===
 function PlotPlan({ plotPlan, cwaToAssociate, onShapeSaved, onShapeClick }) {
   const { image, error } = useImageLoader(plotPlan?.image_url);
   const containerRef = useRef(null);
@@ -167,61 +94,28 @@ function PlotPlan({ plotPlan, cwaToAssociate, onShapeSaved, onShapeClick }) {
   const [polygonPoints, setPolygonPoints] = useState([]);
   const [isDrawingPolygon, setIsDrawingPolygon] = useState(false);
   const startPoint = useRef({ x: 0, y: 0 });
+  
+  // [FIX KONVA]: Estado para la posición y escala del Stage
   const [stageState, setStageState] = useState({ scale: 1, x: 0, y: 0 });
+  
   const [selectedShapeKey, setSelectedShapeKey] = useState(null);
   const [hoveredShape, setHoveredShape] = useState(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
 
-  // Actualizar tamaño del contenedor
   useEffect(() => {
     if (!containerRef.current) return;
-    
     const updateSize = () => {
-      const width = containerRef.current.offsetWidth;
-      const height = containerRef.current.offsetHeight;
-      setContainerSize({ width, height });
+      setContainerSize({ width: containerRef.current.offsetWidth, height: containerRef.current.offsetHeight });
     };
-    
     updateSize();
     window.addEventListener('resize', updateSize);
     return () => window.removeEventListener('resize', updateSize);
   }, []);
 
-  // Calcular dimensiones de imagen
-  const getImageDimensions = () => {
-    if (!image || containerSize.width === 0 || containerSize.height === 0) {
-      return { x: 0, y: 0, width: containerSize.width, height: containerSize.height };
-    }
-    
-    const imageRatio = image.width / image.height;
-    const containerRatio = containerSize.width / containerSize.height;
-    
-    let width, height, x = 0, y = 0;
-    
-    if (imageRatio > containerRatio) {
-      width = containerSize.width;
-      height = containerSize.width / imageRatio;
-      y = (containerSize.height - height) / 2;
-    } else {
-      height = containerSize.height;
-      width = containerSize.height * imageRatio;
-      x = (containerSize.width - width) / 2;
-    }
-    
-    return { x, y, width, height };
-  };
-
-  // Cargar formas desde BD
+  // Cargar formas
   useEffect(() => {
-    if (!plotPlan || !plotPlan.cwas || plotPlan.cwas.length === 0) {
-      console.log("⚠️ [PlotPlan] No hay CWAs");
-      setShapes([]);
-      return;
-    }
-    
-    console.log("🔵 [PlotPlan] Cargando formas...");
+    if (!plotPlan?.cwas) { setShapes([]); return; }
     const loadedShapes = [];
-    
     plotPlan.cwas.forEach(cwa => {
       if (cwa.shape_type && cwa.shape_data) {
         loadedShapes.push({
@@ -231,23 +125,17 @@ function PlotPlan({ plotPlan, cwaToAssociate, onShapeSaved, onShapeClick }) {
           cwaId: cwa.id,
           codigo: cwa.codigo,
           nombre: cwa.nombre,
-          descripcion: cwa.descripcion || '',
           ...cwa.shape_data
         });
       }
     });
-    
-    console.log(`✅ ${loadedShapes.length} formas cargadas`);
     setShapes(loadedShapes);
   }, [plotPlan?.id, plotPlan?.cwas]);
 
-  // Manejo de teclas
+  // ... Manejo de teclas (Undo/Delete) ...
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.ctrlKey && e.key === 'z') {
-        e.preventDefault();
-        handleUndo();
-      }
+      if (e.ctrlKey && e.key === 'z') { e.preventDefault(); handleUndo(); }
       if ((e.key === 'Delete' || e.key === 'Backspace') && selectedShapeKey) {
         setHistory([...history, shapes]);
         setShapes(shapes.filter(s => s.key !== selectedShapeKey));
@@ -258,25 +146,10 @@ function PlotPlan({ plotPlan, cwaToAssociate, onShapeSaved, onShapeClick }) {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [selectedShapeKey, shapes, history]);
 
-  const handleZoom = (scaleFactor) => {
-    setStageState({ ...stageState, scale: stageState.scale * scaleFactor });
-  };
-  
-  const handleClear = () => {
-    if (shapes.length === 0) return;
-    if (window.confirm('¿Limpiar todas las formas?')) {
-      setHistory([...history, shapes]);
-      setShapes([]);
-      setSelectedShapeKey(null);
-    }
-  };
-  
-  const handleUndo = () => {
-    if (history.length === 0) return;
-    setShapes(history[history.length - 1]);
-    setHistory(history.slice(0, -1));
-    setSelectedShapeKey(null);
-  };
+  // Funciones auxiliares
+  const handleZoom = (scaleFactor) => setStageState(s => ({ ...s, scale: s.scale * scaleFactor }));
+  const handleClear = () => { if(confirm('¿Limpiar?')) { setHistory([...history, shapes]); setShapes([]); }};
+  const handleUndo = () => { if(history.length > 0) { setShapes(history[history.length-1]); setHistory(history.slice(0,-1)); }};
 
   const getCanvasPosition = (e, stage) => {
     const pointer = stage.getPointerPosition();
@@ -286,331 +159,149 @@ function PlotPlan({ plotPlan, cwaToAssociate, onShapeSaved, onShapeClick }) {
     };
   };
 
+  // Eventos Mouse
   const handleMouseDown = (e) => {
     if (activeTool === 'pan' || !image || e.evt.button !== 0) {
-      const didClickOnShape = e.target.findAncestor('Shape');
-      if (activeTool === 'pan' && !didClickOnShape) setSelectedShapeKey(null);
+      if (activeTool === 'pan' && !e.target.findAncestor('Shape')) setSelectedShapeKey(null);
       return;
     }
-    
     setSelectedShapeKey(null);
     const pos = getCanvasPosition(e, e.target.getStage());
     startPoint.current = pos;
     
     if (activeTool === 'rect' || activeTool === 'circle') {
-      setHistory([...history, shapes]);
       setIsDrawing(true);
-      setNewShape({ 
-        type: activeTool, 
-        color: currentColor, 
-        x: pos.x, 
-        y: pos.y, 
-        width: 0, 
-        height: 0, 
-        radius: 0 
-      });
+      setNewShape({ type: activeTool, color: currentColor, x: pos.x, y: pos.y, width: 0, height: 0, radius: 0 });
     }
-    
     if (activeTool === 'polygon') {
       setIsDrawingPolygon(true);
-      if (polygonPoints.length === 0) {
-        setHistory([...history, shapes]);
-        setPolygonPoints([pos.x, pos.y]);
-      } else {
+      if (polygonPoints.length === 0) setPolygonPoints([pos.x, pos.y]);
+      else {
         const newPoints = [...polygonPoints, pos.x, pos.y];
         setPolygonPoints(newPoints);
-        
-        if (polygonPoints.length > 4) {
-          const firstPoint = { x: polygonPoints[0], y: polygonPoints[1] };
-          const dist = Math.sqrt(Math.pow(firstPoint.x - pos.x, 2) + Math.pow(firstPoint.y - pos.y, 2));
-          if (dist < 15) {
-            setIsDrawingPolygon(false);
-            handleSaveShape({ type: 'polygon', color: currentColor, points: [...polygonPoints] });
-            setPolygonPoints([]);
-          }
+        const first = { x: polygonPoints[0], y: polygonPoints[1] };
+        if (polygonPoints.length > 4 && Math.hypot(first.x - pos.x, first.y - pos.y) < 15) {
+          setIsDrawingPolygon(false);
+          handleSaveShape({ type: 'polygon', color: currentColor, points: newPoints });
+          setPolygonPoints([]);
         }
       }
     }
   };
 
   const handleMouseMove = (e) => {
-    if (!image || !isDrawing || isDrawingPolygon || activeTool === 'pan') return;
-    
+    if (!image || !isDrawing || activeTool === 'pan') return;
     const pos = getCanvasPosition(e, e.target.getStage());
-    
-    if (activeTool === 'rect') {
-      setNewShape({ 
-        ...newShape, 
-        x: Math.min(startPoint.current.x, pos.x), 
-        y: Math.min(startPoint.current.y, pos.y), 
-        width: Math.abs(pos.x - startPoint.current.x), 
-        height: Math.abs(pos.y - startPoint.current.y) 
-      });
-    }
-    
-    if (activeTool === 'circle') {
-      const radius = Math.sqrt(
-        Math.pow(pos.x - startPoint.current.x, 2) + 
-        Math.pow(pos.y - startPoint.current.y, 2)
-      );
-      setNewShape({ ...newShape, x: startPoint.current.x, y: startPoint.current.y, radius });
-    }
+    if (activeTool === 'rect') setNewShape({ ...newShape, width: pos.x - startPoint.current.x, height: pos.y - startPoint.current.y });
+    if (activeTool === 'circle') setNewShape({ ...newShape, radius: Math.hypot(pos.x - startPoint.current.x, pos.y - startPoint.current.y) });
   };
 
   const handleMouseUp = () => {
     if (!image || activeTool === 'pan') return;
     setIsDrawing(false);
-    
-    if ((activeTool === 'rect' || activeTool === 'circle') && newShape) {
-      if (newShape.width > 5 || newShape.radius > 5) {
-        handleSaveShape(newShape);
-      }
+    if (newShape && (Math.abs(newShape.width) > 5 || newShape.radius > 5)) {
+      handleSaveShape(newShape);
       setNewShape(null);
     }
   };
 
-  const handleShapeClickInternal = (shape) => {
-    if (activeTool === 'pan') {
-      setSelectedShapeKey(shape.key);
-      // Notificar al padre para filtrar la tabla
-      if (onShapeClick) {
-        onShapeClick(shape.cwaId);
-      }
-    }
-  };
-
-  const handleShapeHover = (shape, e) => {
-    setHoveredShape(shape);
-    if (e && e.target && e.target.getStage()) {
-      const stage = e.target.getStage();
-      const pointerPos = stage.getPointerPosition();
-      setTooltipPos({ x: pointerPos.x, y: pointerPos.y });
-    }
-  };
-
-  const handleShapeLeave = () => {
-    setHoveredShape(null);
-  };
-  
+  // Guardar Geometría
   const handleSaveShape = async (finalShape) => {
-    if (!cwaToAssociate) {
-      alert("⚠️ Selecciona un CWA primero");
-      return;
-    }
+    if (!cwaToAssociate) { alert("⚠️ Selecciona un CWA primero"); return; }
 
     let shapeData = {};
-    if (finalShape.type === 'polygon') {
-      shapeData = { points: finalShape.points, color: finalShape.color };
-    } else if (finalShape.type === 'rect') {
-      shapeData = { 
-        x: finalShape.x, 
-        y: finalShape.y, 
-        width: finalShape.width, 
-        height: finalShape.height, 
-        color: finalShape.color 
-      };
-    } else if (finalShape.type === 'circle') {
-      shapeData = { 
-        x: finalShape.x, 
-        y: finalShape.y, 
-        radius: finalShape.radius, 
-        color: finalShape.color 
-      };
-    }
+    if (finalShape.type === 'polygon') shapeData = { points: finalShape.points, color: finalShape.color };
+    else if (finalShape.type === 'rect') shapeData = { x: finalShape.x, y: finalShape.y, width: finalShape.width, height: finalShape.height, color: finalShape.color };
+    else if (finalShape.type === 'circle') shapeData = { x: finalShape.x, y: finalShape.y, radius: finalShape.radius, color: finalShape.color };
 
     try {
       console.log("🔵 Guardando geometría...");
-      
       const formData = new FormData();
       formData.append('shape_type', finalShape.type);
-      formData.append('shape_data', JSON.stringify(shapeData));
-      
-      await axios.put(
-        `${API_URL}/proyectos/${plotPlan.proyecto_id}/plot_plans/${plotPlan.id}/cwa/${cwaToAssociate.id}/geometry`,
+      formData.append('shape_data', JSON.stringify(shapeData)); // JSON como string
+
+      // Axios (client) detectará FormData y pondrá el Content-Type correcto
+      await client.put(
+        `/proyectos/${plotPlan.proyecto_id}/plot_plans/${plotPlan.id}/cwa/${cwaToAssociate.id}/geometry`,
         formData
       );
       
       console.log("✅ Geometría guardada");
+      if (onShapeSaved) onShapeSaved(cwaToAssociate.id, null);
       
-      const newShape = {
-        ...finalShape,
-        key: `cwa-${plotPlan.id}-${cwaToAssociate.id}`,
-        cwaId: cwaToAssociate.id,
-        codigo: cwaToAssociate.codigo,
-        nombre: cwaToAssociate.nombre,
-        descripcion: cwaToAssociate.descripcion || ''
-      };
-      
-      setShapes(prev => [...prev, newShape]);
-      
-      if (onShapeSaved) {
-        onShapeSaved(cwaToAssociate.id, null);
-      }
-      
+      // Actualización optimista local
+      const newShapeVisual = { ...finalShape, key: Date.now(), ...shapeData, codigo: cwaToAssociate.codigo, nombre: cwaToAssociate.nombre };
+      setShapes(prev => [...prev, newShapeVisual]);
+
     } catch (error) {
-      console.error("❌ Error:", error);
-      alert("Error guardando forma");
+      console.error("❌ Error guardando forma:", error);
+      // Si hay detalle del error, mostrarlo
+      const msg = error.response?.data?.detail || "Error al guardar";
+      alert(`Error: ${msg}`);
     }
   };
 
-  const imageDim = getImageDimensions();
-  
-  let cursor = 'default';
-  if (activeTool === 'rect' || activeTool === 'circle') cursor = 'crosshair';
-  else if (activeTool === 'polygon') cursor = 'pointer';
-  else if (activeTool === 'pan') cursor = 'grab';
+  // Render
+  const imageDim = image ? { width: image.width, height: image.height } : { width: 0, height: 0 };
+  const scaleRatio = Math.min(containerSize.width / (imageDim.width || 1), containerSize.height / (imageDim.height || 1));
+  const finalW = imageDim.width * scaleRatio;
+  const finalH = imageDim.height * scaleRatio;
+  const finalX = (containerSize.width - finalW) / 2;
+  const finalY = (containerSize.height - finalH) / 2;
 
   return (
     <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
-      <Toolbar 
-        activeTool={activeTool} 
-        setActiveTool={setActiveTool}
-        color={currentColor}
-        setColor={setCurrentColor}
-        onZoom={handleZoom}
-        onClear={shapes.length > 0 ? handleClear : null}
-        onUndo={history.length > 0 ? handleUndo : null}
-      />
+      <Toolbar activeTool={activeTool} setActiveTool={setActiveTool} color={currentColor} setColor={setCurrentColor} onZoom={handleZoom} onClear={handleClear} onUndo={handleUndo} />
       
-      {/* Canvas Container */}
-      <div 
-        ref={containerRef}
-        className="bg-gray-900 w-full relative"
-        style={{ 
-          height: '600px',
-          cursor: cursor,
-          overflow: 'hidden'
-        }}
-      >
-        {error && (
-          <div className="flex items-center justify-center h-full text-red-400">
-            ❌ Error cargando imagen
-          </div>
-        )}
-        
-        {!image && !error && (
-          <div className="flex items-center justify-center h-full text-gray-400">
-            ⏳ Cargando imagen...
-          </div>
-        )}
-        
+      <div ref={containerRef} className="bg-gray-900 w-full relative" style={{ height: '600px', cursor: activeTool === 'pan' ? 'grab' : 'crosshair' }}>
+        {!image && <div className="flex items-center justify-center h-full text-gray-400">⏳ Cargando imagen...</div>}
         {image && (
-          <>
-            <Stage 
-              ref={stageRef} 
-              width={containerSize.width} 
-              height={containerSize.height}
-              onMouseDown={handleMouseDown} 
-              onMouseMove={handleMouseMove} 
-              onMouseUp={handleMouseUp}
-              draggable={activeTool === 'pan'} 
-              scaleX={stageState.scale} 
-              scaleY={stageState.scale} 
-              x={stageState.x} 
-              y={stageState.y}
-            >
-              <Layer>
-                {/* Imagen de fondo */}
-                <Image 
-                  image={image} 
-                  x={imageDim.x}
-                  y={imageDim.y}
-                  width={imageDim.width}
-                  height={imageDim.height}
-                  listening={false} 
-                />
-                
-                {/* Formas guardadas */}
-                {shapes.map(shape => {
-                  const isSelected = shape.key === selectedShapeKey;
-                  const isHovered = hoveredShape?.key === shape.key;
-                  
-                  const props = {
-                    fill: `${shape.color}60`,
-                    stroke: isSelected ? '#00FFFF' : isHovered ? '#FFD700' : shape.color,
-                    strokeWidth: isSelected ? 4 : isHovered ? 3 : 2,
-                    onClick: () => handleShapeClickInternal(shape),
-                    onTap: () => handleShapeClickInternal(shape),
-                    onMouseEnter: (e) => handleShapeHover(shape, e),
-                    onMouseLeave: handleShapeLeave,
-                    cursor: 'pointer',
-                    shadowColor: 'black',
-                    shadowBlur: isSelected ? 8 : isHovered ? 6 : 3,
-                    shadowOpacity: 0.5,
-                  };
-                  
-                  if (shape.type === 'rect') {
-                    return <Rect key={shape.key} {...props} x={shape.x} y={shape.y} width={shape.width} height={shape.height} />;
-                  }
-                  if (shape.type === 'circle') {
-                    return <Circle key={shape.key} {...props} x={shape.x} y={shape.y} radius={shape.radius} />;
-                  }
-                  if (shape.type === 'polygon') {
-                    return <Line key={shape.key} {...props} points={shape.points} closed />;
-                  }
-                  return null;
-                })}
-                
-                {/* Tooltip en canvas */}
-                {hoveredShape && (
-                  <Label x={tooltipPos.x + 10} y={tooltipPos.y + 10}>
-                    <Tag fill="#1F2937" stroke="#4B5563" strokeWidth={1} cornerRadius={4} />
-                    <Text
-                      text={`${hoveredShape.codigo}\n${hoveredShape.nombre}`}
-                      fontSize={12}
-                      fill="white"
-                      padding={6}
-                    />
-                  </Label>
-                )}
-                
-                {/* Forma temporal */}
-                {newShape && activeTool === 'rect' && (
-                  <Rect 
-                    x={newShape.x} 
-                    y={newShape.y} 
-                    width={newShape.width} 
-                    height={newShape.height} 
-                    fill={`${newShape.color}40`} 
-                    stroke={newShape.color} 
-                    strokeWidth={2} 
-                    dash={[10, 5]} 
-                  />
-                )}
-                
-                {newShape && activeTool === 'circle' && (
-                  <Circle 
-                    x={newShape.x} 
-                    y={newShape.y} 
-                    radius={newShape.radius} 
-                    fill={`${newShape.color}40`} 
-                    stroke={newShape.color} 
-                    strokeWidth={2} 
-                    dash={[10, 5]} 
-                  />
-                )}
-                
-                {isDrawingPolygon && polygonPoints.length > 0 && (
-                  <Line 
-                    points={polygonPoints} 
-                    stroke={currentColor} 
-                    strokeWidth={2} 
-                    dash={[10, 5]} 
-                  />
-                )}
-              </Layer>
-            </Stage>
-          </>
+          <Stage 
+            width={containerSize.width} 
+            height={containerSize.height}
+            draggable={activeTool === 'pan'}
+            scaleX={stageState.scale} 
+            scaleY={stageState.scale}
+            x={stageState.x} 
+            y={stageState.y}
+            // [FIX KONVA] Actualizar estado al terminar de arrastrar
+            onDragEnd={(e) => setStageState(prev => ({ ...prev, x: e.target.x(), y: e.target.y() }))}
+            onMouseDown={handleMouseDown} 
+            onMouseMove={handleMouseMove} 
+            onMouseUp={handleMouseUp}
+          >
+            <Layer>
+              <Image image={image} x={finalX} y={finalY} width={finalW} height={finalH} listening={false} />
+              
+              {shapes.map(shape => {
+                const isSel = shape.key === selectedShapeKey;
+                const props = {
+                  fill: `${shape.color}60`, stroke: isSel ? '#00FFFF' : shape.color, strokeWidth: isSel?4:2,
+                  onClick: () => { setSelectedShapeKey(shape.key); if(onShapeClick) onShapeClick(shape.cwaId); },
+                  onMouseEnter: (e) => { setHoveredShape(shape); setTooltipPos(e.target.getStage().getPointerPosition()); },
+                  onMouseLeave: () => setHoveredShape(null),
+                };
+                if(shape.type==='rect') return <Rect key={shape.key} {...props} x={shape.x} y={shape.y} width={shape.width} height={shape.height} />;
+                if(shape.type==='circle') return <Circle key={shape.key} {...props} x={shape.x} y={shape.y} radius={shape.radius} />;
+                if(shape.type==='polygon') return <Line key={shape.key} {...props} points={shape.points} closed />;
+                return null;
+              })}
+
+              {/* Tooltip */}
+              {hoveredShape && (
+                <Label x={(tooltipPos.x - stageState.x)/stageState.scale} y={(tooltipPos.y - stageState.y)/stageState.scale - 20}>
+                  <Tag fill="#1F2937" stroke="#4B5563" strokeWidth={1} />
+                  <Text text={`${hoveredShape.codigo}`} fontSize={12} fill="white" padding={5} />
+                </Label>
+              )}
+
+              {/* Dibujo temporal */}
+              {newShape && activeTool === 'rect' && <Rect {...newShape} fill={`${newShape.color}40`} stroke={newShape.color} dash={[5,5]} />}
+              {newShape && activeTool === 'circle' && <Circle {...newShape} fill={`${newShape.color}40`} stroke={newShape.color} dash={[5,5]} />}
+              {isDrawingPolygon && polygonPoints.length > 0 && <Line points={polygonPoints} stroke={currentColor} dash={[5,5]} />}
+            </Layer>
+          </Stage>
         )}
-      </div>
-      
-      {/* Footer */}
-      <div className="px-3 py-1.5 bg-gray-800 border-t border-gray-700 flex justify-between text-xs text-gray-400">
-        <span>Formas: {shapes.length}</span>
-        <span>Zoom: {Math.round(stageState.scale * 100)}%</span>
-        <span className="text-gray-500">
-          {isDrawingPolygon && 'Click cerca del inicio para cerrar'}
-        </span>
       </div>
     </div>
   );

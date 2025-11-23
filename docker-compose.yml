@@ -1,8 +1,11 @@
+version: '3.8'
+
 services:
-  # 1. Servicio de Base de Datos (PostgreSQL)
+  # 1. Base de Datos
   db:
     image: postgres:15-alpine
     container_name: awp_db
+    restart: always
     environment:
       - POSTGRES_USER=admin
       - POSTGRES_PASSWORD=admin
@@ -11,28 +14,35 @@ services:
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./.docker/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+      # Si tienes un script inicial, déjalo, si no, puedes comentar esta línea:
+      # - ./.docker/db/init.sql:/docker-entrypoint-initdb.d/init.sql
 
-  # 2. Servicio de Backend (FastAPI)
+  # 2. Backend (FastAPI)
   backend:
     container_name: awp_backend
     build:
       context: ./backend
+    restart: always
     ports:
       - "8000:8000"
     volumes:
       - ./backend:/app
+      # 🔥 IMPORTANTE: Esto evita que se borren las fotos al reiniciar Docker
+      # Crea manualmente una carpeta llamada "backend_uploads" junto a este archivo
+      - ./backend_uploads:/app/uploads
     depends_on:
       - db
     environment:
       - DATABASE_URL=postgresql://admin:admin@db:5432/awp_db
 
-  # 3. Servicio de Frontend (React / Vite)
+  # 3. Frontend (React / Vite)
   frontend:
     container_name: awp_frontend
     build:
       context: ./frontend
     ports:
+      # Nota: Estás mapeando el puerto interno 5173 al externo 3000.
+      # Tendrás que entrar a http://localhost:3000
       - "3000:5173"
     volumes:
       - ./frontend:/app
@@ -40,8 +50,10 @@ services:
     depends_on:
       - backend
     environment:
-      # AÑADIDO: Esta variable es leída por React/Vite para saber dónde está el Backend
-      - VITE_API_URL=http://localhost:8000
+      # 🔥 IMPORTANTE PARA MAC: Hace que los cambios de código se vean al instante
+      - CHOKIDAR_USEPOLLING=true
+      # Configuración de red centralizada
+      - VITE_API_URL=http://localhost:8000/api/v1
 
 volumes:
   postgres_data:

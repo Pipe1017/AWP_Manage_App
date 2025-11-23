@@ -1,9 +1,10 @@
+// frontend/src/App.jsx
+
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+// 1. Importamos el cliente configurado
+import client from "./api/axios"; 
 import ProyectosLanding from './pages/ProyectosLanding';
 import ProyectoDashboard from './pages/ProyectoDashboard';
-
-const API_URL = 'http://10.92.12.84:8000/api/v1';
 
 function App() {
   const [view, setView] = useState('landing');
@@ -12,7 +13,8 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  axios.defaults.baseURL = API_URL;
+  // ❌ BORRAMOS ESTA LÍNEA: axios.defaults.baseURL = API_URL;
+  // (El archivo api/axios.js ya se encarga de esto automáticamente)
 
   useEffect(() => {
     fetchProyectos();
@@ -20,13 +22,15 @@ function App() {
 
   const fetchProyectos = async () => {
     try {
-      const response = await axios.get('/proyectos/');
+      // ✅ CAMBIO 1: Usamos 'client' en vez de 'axios'
+      const response = await client.get('/proyectos/');
       
       // Cargar datos completos de cada proyecto
       const proyectosCompletos = await Promise.all(
         response.data.map(async (proyecto) => {
           try {
-            const detalle = await axios.get(`/proyectos/${proyecto.id}`);
+            // ✅ CAMBIO 2: Usamos 'client'
+            const detalle = await client.get(`/proyectos/${proyecto.id}`);
             return detalle.data;
           } catch (err) {
             console.error(`Error cargando proyecto ${proyecto.id}:`, err);
@@ -47,13 +51,15 @@ function App() {
 
   const handleAddProyecto = async (nombreProyecto) => {
     try {
-      const response = await axios.post('/proyectos/', {
+      // ✅ CAMBIO 3: Usamos 'client.post'
+      const response = await client.post('/proyectos/', {
         nombre: nombreProyecto,
         descripcion: ""
       });
       
       // Cargar proyecto completo con relaciones
-      const proyectoCompleto = await axios.get(`/proyectos/${response.data.id}`);
+      // ✅ CAMBIO 4: Usamos 'client.get'
+      const proyectoCompleto = await client.get(`/proyectos/${response.data.id}`);
       setProyectos([...proyectos, proyectoCompleto.data]);
       handleSelectProyecto(proyectoCompleto.data);
     } catch (err) {
@@ -63,7 +69,8 @@ function App() {
 
   const handleSelectProyecto = async (proyecto) => {
     try {
-      const response = await axios.get(`/proyectos/${proyecto.id}`);
+      // ✅ CAMBIO 5: Usamos 'client.get'
+      const response = await client.get(`/proyectos/${proyecto.id}`);
       setSelectedProyecto(response.data);
       setView('dashboard');
     } catch (err) {

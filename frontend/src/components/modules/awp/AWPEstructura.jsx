@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
-import axios from 'axios';
+// frontend/src/components/modules/awp/AWPEstructura.jsx
 
-const API_URL = 'http://10.92.12.84:8000';
-const AWP_API_URL = `${API_URL}/api/v1/awp`;
+import React, { useState } from 'react';
+import client from '../../../api/axios';
 
 // --- Formulario para CWP (Componente interno) ---
 function CWPForm({ cwaId, onCWPCreado, disciplinas = [] }) {
@@ -19,7 +18,7 @@ function CWPForm({ cwaId, onCWPCreado, disciplinas = [] }) {
     
     setLoading(true);
     try {
-      const response = await axios.post(
+      const response = await client.post(
         `${AWP_API_URL}/cwa/${cwaId}/cwp/?disciplina_id=${disciplinaId}`,
         { 
           nombre,

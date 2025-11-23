@@ -1,31 +1,31 @@
+// frontend/src/components/sections/ResumenTab.jsx
+
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+// 1. Importamos el cliente centralizado
+import client from '../../api/axios';
+
 import PlotPlan from '../modules/plotplan/PlotPlan';
 import AWPTableConsolidada from '../modules/awp/AWPTableConsolidada';
-// import ConfigPanel from '../forms/ConfigPanel'; // <-- Eliminado
 import UploadPlotPlanForm from '../modules/upload/UploadPlotPlanForm';
-
-const API_URL = 'http://10.92.12.84:8000/api/v1';
 
 function ResumenTab({ proyecto, onProyectoUpdate }) {
   const [selectedPlotPlanId, setSelectedPlotPlanId] = useState(null);
   const [selectedCWA, setSelectedCWA] = useState(null);
   const [filteredCWAId, setFilteredCWAId] = useState(null);
-  // const [showConfig, setShowConfig] = useState(false); // <-- Eliminado
   const [isLoadingPlotPlan, setIsLoadingPlotPlan] = useState(false);
 
-  // Inicializar con el primer plot plan
+  // Inicializar con el primer plot plan si existe
   useEffect(() => {
     if (proyecto.plot_plans && proyecto.plot_plans.length > 0 && !selectedPlotPlanId) {
       setSelectedPlotPlanId(proyecto.plot_plans[0].id);
     }
   }, [proyecto.plot_plans]);
 
-  // Función para recargar proyecto completo
+  // Función para recargar todo el proyecto desde el servidor
   const recargarProyecto = async () => {
     try {
       console.log("🔄 Recargando proyecto completo...");
-      const response = await axios.get(`${API_URL}/proyectos/${proyecto.id}`);
+      const response = await client.get(`/proyectos/${proyecto.id}`);
       onProyectoUpdate(response.data);
       console.log("✅ Proyecto recargado");
     } catch (err) {
@@ -33,26 +33,25 @@ function ResumenTab({ proyecto, onProyectoUpdate }) {
     }
   };
 
-  // Cargar plot plan específico cuando se selecciona
+  // Cargar detalles del plot plan cuando se selecciona (incluye CWAs y geometrías)
   useEffect(() => {
-    if (!selectedPlotPlanId || isLoadingPlotPlan) return;
+    if (!selectedPlotPlanId) return;
     
     let isMounted = true;
     
     const loadPlotPlanWithCWAs = async () => {
       try {
         setIsLoadingPlotPlan(true);
-        console.log(`🔄 Cargando plot plan ${selectedPlotPlanId}...`);
+        console.log(`🔄 Cargando detalles del plot plan ${selectedPlotPlanId}...`);
         
-        const response = await axios.get(
-          `${API_URL}/proyectos/${proyecto.id}/plot_plans/${selectedPlotPlanId}`
+        const response = await client.get(
+          `/proyectos/${proyecto.id}/plot_plans/${selectedPlotPlanId}`
         );
         
         if (!isMounted) return;
         
-        console.log("✅ Plot plan cargado:", response.data);
-        
-        const updatedPlotPlans = proyecto.plot_plans.map(pp =>
+        // Actualizamos solo este plot plan dentro de la estructura del proyecto
+        const updatedPlotPlans = (proyecto.plot_plans || []).map(pp =>
           pp.id === selectedPlotPlanId ? response.data : pp
         );
         
@@ -61,6 +60,7 @@ function ResumenTab({ proyecto, onProyectoUpdate }) {
           plot_plans: updatedPlotPlans
         });
         
+        // Reseteamos selecciones
         setSelectedCWA(null);
         setIsLoadingPlotPlan(false);
         
@@ -79,14 +79,37 @@ function ResumenTab({ proyecto, onProyectoUpdate }) {
     };
   }, [selectedPlotPlanId]);
 
+  // Obtener el objeto del plan seleccionado
   const currentPlotPlan = proyecto.plot_plans?.find(pp => pp.id === selectedPlotPlanId);
 
-  const handleShapeSaved = async (cwaId, updatedCWA) => {
-    console.log("✅ Forma guardada, recargando plot plan...");
+  // --- HANDLERS ---
+
+  // 🌟 LÓGICA CORREGIDA: Actualización Optimista al subir plano
+  const handlePlotPlanUploaded = async (nuevoPlotPlan) => {
+    console.log("📥 Plot Plan subido, actualizando vista...", nuevoPlotPlan);
     
+    // 1. Forzamos la actualización local inmediata para que aparezca en la lista
+    const planosActuales = proyecto.plot_plans || [];
+    const proyectoActualizado = {
+      ...proyecto,
+      plot_plans: [...planosActuales, nuevoPlotPlan]
+    };
+
+    // 2. Actualizamos el estado global
+    onProyectoUpdate(proyectoActualizado);
+    
+    // 3. Seleccionamos el nuevo plano automáticamente
+    setSelectedPlotPlanId(nuevoPlotPlan.id);
+
+    // 4. Recargamos del servidor en segundo plano para asegurar consistencia
+    await recargarProyecto();
+  };
+
+  const handleShapeSaved = async (cwaId, updatedCWA) => {
+    console.log("✅ Forma guardada, recargando datos...");
     try {
-      const response = await axios.get(
-        `${API_URL}/proyectos/${proyecto.id}/plot_plans/${selectedPlotPlanId}`
+      const response = await client.get(
+        `/proyectos/${proyecto.id}/plot_plans/${selectedPlotPlanId}`
       );
       
       const updatedPlotPlans = proyecto.plot_plans.map(pp =>
@@ -97,12 +120,30 @@ function ResumenTab({ proyecto, onProyectoUpdate }) {
         ...proyecto,
         plot_plans: updatedPlotPlans
       });
-      
-      console.log("✅ Plot plan recargado con geometrías");
-      
     } catch (err) {
-      console.error("❌ Error recargando plot plan:", err);
+      console.error("❌ Error actualizando tras guardar forma:", err);
     }
+  };
+
+  const handleCWACreada = async () => {
+    console.log("✅ CWA creada, actualizando...");
+    // Reutilizamos la lógica de recarga para traer la nueva CWA
+    try {
+      const response = await client.get(
+        `/proyectos/${proyecto.id}/plot_plans/${selectedPlotPlanId}`
+      );
+      const updatedPlotPlans = proyecto.plot_plans.map(pp =>
+        pp.id === selectedPlotPlanId ? response.data : pp
+      );
+      onProyectoUpdate({ ...proyecto, plot_plans: updatedPlotPlans });
+    } catch (err) { console.error(err); }
+  };
+
+  const handlePlotPlanChange = (newId) => {
+    console.log(`🔄 Cambiando a plot plan ${newId}`);
+    setSelectedCWA(null);
+    setFilteredCWAId(null);
+    setSelectedPlotPlanId(newId);
   };
 
   const handleShapeClick = (cwaId) => {
@@ -114,56 +155,13 @@ function ResumenTab({ proyecto, onProyectoUpdate }) {
     setFilteredCWAId(null);
   };
 
-  const handlePlotPlanUploaded = async (nuevoPlotPlan) => {
-    await recargarProyecto();
-    setTimeout(() => {
-      setSelectedPlotPlanId(nuevoPlotPlan.id);
-    }, 100);
-  };
-
-  // const handleDisciplinaCreada = async (nuevaDisciplina) => { // <-- Eliminado (ya no se usa)
-  //   await recargarProyecto();
-  // };
-
-  const handleCWACreada = async () => {
-    console.log("✅ CWA creado, recargando plot plan...");
-    
-    try {
-      const response = await axios.get(
-        `${API_URL}/proyectos/${proyecto.id}/plot_plans/${selectedPlotPlanId}`
-      );
-      
-      const updatedPlotPlans = proyecto.plot_plans.map(pp =>
-        pp.id === selectedPlotPlanId ? response.data : pp
-      );
-      
-      onProyectoUpdate({
-        ...proyecto,
-        plot_plans: updatedPlotPlans
-      });
-      
-      console.log("✅ Plot plan recargado después de crear CWA");
-      
-    } catch (err) {
-      console.error("❌ Error recargando plot plan:", err);
-    }
-  };
-
-  const handlePlotPlanChange = (newId) => {
-    console.log(`🔄 Cambiando a plot plan ${newId}`);
-    setSelectedCWA(null);
-    setFilteredCWAId(null);
-    setSelectedPlotPlanId(newId);
-  };
-
   const handleTableDataChange = async () => {
-    console.log("🔄 Datos de tabla cambiados, recargando...");
     await recargarProyecto();
   };
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
-      {/* Toolbar Superior */}
+      {/* --- Toolbar Superior --- */}
       <div className="flex items-center justify-between p-4 border-b border-gray-700 bg-gray-800/50">
         <div className="flex items-center gap-3">
           <h2 className="text-lg font-semibold text-white">Resumen General</h2>
@@ -178,7 +176,7 @@ function ResumenTab({ proyecto, onProyectoUpdate }) {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Selector de CWA para asignar a áreas */}
+          {/* Selector de CWA (si hay plan seleccionado) */}
           {currentPlotPlan && currentPlotPlan.cwas && currentPlotPlan.cwas.length > 0 && (
             <div className="flex items-center gap-2 px-3 py-2 bg-gray-700/50 rounded-lg border border-gray-600">
               <span className="text-xs text-gray-400 font-medium">Asignar CWA:</span>
@@ -198,13 +196,11 @@ function ResumenTab({ proyecto, onProyectoUpdate }) {
                   </option>
                 ))}
               </select>
-              {selectedCWA && (
-                <span className="text-xs text-green-400">✓</span>
-              )}
+              {selectedCWA && <span className="text-xs text-green-400">✓</span>}
             </div>
           )}
 
-          {/* Botón de refresh */}
+          {/* Botón Recargar */}
           <button
             onClick={recargarProyecto}
             className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-medium flex items-center gap-2 transition-colors"
@@ -229,16 +225,13 @@ function ResumenTab({ proyecto, onProyectoUpdate }) {
               ))}
             </select>
           )}
-
-          {/* Botón Configuración <-- Eliminado */}
         </div>
       </div>
 
-      {/* Content */}
+      {/* --- Contenido Principal --- */}
       <div className="flex-1 overflow-y-auto">
-        {/* Panel de Configuración (colapsable) <-- Eliminado */}
         
-        {/* Upload Plot Plan */}
+        {/* Sección de Subida */}
         <div className="p-6 border-b border-gray-700 bg-gray-800/20">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold text-gray-400 uppercase">📤 Subir Nuevo Plano</h3>
@@ -249,20 +242,20 @@ function ResumenTab({ proyecto, onProyectoUpdate }) {
           />
         </div>
 
+        {/* Visualizador y Tabla */}
         {currentPlotPlan ? (
           <div className="p-6 space-y-6">
-            {/* Plot Plan Canvas */}
+            {/* Canvas del Plano */}
             <div className="bg-gray-800/30 border border-gray-700 rounded-lg overflow-hidden">
               <div className="p-4 border-b border-gray-700 bg-gray-800/50">
                 <h3 className="text-sm font-semibold text-gray-400 uppercase">
                   📐 Plot Plan Interactivo
                 </h3>
-                {selectedCWA && (
+                {selectedCWA ? (
                   <p className="text-xs text-green-400 mt-1">
                     ✓ CWA seleccionado: {selectedCWA.codigo} - {selectedCWA.nombre}
                   </p>
-                )}
-                {!selectedCWA && (
+                ) : (
                   <p className="text-xs text-yellow-400 mt-1">
                     ⚠️ Selecciona un CWA arriba para asignar áreas dibujadas
                   </p>
@@ -271,7 +264,7 @@ function ResumenTab({ proyecto, onProyectoUpdate }) {
               
               <div className="p-4">
                 <PlotPlan
-                  key={`plotplan-${selectedPlotPlanId}`}
+                  key={`plotplan-${selectedPlotPlanId}`} // Forzar re-render al cambiar de plano
                   plotPlan={currentPlotPlan}
                   cwaToAssociate={selectedCWA}
                   onShapeSaved={handleShapeSaved}
@@ -280,14 +273,12 @@ function ResumenTab({ proyecto, onProyectoUpdate }) {
               </div>
             </div>
 
-            {/* Tabla Consolidada AWP */}
+            {/* Tabla AWP */}
             <div className="bg-gray-800/30 border border-gray-700 rounded-lg overflow-hidden">
               <div className="p-4 border-b border-gray-700 bg-gray-800/50 flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-gray-400 uppercase">
                   📋 Estructura AWP Consolidada
                 </h3>
-                
-                {/* Indicador de filtro activo */}
                 {filteredCWAId && (
                   <button
                     onClick={handleClearFilter}

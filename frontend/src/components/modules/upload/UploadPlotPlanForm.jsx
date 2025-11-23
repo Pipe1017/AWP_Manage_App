@@ -1,7 +1,6 @@
+// frontend/src/components/modules/upload/UploadPlotPlanForm.jsx
 import React, { useState } from 'react';
-import axios from 'axios';
-
-const API_URL = 'http://10.92.12.84:8000/api/v1';
+import client from '../../../api/axios';
 
 function UploadPlotPlanForm({ proyecto, onUploadSuccess }) {
   const [nombre, setNombre] = useState("");
@@ -28,8 +27,8 @@ function UploadPlotPlanForm({ proyecto, onUploadSuccess }) {
     }
 
     try {
-      const response = await axios.post(
-        `${API_URL}/proyectos/${proyecto.id}/plot_plans/`,
+      const response = await client.post(
+        `/proyectos/${proyecto.id}/plot_plans/`,
         formData
       );
       console.log("✅ Plot Plan creado:", response.data);

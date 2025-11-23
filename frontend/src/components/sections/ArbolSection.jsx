@@ -1,3 +1,4 @@
+// frontend/src/components/sections/CronogramaSection.jsx
 import React from 'react';
 
 function CronogramaTab({ proyecto }) {

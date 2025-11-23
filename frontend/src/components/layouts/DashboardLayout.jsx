@@ -1,17 +1,17 @@
 // frontend/src/components/layouts/DashboardLayout.jsx
 
-// --- IMPORTACIONES EXISTENTES ---
+import React, { useState, useEffect } from 'react';
+import DashboardHeader from '../common/DashboardHeader';
+import DashboardSidebar from '../common/DashboardSidebar';
+
+// Secciones
+import ResumenTab from '../sections/ResumenTab';
+import CronogramaTab from '../sections/CronogramaSection';
+import ArbolTab from '../sections/ArbolSection';
 import ConfiguracionSection from '../sections/ConfiguracionSection';
 
-// --- IMPORTACIONES FALTANTES (AGREGAR ESTAS) ---
-import DashboardHeader from '../common/DashboardHeader'; // (Ajusta la ruta si es necesario)
-import DashboardSidebar from '../common/DashboardSidebar'; // (Ajusta la ruta si es necesario)
-import ResumenTab from '../sections/ResumenTab'; // (Probablemente en una carpeta 'sections')
-import CronogramaTab from '../sections/CronogramaSection'; // (Probablemente en una carpeta 'sections')
-import ArbolTab from '../sections/ArbolSection'; // (Probablemente en una carpeta 'sections')
-
 function ProyectoDashboardLayout({
-  proyecto,
+  proyecto: proyectoInicial,
   selectedSection,
   setSelectedSection,
   sidebarExpanded,
@@ -19,8 +19,27 @@ function ProyectoDashboardLayout({
   onBack,
   onProyectoUpdate
 }) {
+  // 1. Estado local para manejar actualizaciones inmediatas
+  const [proyecto, setProyecto] = useState(proyectoInicial);
+
+  // 2. Sincronizar si el padre manda un proyecto nuevo
+  useEffect(() => {
+    setProyecto(proyectoInicial);
+  }, [proyectoInicial]);
+
+  // 3. Handler local para actualizar estado y propagar al padre
+  const handleProyectoUpdate = (nuevoProyecto) => {
+    console.log("🔄 DashboardLayout: Actualizando proyecto...", nuevoProyecto);
+    setProyecto(nuevoProyecto);
+    
+    if (onProyectoUpdate) {
+      onProyectoUpdate(nuevoProyecto);
+    }
+  };
+
   return (
     <div className="bg-gray-900 text-white min-h-screen flex flex-col">
+      {/* Header */}
       <DashboardHeader
         proyecto={proyecto}
         onBack={onBack}
@@ -28,7 +47,10 @@ function ProyectoDashboardLayout({
         setSidebarExpanded={setSidebarExpanded}
       />
 
+      {/* Contenedor Principal con Sidebar y Contenido */}
       <div className="flex-1 flex overflow-hidden">
+        
+        {/* Sidebar */}
         <DashboardSidebar
           proyecto={proyecto}
           selectedSection={selectedSection}
@@ -36,11 +58,13 @@ function ProyectoDashboardLayout({
           isExpanded={sidebarExpanded}
         />
 
+        {/* Área de Contenido Variable */}
         <div className="flex-1 overflow-auto bg-gray-900">
+          
           {selectedSection === 'resumen' && (
             <ResumenTab
               proyecto={proyecto}
-              onProyectoUpdate={onProyectoUpdate}
+              onProyectoUpdate={handleProyectoUpdate}
             />
           )}
 
@@ -52,13 +76,13 @@ function ProyectoDashboardLayout({
             <ArbolTab proyecto={proyecto} />
           )}
 
-          {/* ✨ NUEVA SECCIÓN */}
           {selectedSection === 'configuracion' && (
-            <ConfiguracionSection
-              proyecto={proyecto}
-              onProyectoUpdate={onProyectoUpdate}
+            <ConfiguracionSection 
+              proyecto={proyecto} 
+              onProyectoUpdate={handleProyectoUpdate} 
             />
           )}
+
         </div>
       </div>
     </div>

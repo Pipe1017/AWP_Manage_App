@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import axios from 'axios';
+// frontend/src/components/forms/TipoEntregableForm.jsx
 
-const API_URL = 'http://10.92.12.84:8000';
+import React, { useState } from 'react';
+import client from '../../api/axios';
+
 
 function TipoEntregableForm({ disciplina, onTipoCreado }) {
   const [nombre, setNombre] = useState("");
@@ -23,8 +24,8 @@ function TipoEntregableForm({ disciplina, onTipoCreado }) {
 
     try {
       // ESTA ES LA URL CORREGIDA DEL 404
-      const response = await axios.post(
-        `${API_URL}/api/v1/proyectos/${disciplina.proyecto_id}/disciplinas/${disciplina.id}/tipos_entregables/`,
+      const response = await client.post(
+        `/api/v1/proyectos/${disciplina.proyecto_id}/disciplinas/${disciplina.id}/tipos_entregables/`,
         {
           nombre: nombre,
           codigo: codigo,
