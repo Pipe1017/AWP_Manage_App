@@ -45,26 +45,26 @@ function UploadPlotPlanForm({ proyecto, onUploadSuccess }) {
   };
 
   return (
-    <form onSubmit={handleUpload} className="p-4 bg-gray-700 rounded-lg flex items-center gap-4">
+    <form onSubmit={handleUpload} className="p-4 bg-hatch-gray rounded-lg flex items-center gap-4">
       <input
         type="text"
         value={nombre}
         onChange={(e) => setNombre(e.target.value)}
         placeholder="Nombre del Plano (ej. Nivel 1)"
-        className="flex-grow px-3 py-2 rounded bg-gray-800 border border-gray-600 text-white"
+        className="flex-grow px-3 py-2 rounded bg-white border-r-2 border-hatch-gray border border-gray-600 text-hatch-blue"
         required
       />
       <input 
         type="file" 
         accept="image/jpeg, image/png"
         onChange={(e) => setFile(e.target.files[0])}
-        className="text-sm text-gray-300 file:mr-2 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700"
+        className="text-sm text-gray-300 file:mr-2 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-gradient-orange file:text-hatch-blue hover:file:bg-blue-700"
         required
       />
       <button
         type="submit"
         disabled={loading || !file || !nombre}
-        className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-bold rounded disabled:opacity-50 disabled:cursor-not-allowed"
+        className="px-4 py-2 bg-green-600 hover:bg-green-700 text-hatch-blue font-bold rounded disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {loading ? "..." : "+ Añadir Plano"}
       </button>

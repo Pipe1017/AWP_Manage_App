@@ -72,7 +72,7 @@ function ProyectoDetalle({ proyecto, onDisciplinaCreada, onTipoEntregableCreado,
       
       {/* Sección de CWAs */}
       <div className="mb-8 p-6 bg-gradient-to-r from-blue-900/30 to-blue-800/20 border-2 border-blue-700 rounded-lg">
-        <h3 className="text-xl font-bold mb-4 text-blue-300 flex items-center gap-2">
+        <h3 className="text-xl font-bold mb-4 text-hatch-orange flex items-center gap-2">
           <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
           </svg>
@@ -89,7 +89,7 @@ function ProyectoDetalle({ proyecto, onDisciplinaCreada, onTipoEntregableCreado,
               <select
                 value={selectedPlotPlanId || ''}
                 onChange={(e) => setSelectedPlotPlanId(Number(e.target.value))}
-                className="w-full px-4 py-2 rounded-lg bg-gray-800 border border-gray-600 text-white"
+                className="w-full px-4 py-2 rounded-lg bg-white border-r-2 border-hatch-gray border border-gray-600 text-hatch-blue"
                 required
               >
                 {proyecto.plot_plans.map(pp => (
@@ -107,7 +107,7 @@ function ProyectoDetalle({ proyecto, onDisciplinaCreada, onTipoEntregableCreado,
                 value={cwaNombre} 
                 onChange={(e) => setCwaNombre(e.target.value)} 
                 placeholder="Nombre del CWA (ej. Área Norte)" 
-                className="flex-1 px-4 py-2 rounded-lg bg-gray-800 border border-gray-600 text-white placeholder-gray-500" 
+                className="flex-1 px-4 py-2 rounded-lg bg-white border-r-2 border-hatch-gray border border-gray-600 text-hatch-blue placeholder-gray-500" 
                 required 
               />
               <input 
@@ -115,12 +115,12 @@ function ProyectoDetalle({ proyecto, onDisciplinaCreada, onTipoEntregableCreado,
                 value={cwaCodigo} 
                 onChange={(e) => setCwaCodigo(e.target.value.toUpperCase())} 
                 placeholder="Código (ej. CWA-01)" 
-                className="w-32 px-4 py-2 rounded-lg bg-gray-800 border border-gray-600 text-white placeholder-gray-500" 
+                className="w-32 px-4 py-2 rounded-lg bg-white border-r-2 border-hatch-gray border border-gray-600 text-hatch-blue placeholder-gray-500" 
                 required 
               />
               <button 
                 type="submit" 
-                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors"
+                className="px-6 py-2 bg-gradient-orange hover:bg-blue-700 text-hatch-blue font-bold rounded-lg transition-colors"
               >
                 + Crear CWA
               </button>
@@ -138,16 +138,16 @@ function ProyectoDetalle({ proyecto, onDisciplinaCreada, onTipoEntregableCreado,
         {/* Lista de CWAs existentes */}
         {proyecto.plot_plans && proyecto.plot_plans.some(pp => pp.cwas && pp.cwas.length > 0) && (
           <div className="mt-6">
-            <h4 className="text-sm font-semibold text-gray-400 mb-3">CWAs Existentes:</h4>
+            <h4 className="text-sm font-semibold text-hatch-blue mb-3">CWAs Existentes:</h4>
             {proyecto.plot_plans.map(pp => (
               pp.cwas && pp.cwas.length > 0 && (
                 <div key={pp.id} className="mb-4">
-                  <p className="text-xs text-blue-300 mb-2">📍 {pp.nombre}</p>
+                  <p className="text-xs text-hatch-orange mb-2">📍 {pp.nombre}</p>
                   <div className="grid grid-cols-2 gap-2">
                     {pp.cwas.map(cwa => (
-                      <div key={cwa.id} className="p-3 bg-gray-800 rounded-lg border border-gray-700">
-                        <p className="font-medium text-white">{cwa.nombre}</p>
-                        <p className="text-xs text-gray-400">{cwa.codigo}</p>
+                      <div key={cwa.id} className="p-3 bg-white border-r-2 border-hatch-gray rounded-lg border border-gray-700">
+                        <p className="font-medium text-hatch-blue">{cwa.nombre}</p>
+                        <p className="text-xs text-hatch-blue">{cwa.codigo}</p>
                         <p className="text-xs text-green-400 mt-1">
                           {(cwa.cwps || []).length} CWP(s)
                         </p>
@@ -165,7 +165,7 @@ function ProyectoDetalle({ proyecto, onDisciplinaCreada, onTipoEntregableCreado,
       <div className="my-8 border-t-2 border-gray-700"></div>
 
       {/* Formulario de Disciplinas */}
-      <div className="mb-8 p-6 bg-gray-800 rounded-lg border border-gray-700">
+      <div className="mb-8 p-6 bg-white border-r-2 border-hatch-gray rounded-lg border border-gray-700">
         <h3 className="text-xl font-bold mb-4 text-gray-300">Disciplinas del Proyecto</h3>
         <form onSubmit={handleDisciplinaSubmit} className="flex gap-3">
           <input 
@@ -173,7 +173,7 @@ function ProyectoDetalle({ proyecto, onDisciplinaCreada, onTipoEntregableCreado,
             value={discNombre} 
             onChange={(e) => setDiscNombre(e.target.value)} 
             placeholder="Nombre (ej. Piping)" 
-            className="flex-1 px-4 py-2 rounded-lg bg-gray-900 border border-gray-700 text-white" 
+            className="flex-1 px-4 py-2 rounded-lg bg-gray-900 border border-gray-700 text-hatch-blue" 
             required 
           />
           <input 
@@ -181,17 +181,17 @@ function ProyectoDetalle({ proyecto, onDisciplinaCreada, onTipoEntregableCreado,
             value={discCodigo} 
             onChange={(e) => setDiscCodigo(e.target.value.toUpperCase())} 
             placeholder="Código (ej. PI)" 
-            className="w-24 px-4 py-2 rounded-lg bg-gray-900 border border-gray-700 text-white" 
+            className="w-24 px-4 py-2 rounded-lg bg-gray-900 border border-gray-700 text-hatch-blue" 
             required 
           />
-          <button type="submit" className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg">
+          <button type="submit" className="px-6 py-2 bg-green-600 hover:bg-green-700 text-hatch-blue font-bold rounded-lg">
             + Añadir
           </button>
         </form>
       </div>
 
       {/* Biblioteca de Entregables */}
-      <div className="p-6 bg-gray-800 rounded-lg border border-gray-700">
+      <div className="p-6 bg-white border-r-2 border-hatch-gray rounded-lg border border-gray-700">
         <h3 className="text-xl font-bold mb-4 text-gray-300">Biblioteca de Entregables</h3>
         <ul>
           {(proyecto.disciplinas || []).length > 0 ? (
@@ -199,10 +199,10 @@ function ProyectoDetalle({ proyecto, onDisciplinaCreada, onTipoEntregableCreado,
               <li key={disc.id} className="bg-gray-900 my-2 rounded-md overflow-hidden border border-gray-700">
                 <div 
                   onClick={() => setSelectedDiscId(disc.id === selectedDiscId ? null : disc.id)} 
-                  className="p-4 cursor-pointer hover:bg-gray-700 transition-colors"
+                  className="p-4 cursor-pointer hover:bg-hatch-gray transition-colors"
                 >
-                  <strong className="text-white">{disc.nombre}</strong>
-                  <span className="ml-2 text-gray-400">({disc.codigo})</span>
+                  <strong className="text-hatch-blue">{disc.nombre}</strong>
+                  <span className="ml-2 text-hatch-blue">({disc.codigo})</span>
                   <span className="ml-4 text-xs text-gray-500">
                     {(disc.tipos_entregables || []).length} tipo(s)
                   </span>
@@ -211,7 +211,7 @@ function ProyectoDetalle({ proyecto, onDisciplinaCreada, onTipoEntregableCreado,
                 <ul className="px-8 pb-2 text-sm text-gray-300">
                   {(disc.tipos_entregables || []).map(tipo => (
                     <li key={tipo.id} className="my-1">
-                      <span className="font-medium text-blue-300 mr-2">[{tipo.categoria_awp}]</span> 
+                      <span className="font-medium text-hatch-orange mr-2">[{tipo.categoria_awp}]</span> 
                       {tipo.nombre} 
                       <span className="text-gray-500 ml-2">({tipo.codigo})</span>
                     </li>
@@ -227,7 +227,7 @@ function ProyectoDetalle({ proyecto, onDisciplinaCreada, onTipoEntregableCreado,
               </li>
             ))
           ) : (
-            <p className="text-gray-400 p-4">Este proyecto aún no tiene disciplinas.</p>
+            <p className="text-hatch-blue p-4">Este proyecto aún no tiene disciplinas.</p>
           )}
         </ul>
       </div>

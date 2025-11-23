@@ -1,7 +1,6 @@
 // frontend/src/App.jsx
 
 import React, { useState, useEffect } from 'react';
-// 1. Importamos el cliente configurado
 import client from "./api/axios"; 
 import ProyectosLanding from './pages/ProyectosLanding';
 import ProyectoDashboard from './pages/ProyectoDashboard';
@@ -13,23 +12,16 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // ❌ BORRAMOS ESTA LÍNEA: axios.defaults.baseURL = API_URL;
-  // (El archivo api/axios.js ya se encarga de esto automáticamente)
-
   useEffect(() => {
     fetchProyectos();
   }, []);
 
   const fetchProyectos = async () => {
     try {
-      // ✅ CAMBIO 1: Usamos 'client' en vez de 'axios'
       const response = await client.get('/proyectos/');
-      
-      // Cargar datos completos de cada proyecto
       const proyectosCompletos = await Promise.all(
         response.data.map(async (proyecto) => {
           try {
-            // ✅ CAMBIO 2: Usamos 'client'
             const detalle = await client.get(`/proyectos/${proyecto.id}`);
             return detalle.data;
           } catch (err) {
@@ -38,7 +30,6 @@ function App() {
           }
         })
       );
-      
       setProyectos(proyectosCompletos);
       setError(null);
     } catch (err) {
@@ -51,14 +42,10 @@ function App() {
 
   const handleAddProyecto = async (nombreProyecto) => {
     try {
-      // ✅ CAMBIO 3: Usamos 'client.post'
       const response = await client.post('/proyectos/', {
         nombre: nombreProyecto,
         descripcion: ""
       });
-      
-      // Cargar proyecto completo con relaciones
-      // ✅ CAMBIO 4: Usamos 'client.get'
       const proyectoCompleto = await client.get(`/proyectos/${response.data.id}`);
       setProyectos([...proyectos, proyectoCompleto.data]);
       handleSelectProyecto(proyectoCompleto.data);
@@ -69,7 +56,6 @@ function App() {
 
   const handleSelectProyecto = async (proyecto) => {
     try {
-      // ✅ CAMBIO 5: Usamos 'client.get'
       const response = await client.get(`/proyectos/${proyecto.id}`);
       setSelectedProyecto(response.data);
       setView('dashboard');
@@ -81,7 +67,7 @@ function App() {
   const handleBackToProyectos = () => {
     setView('landing');
     setSelectedProyecto(null);
-    fetchProyectos(); // Refrescar lista al volver
+    fetchProyectos();
   };
 
   const handleProyectoUpdate = (updatedProyecto) => {
@@ -91,13 +77,11 @@ function App() {
 
   if (loading) {
     return (
-      <div className="bg-gray-900 text-white min-h-screen flex items-center justify-center">
+      <div className="bg-white min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <svg className="animate-spin h-16 w-16 text-blue-500 mx-auto mb-4" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-          <p className="text-lg text-gray-400">Cargando AWP Manager...</p>
+          <div className="w-16 h-16 border-4 border-hatch-orange border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-lg text-hatch-blue font-semibold">Cargando AWP Manager...</p>
+          <p className="text-sm text-gray-500 mt-2">Powered by HATCH</p>
         </div>
       </div>
     );

@@ -47,13 +47,13 @@ function TipoEntregableForm({ disciplina, onTipoCreado }) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="p-4 bg-gray-700 rounded-b-md">
+    <form onSubmit={handleSubmit} className="p-4 bg-hatch-gray rounded-b-md">
       <input
         type="text"
         value={nombre}
         onChange={(e) => setNombre(e.target.value)}
         placeholder="Nombre (ej. P&ID)"
-        className="px-2 py-1 rounded bg-gray-800 border border-gray-600 text-white"
+        className="px-2 py-1 rounded bg-white border-r-2 border-hatch-gray border border-gray-600 text-hatch-blue"
         required
       />
       <input
@@ -61,13 +61,13 @@ function TipoEntregableForm({ disciplina, onTipoCreado }) {
         value={codigo}
         onChange={(e) => setCodigo(e.target.value)}
         placeholder="Código (ej. PID)"
-        className="w-20 mx-2 px-2 py-1 rounded bg-gray-800 border border-gray-600 text-white"
+        className="w-20 mx-2 px-2 py-1 rounded bg-white border-r-2 border-hatch-gray border border-gray-600 text-hatch-blue"
         required
       />
       <select 
         value={categoria} 
         onChange={(e) => setCategoria(e.target.value)}
-        className="px-2 py-1 rounded bg-gray-800 border border-gray-600 text-white"
+        className="px-2 py-1 rounded bg-white border-r-2 border-hatch-gray border border-gray-600 text-hatch-blue"
       >
         <option value="EWP">EWP</option>
         <option value="IWP">IWP</option>
@@ -76,7 +76,7 @@ function TipoEntregableForm({ disciplina, onTipoCreado }) {
       </select>
       <button 
         type="submit" 
-        className="ml-2 px-3 py-1 bg-green-600 hover:bg-green-700 text-white font-bold rounded disabled:opacity-50"
+        className="ml-2 px-3 py-1 bg-green-600 hover:bg-green-700 text-hatch-blue font-bold rounded disabled:opacity-50"
         disabled={loading}
       >
         {loading ? "..." : "+"}

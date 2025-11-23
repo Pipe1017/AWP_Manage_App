@@ -47,7 +47,7 @@ function Toolbar({ activeTool, setActiveTool, color, setColor, onZoom, onClear, 
             key={tool.id}
             onClick={() => setActiveTool(tool.id)}
             className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
-              activeTool === tool.id ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              activeTool === tool.id ? 'bg-gradient-orange text-hatch-blue' : 'bg-hatch-gray text-gray-300 hover:bg-gray-600'
             }`}
           >
             <span className="mr-1">{tool.icon}</span>{tool.name}
@@ -55,16 +55,16 @@ function Toolbar({ activeTool, setActiveTool, color, setColor, onZoom, onClear, 
         ))}
       </div>
       <div className="flex items-center gap-2">
-        <button onClick={() => onZoom(1.2)} className="px-2 py-1 bg-gray-700 text-white text-xs font-bold rounded">+</button>
-        <button onClick={() => onZoom(0.8)} className="px-2 py-1 bg-gray-700 text-white text-xs font-bold rounded">-</button>
-        {onUndo && <button onClick={onUndo} className="px-2 py-1 bg-gray-700 text-gray-300 rounded text-xs">↶</button>}
-        {onClear && <button onClick={onClear} className="px-2 py-1 bg-red-600 text-white rounded text-xs">🗑️</button>}
+        <button onClick={() => onZoom(1.2)} className="px-2 py-1 bg-hatch-gray text-hatch-blue text-xs font-bold rounded">+</button>
+        <button onClick={() => onZoom(0.8)} className="px-2 py-1 bg-hatch-gray text-hatch-blue text-xs font-bold rounded">-</button>
+        {onUndo && <button onClick={onUndo} className="px-2 py-1 bg-hatch-gray text-gray-300 rounded text-xs">↶</button>}
+        {onClear && <button onClick={onClear} className="px-2 py-1 bg-red-600 text-hatch-blue rounded text-xs">🗑️</button>}
         <div className="relative">
-          <button onClick={() => setShowColorPicker(!showColorPicker)} className="flex items-center gap-1 px-2 py-1 bg-gray-700 rounded">
+          <button onClick={() => setShowColorPicker(!showColorPicker)} className="flex items-center gap-1 px-2 py-1 bg-hatch-gray rounded">
             <div className="w-4 h-4 rounded border border-white" style={{ backgroundColor: color }} />
           </button>
           {showColorPicker && (
-            <div className="absolute right-0 top-full mt-1 bg-gray-800 p-2 rounded shadow-xl border border-gray-700 z-50 grid grid-cols-4 gap-1">
+            <div className="absolute right-0 top-full mt-1 bg-white border-r-2 border-hatch-gray p-2 rounded shadow-xl border border-gray-700 z-50 grid grid-cols-4 gap-1">
               {allColors.map((c, idx) => (
                 <button key={idx} onClick={() => { setColor(c); setShowColorPicker(false); }} className="w-6 h-6 rounded border border-gray-600" style={{ backgroundColor: c }} />
               ))}
@@ -284,11 +284,11 @@ function PlotPlan({ plotPlan, cwaToAssociate, onShapeSaved, onShapeClick }) {
   };
 
   return (
-    <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
+    <div className="bg-white border-r-2 border-hatch-gray rounded-lg border border-gray-700 overflow-hidden">
       <Toolbar activeTool={activeTool} setActiveTool={setActiveTool} color={currentColor} setColor={setCurrentColor} onZoom={handleZoom} onClear={handleClear} onUndo={handleUndo} />
       
       <div ref={containerRef} className="bg-gray-900 w-full relative" style={{ height: '600px', cursor: activeTool === 'pan' ? 'grab' : 'crosshair' }}>
-        {!image && <div className="flex items-center justify-center h-full text-gray-400">⏳ Cargando imagen...</div>}
+        {!image && <div className="flex items-center justify-center h-full text-hatch-blue">⏳ Cargando imagen...</div>}
         {image && (
           <Stage 
             width={containerSize.width} 

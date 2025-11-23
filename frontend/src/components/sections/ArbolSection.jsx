@@ -10,13 +10,13 @@ function CronogramaTab({ proyecto }) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
           </svg>
         </div>
-        <h2 className="text-2xl font-bold text-white mb-2">Cronograma</h2>
-        <p className="text-gray-400 mb-6">
+        <h2 className="text-2xl font-bold text-hatch-blue mb-2">Cronograma</h2>
+        <p className="text-hatch-blue mb-6">
           Visualización Gantt con dependencias entre paquetes de trabajo.
         </p>
-        <div className="bg-gray-800 rounded-lg p-4 border border-gray-700 text-left">
+        <div className="bg-white border-r-2 border-hatch-gray rounded-lg p-4 border border-gray-700 text-left">
           <p className="text-sm text-gray-300 font-semibold mb-3">Características futuras:</p>
-          <ul className="space-y-2 text-sm text-gray-400">
+          <ul className="space-y-2 text-sm text-hatch-blue">
             <li className="flex items-start gap-2">
               <span className="text-amber-400 font-bold">•</span>
               Gráfico Gantt interactivo

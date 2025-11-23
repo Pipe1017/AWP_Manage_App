@@ -36,13 +36,13 @@ function CWPForm({ cwaId, onCWPCreado, disciplinas = [] }) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="p-4 bg-gray-700 rounded-b-md flex gap-2">
+    <form onSubmit={handleSubmit} className="p-4 bg-hatch-gray rounded-b-md flex gap-2">
       <input 
         type="text" 
         value={nombre} 
         onChange={(e) => setNombre(e.target.value)} 
         placeholder="Nombre CWP" 
-        className="px-2 py-1 rounded bg-gray-800 border border-gray-600 text-white flex-grow" 
+        className="px-2 py-1 rounded bg-white border-r-2 border-hatch-gray border border-gray-600 text-hatch-blue flex-grow" 
         required 
       />
       
@@ -50,7 +50,7 @@ function CWPForm({ cwaId, onCWPCreado, disciplinas = [] }) {
         <select 
           value={disciplinaId} 
           onChange={(e) => setDisciplinaId(Number(e.target.value))}
-          className="px-2 py-1 rounded bg-gray-800 border border-gray-600 text-white"
+          className="px-2 py-1 rounded bg-white border-r-2 border-hatch-gray border border-gray-600 text-hatch-blue"
           required
         >
           <option value="">Selecciona disciplina</option>
@@ -68,7 +68,7 @@ function CWPForm({ cwaId, onCWPCreado, disciplinas = [] }) {
       
       <button 
         type="submit" 
-        className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white font-bold rounded disabled:opacity-50" 
+        className="px-3 py-1 bg-green-600 hover:bg-green-700 text-hatch-blue font-bold rounded disabled:opacity-50" 
         disabled={loading || !disciplinaId}
       >
         {loading ? "..." : "+ CWP"}
@@ -89,8 +89,8 @@ function AWPEstructura({ plotPlan, proyecto, onCWACreada, onCWPCreado, selectedC
   };
 
   return (
-    <div className="mt-6 p-4 border-t border-gray-700 bg-gray-800 rounded-lg shadow-xl">
-      <h3 className="text-lg font-semibold mb-4 text-blue-300">
+    <div className="mt-6 p-4 border-t border-gray-700 bg-white border-r-2 border-hatch-gray rounded-lg shadow-xl">
+      <h3 className="text-lg font-semibold mb-4 text-hatch-orange">
         📋 Estructura AWP - {plotPlan?.nombre}
       </h3>
       
@@ -111,7 +111,7 @@ function AWPEstructura({ plotPlan, proyecto, onCWACreada, onCWPCreado, selectedC
         {plotPlan?.cwas && plotPlan.cwas.length > 0 ? (
           plotPlan.cwas.map(cwa => (
             <li key={cwa.id} className={`
-              bg-gray-700 my-1 rounded-md overflow-hidden border transition-all
+              bg-hatch-gray my-1 rounded-md overflow-hidden border transition-all
               ${selectedCWAId === cwa.id ? 'border-yellow-400 ring-2 ring-yellow-400 shadow-lg' : 'border-gray-600 hover:bg-gray-600'}
             `}>
               <div 
@@ -122,10 +122,10 @@ function AWPEstructura({ plotPlan, proyecto, onCWACreada, onCWPCreado, selectedC
                   {/* Indicador visual de selección */}
                   <div className={`w-3 h-3 rounded-full ${selectedCWAId === cwa.id ? 'bg-yellow-400 animate-pulse' : 'bg-gray-500'}`} />
                   <div>
-                    <strong className="text-md text-white">
+                    <strong className="text-md text-hatch-blue">
                       {cwa.nombre}
                     </strong>
-                    <span className="ml-2 text-xs text-gray-400">
+                    <span className="ml-2 text-xs text-hatch-blue">
                       ({cwa.codigo})
                     </span>
                     {cwa.es_transversal && (
@@ -135,7 +135,7 @@ function AWPEstructura({ plotPlan, proyecto, onCWACreada, onCWPCreado, selectedC
                     )}
                   </div>
                 </div>
-                <span className="text-xs px-2 py-1 bg-gray-800 rounded text-gray-300">
+                <span className="text-xs px-2 py-1 bg-white border-r-2 border-hatch-gray rounded text-gray-300">
                     {cwa.cwps?.length || 0} CWP{cwa.cwps?.length !== 1 ? 's' : ''}
                 </span>
               </div>
@@ -144,13 +144,13 @@ function AWPEstructura({ plotPlan, proyecto, onCWACreada, onCWPCreado, selectedC
               {selectedCWAId === cwa.id && (
                 <div className="border-t border-gray-600 p-2 bg-gray-750">
                     <div className="px-4 py-2">
-                      <p className="text-xs text-gray-400 mb-2">
+                      <p className="text-xs text-hatch-blue mb-2">
                         Work Packages en esta área:
                       </p>
                       <ul className="text-sm text-gray-300 space-y-1">
                         {cwa.cwps?.length > 0 ? (
                           cwa.cwps.map(cwp => (
-                            <li key={cwp.id} className="flex items-center gap-2 p-2 bg-gray-800 rounded">
+                            <li key={cwp.id} className="flex items-center gap-2 p-2 bg-white border-r-2 border-hatch-gray rounded">
                               {/* Ícono según si tiene geometría o no */}
                               {cwp.shape_type ? (
                                 <svg className="w-4 h-4 text-green-400" fill="currentColor" viewBox="0 0 20 20">
@@ -182,7 +182,7 @@ function AWPEstructura({ plotPlan, proyecto, onCWACreada, onCWPCreado, selectedC
                     
                     {/* Formulario para añadir CWP manualmente */}
                     <div className="border-t border-gray-600 mt-2">
-                      <p className="text-xs text-gray-400 px-4 pt-2">
+                      <p className="text-xs text-hatch-blue px-4 pt-2">
                         O crea un CWP manualmente:
                       </p>
                       <CWPForm 
@@ -196,7 +196,7 @@ function AWPEstructura({ plotPlan, proyecto, onCWACreada, onCWPCreado, selectedC
             </li>
           ))
         ) : (
-          <div className="p-4 text-center text-gray-400 bg-gray-750 rounded-lg border border-gray-600">
+          <div className="p-4 text-center text-hatch-blue bg-gray-750 rounded-lg border border-gray-600">
             <svg className="w-12 h-12 mx-auto mb-2 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>

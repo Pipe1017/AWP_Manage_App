@@ -38,7 +38,7 @@ function ProyectoDashboardLayout({
   };
 
   return (
-    <div className="bg-gray-900 text-white min-h-screen flex flex-col">
+    <div className="bg-gray-900 text-hatch-blue min-h-screen flex flex-col">
       {/* Header */}
       <DashboardHeader
         proyecto={proyecto}
