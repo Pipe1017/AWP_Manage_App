@@ -1,6 +1,6 @@
 # backend/app/models.py
 
-from sqlalchemy import Column, Integer, String, ForeignKey, JSON, Text, Date, Float, Boolean, DateTime, Table
+from sqlalchemy import Column, Integer, String, ForeignKey, JSON, Text, Date, Float, Boolean, DateTime
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from .database import Base
@@ -17,8 +17,12 @@ class Proyecto(Base):
     fecha_inicio = Column(Date, nullable=True)
     fecha_fin = Column(Date, nullable=True)
     
+    # Relaciones principales
     plot_plans = relationship("PlotPlan", back_populates="proyecto", cascade="all, delete-orphan")
     disciplinas = relationship("Disciplina", back_populates="proyecto", cascade="all, delete-orphan")
+    
+    # ✨ NUEVO: Relación para metadatos personalizados
+    columnas_metadata = relationship("CWPColumnaMetadata", backref="proyecto", cascade="all, delete-orphan")
 
 
 class Disciplina(Base):
@@ -112,18 +116,15 @@ class CWP(Base):
     
     restricciones_levantadas = Column(Boolean, default=False)
     restricciones_json = Column(JSON, nullable=True)
+    
+    # ✨ Aquí se guardarán los valores de las columnas personalizadas (Ej: {"Fase": "Parada"})
+    metadata_json = Column(JSON, nullable=True)
 
-
-# ============================================================================
-# ✨ PAQUETE UNIFICADO - CORREGIDO
-# ============================================================================
 
 class Paquete(Base):
     """
     Paquete de Trabajo Unificado - Nivel 2 de la jerarquía AWP
     Tipos: EWP, IWP, PWP, DWP
-    Código: {TIPO}-{area}-{disciplina}-{consecutivo}
-    Ejemplo: EWP-005-01-CIV-0001
     """
     __tablename__ = "paquetes"
     id = Column(Integer, primary_key=True, index=True)
@@ -146,7 +147,6 @@ class Paquete(Base):
     porcentaje_completitud = Column(Float, default=0.0)
     estado = Column(String(20), default="NO_INICIADO")
     
-    # ✅ CORREGIDO: metadata -> metadata_json
     metadata_json = Column(JSON, nullable=True)
     
     fecha_creacion = Column(DateTime, default=datetime.utcnow)
@@ -154,36 +154,36 @@ class Paquete(Base):
 
 
 # ============================================================================
-# ✨ ITEM UNIFICADO - CORREGIDO (SIN CÓDIGO, SIN RESPONSABLE)
+# ✨ ITEM ACTUALIZADO (Opcionalidad y Vínculos)
 # ============================================================================
 
 class Item(Base):
     """
     Item de Trabajo - Nivel 3 de la jerarquía AWP
-    NO tiene código automático - usa ID único
-    NO tiene responsable - hereda del Paquete padre
     """
     __tablename__ = "items"
     id = Column(Integer, primary_key=True, index=True)
     nombre = Column(String, nullable=False)
     descripcion = Column(Text, nullable=True)
     
-    tipo_entregable_id = Column(Integer, ForeignKey("tipos_entregables.id"))
+    # ✅ CAMBIO: Ahora es nullable (Opcional al inicio)
+    tipo_entregable_id = Column(Integer, ForeignKey("tipos_entregables.id"), nullable=True)
     tipo_entregable = relationship("TipoEntregable", back_populates="items")
     
     paquete_id = Column(Integer, ForeignKey("paquetes.id"))
     paquete = relationship("Paquete", back_populates="items")
     
+    # ✅ CAMBIO: Referencia a otro item (para Transversales)
+    # Si esto tiene valor, este item es un "vínculo" o "call-off" del original
+    source_item_id = Column(Integer, ForeignKey("items.id"), nullable=True)
+    source_item = relationship("Item", remote_side=[id], backref="linked_items")
+    
     version = Column(Integer, default=1)
     estado = Column(String(20), default="NO_INICIADO")
     porcentaje_completitud = Column(Float, default=0.0)
-    
     archivo_url = Column(String, nullable=True)
-    
     es_entregable_cliente = Column(Boolean, default=False)
     requiere_aprobacion = Column(Boolean, default=True)
-    
-    # ✅ CORREGIDO: metadata -> metadata_json
     metadata_json = Column(JSON, nullable=True)
     
     fecha_creacion = Column(DateTime, default=datetime.utcnow)
@@ -191,67 +191,14 @@ class Item(Base):
 
 
 # ============================================================================
-# MODELOS DEPRECATED (mantener temporalmente para compatibilidad)
+# ✨ NUEVO: CONFIGURACIÓN DE METADATOS (Columnas Dinámicas)
 # ============================================================================
 
-class EWP(Base):
-    """DEPRECATED: Usar Paquete con tipo='EWP'"""
-    __tablename__ = "ewp"
+class CWPColumnaMetadata(Base):
+    __tablename__ = "cwp_columnas_metadata"
     id = Column(Integer, primary_key=True, index=True)
     nombre = Column(String, nullable=False)
-    codigo = Column(String(30), unique=True, index=True)
-    descripcion = Column(Text, nullable=True)
-    cwp_id = Column(Integer, ForeignKey("cwp.id"))
-    porcentaje_completitud = Column(Float, default=0.0)
-    estado = Column(String(20), default="NO_INICIADO")
-    fecha_publicacion_prevista = Column(Date, nullable=True)
-    fecha_publicacion_real = Column(Date, nullable=True)
-
-
-class PWP(Base):
-    """DEPRECATED: Usar Paquete con tipo='PWP'"""
-    __tablename__ = "pwp"
-    id = Column(Integer, primary_key=True, index=True)
-    nombre = Column(String, nullable=False)
-    codigo = Column(String(30), unique=True, index=True)
-    descripcion = Column(Text, nullable=True)
-    cwp_id = Column(Integer, ForeignKey("cwp.id"))
-    porcentaje_completitud = Column(Float, default=0.0)
-    estado = Column(String(20), default="NO_INICIADO")
-    fecha_ros_prevista = Column(Date, nullable=True)
-    fecha_ros_real = Column(Date, nullable=True)
-    alineado_poc = Column(Boolean, default=False)
-
-
-class IWP(Base):
-    """DEPRECATED: Usar Paquete con tipo='IWP'"""
-    __tablename__ = "iwp"
-    id = Column(Integer, primary_key=True, index=True)
-    nombre = Column(String, nullable=False)
-    codigo = Column(String(30), unique=True, index=True)
-    descripcion = Column(Text, nullable=True)
-    cwp_id = Column(Integer, ForeignKey("cwp.id"))
-    porcentaje_completitud = Column(Float, default=0.0)
-    estado = Column(String(20), default="NO_INICIADO")
-    cuadrilla_construccion = Column(String, nullable=True)
-    fecha_inicio_prevista = Column(Date, nullable=True)
-    fecha_fin_prevista = Column(Date, nullable=True)
-
-
-class EntregableEWP(Base):
-    """DEPRECATED: Usar Item"""
-    __tablename__ = "entregables_ewp"
-    id = Column(Integer, primary_key=True, index=True)
-    nombre = Column(String, nullable=False)
-    codigo = Column(String(50), unique=True, index=True)
-    descripcion = Column(Text, nullable=True)
-    ewp_id = Column(Integer, ForeignKey("ewp.id"))
-    tipo_entregable_id = Column(Integer, ForeignKey("tipos_entregables.id"))
-    version = Column(Integer, default=1)
-    estado_documento = Column(String(20), default="BORRADOR")
-    fecha_creacion = Column(DateTime, default=datetime.utcnow)
-    fecha_ultima_modificacion = Column(DateTime, default=datetime.utcnow)
-    responsable = Column(String, nullable=True)
-    archivo_url = Column(String, nullable=True)
-    es_entregable_cliente = Column(Boolean, default=False)
-    requiere_aprobacion = Column(Boolean, default=True)
+    tipo_dato = Column(String, default="TEXTO")
+    opciones_json = Column(JSON, nullable=True)
+    proyecto_id = Column(Integer, ForeignKey("proyectos.id"))
+    orden = Column(Integer, default=0)

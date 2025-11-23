@@ -1,14 +1,8 @@
 # backend/app/schemas.py
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from datetime import date, datetime
-
-# ============================================================================
-# NOTA IMPORTANTE: 
-# El orden importa. Primero definimos los hijos (Items, Paquetes, CWAs, PlotPlans)
-# y al final el Padre (Proyecto) para que pueda referenciarlos.
-# ============================================================================
 
 # --- 1. BASES SIMPLES ---
 
@@ -26,7 +20,7 @@ class DisciplinaResponse(DisciplinaBase):
     class Config:
         from_attributes = True
 
-# --- 2. ESTRUCTURA AWP (CWA, CWP) ---
+# --- 2. ESTRUCTURA AWP ---
 
 class CWACreate(BaseModel):
     nombre: str
@@ -49,6 +43,7 @@ class CWPResponse(BaseModel):
     descripcion: Optional[str]
     porcentaje_completitud: float
     estado: str
+    metadata_json: Optional[Dict[str, Any]] = None
     class Config:
         from_attributes = True
 
@@ -61,8 +56,7 @@ class CWAResponse(BaseModel):
     plot_plan_id: int
     shape_type: Optional[str]
     shape_data: Optional[Dict[str, Any]]
-    cwps: List[CWPResponse] = [] # Incluimos CWPs aquí
-    
+    cwps: List[CWPResponse] = []
     class Config:
         from_attributes = True
 
@@ -79,8 +73,7 @@ class PlotPlanResponse(BaseModel):
     descripcion: Optional[str]
     image_url: Optional[str]
     proyecto_id: int
-    cwas: List[CWAResponse] = [] # Incluimos los CWAs dentro del plano
-    
+    cwas: List[CWAResponse] = []
     class Config:
         from_attributes = True
 
@@ -105,7 +98,27 @@ class TipoEntregableResponse(BaseModel):
     class Config:
         from_attributes = True
 
-# --- 5. PROYECTO (EL PADRE DE TODO) ---
+# ==========================================
+# 5. METADATOS CUSTOM (CORREGIDO)
+# ==========================================
+
+class ColumnaCreate(BaseModel):
+    nombre: str
+    tipo_dato: str # TEXTO, SELECCION
+    opciones: Optional[List[str]] = [] # Frontend envía "opciones"
+
+class ColumnaResponse(BaseModel):
+    id: int
+    nombre: str
+    tipo_dato: str
+    proyecto_id: int
+    # ✅ CORRECCIÓN: Mapeamos explícitamente el campo de la BD
+    opciones_json: Optional[List[str]] = [] 
+    
+    class Config:
+        from_attributes = True
+
+# --- 6. PROYECTO ---
 
 class ProyectoBase(BaseModel):
     nombre: str
@@ -118,16 +131,13 @@ class ProyectoCreate(ProyectoBase):
 
 class ProyectoResponse(ProyectoBase):
     id: int
-    # 🔥 AQUÍ ESTABA EL ERROR: Faltaban estas listas
     disciplinas: List[DisciplinaResponse] = []
-    plot_plans: List[PlotPlanResponse] = [] 
+    plot_plans: List[PlotPlanResponse] = []
     
     class Config:
         from_attributes = True
 
-# ============================================================================
-# OTROS SCHEMAS (Paquete, Item, Importación)
-# ============================================================================
+# --- OTROS ---
 
 class CWPCreate(BaseModel):
     nombre: str
@@ -139,6 +149,7 @@ class CWPCreate(BaseModel):
     fecha_fin_prevista: Optional[date] = None
     secuencia: Optional[int] = 0
     prioridad: Optional[str] = "MEDIA"
+    metadata_json: Optional[Dict[str, Any]] = None
 
 class PaqueteCreate(BaseModel):
     nombre: str
@@ -175,7 +186,8 @@ class PaqueteResponse(BaseModel):
 class ItemCreate(BaseModel):
     nombre: str
     descripcion: Optional[str] = None
-    tipo_entregable_id: int
+    # ✅ CAMBIO: Ahora es opcional
+    tipo_entregable_id: Optional[int] = None 
     es_entregable_cliente: Optional[bool] = False
     requiere_aprobacion: Optional[bool] = True
     metadata_json: Optional[dict] = None
@@ -183,6 +195,8 @@ class ItemCreate(BaseModel):
 class ItemUpdate(BaseModel):
     nombre: Optional[str] = None
     descripcion: Optional[str] = None
+    # ✅ CAMBIO: Permitimos actualizar el tipo
+    tipo_entregable_id: Optional[int] = None
     version: Optional[int] = None
     estado: Optional[str] = None
     porcentaje_completitud: Optional[float] = None
@@ -194,7 +208,7 @@ class ItemResponse(BaseModel):
     id: int
     nombre: str
     descripcion: Optional[str]
-    tipo_entregable_id: int
+    tipo_entregable_id: Optional[int] # Ahora es Optional
     paquete_id: int
     version: int
     estado: str
@@ -202,8 +216,13 @@ class ItemResponse(BaseModel):
     archivo_url: Optional[str]
     es_entregable_cliente: bool
     requiere_aprobacion: bool
+    source_item_id: Optional[int] # Nuevo campo
+    
     class Config:
         from_attributes = True
+
+class ItemLinkRequest(BaseModel):
+    source_item_ids: List[int] # Lista de IDs de los items transversales a traer
 
 class ItemImportRow(BaseModel):
     id_item: Optional[int] = None
