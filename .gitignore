@@ -1,2 +1,9 @@
 __pycache__/
 *.pyc
+backend_uploads/
+*.jpg
+*.png
+*.pdf
+node_modules/
+.env
+.DS_Store
