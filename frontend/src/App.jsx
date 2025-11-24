@@ -70,9 +70,30 @@ function App() {
     fetchProyectos();
   };
 
-  const handleProyectoUpdate = (updatedProyecto) => {
-    setSelectedProyecto(updatedProyecto);
-    setProyectos(proyectos.map(p => p.id === updatedProyecto.id ? updatedProyecto : p));
+  // ✅ CORREGIDO: Aceptar tanto proyectoId como objeto
+  const handleProyectoUpdate = async (proyectoIdOrData) => {
+    // Determinar si recibimos un ID o un objeto completo
+    const proyectoId = typeof proyectoIdOrData === 'number' 
+      ? proyectoIdOrData 
+      : proyectoIdOrData?.id || selectedProyecto?.id;
+    
+    console.log('🔄 Recargando proyecto ID:', proyectoId);
+    
+    try {
+      const response = await client.get(`/proyectos/${proyectoId}`);
+      const updatedProyecto = response.data;
+      
+      setSelectedProyecto(updatedProyecto);
+      
+      setProyectos(proyectos.map(p => 
+        p.id === updatedProyecto.id ? updatedProyecto : p
+      ));
+      
+      console.log('✅ Proyecto actualizado:', updatedProyecto);
+    } catch (error) {
+      console.error('❌ Error recargando proyecto:', error);
+      alert('Error al actualizar el proyecto');
+    }
   };
 
   if (loading) {
@@ -97,7 +118,6 @@ function App() {
           error={error}
         />
       )}
-
       {view === 'dashboard' && selectedProyecto && (
         <ProyectoDashboard
           proyecto={selectedProyecto}

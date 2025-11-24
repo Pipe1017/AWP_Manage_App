@@ -1,7 +1,6 @@
 // frontend/src/components/sections/ResumenTab.jsx
 
 import React, { useState, useEffect } from 'react';
-// 1. Importamos el cliente centralizado
 import client from '../../api/axios';
 
 import PlotPlan from '../modules/plotplan/PlotPlan';
@@ -13,13 +12,22 @@ function ResumenTab({ proyecto, onProyectoUpdate }) {
   const [selectedCWA, setSelectedCWA] = useState(null);
   const [filteredCWAId, setFilteredCWAId] = useState(null);
   const [isLoadingPlotPlan, setIsLoadingPlotPlan] = useState(false);
+  const [showUploadForm, setShowUploadForm] = useState(false); // ✅ NUEVO: Control de visibilidad
+
+  // ✅ DEBUG
+  console.log("🔍 ResumenTab - Proyecto recibido:", {
+    id: proyecto?.id,
+    nombre: proyecto?.nombre,
+    plot_plans_count: proyecto?.plot_plans?.length
+  });
 
   // Inicializar con el primer plot plan si existe
   useEffect(() => {
     if (proyecto.plot_plans && proyecto.plot_plans.length > 0 && !selectedPlotPlanId) {
       setSelectedPlotPlanId(proyecto.plot_plans[0].id);
+      setShowUploadForm(false); // ✅ Ocultar formulario si hay plot plans
     }
-  }, [proyecto.plot_plans]);
+  }, [proyecto.plot_plans, selectedPlotPlanId]);
 
   // Función para recargar todo el proyecto desde el servidor
   const recargarProyecto = async () => {
@@ -84,25 +92,29 @@ function ResumenTab({ proyecto, onProyectoUpdate }) {
 
   // --- HANDLERS ---
 
-  // 🌟 LÓGICA CORREGIDA: Actualización Optimista al subir plano
+  // ✅ CORREGIDO: Handler cuando se sube un nuevo Plot Plan
   const handlePlotPlanUploaded = async (nuevoPlotPlan) => {
-    console.log("📥 Plot Plan subido, actualizando vista...", nuevoPlotPlan);
+    console.log("📥 Plot Plan subido:", nuevoPlotPlan);
     
-    // 1. Forzamos la actualización local inmediata para que aparezca en la lista
-    const planosActuales = proyecto.plot_plans || [];
-    const proyectoActualizado = {
-      ...proyecto,
-      plot_plans: [...planosActuales, nuevoPlotPlan]
-    };
-
-    // 2. Actualizamos el estado global
-    onProyectoUpdate(proyectoActualizado);
-    
-    // 3. Seleccionamos el nuevo plano automáticamente
-    setSelectedPlotPlanId(nuevoPlotPlan.id);
-
-    // 4. Recargamos del servidor en segundo plano para asegurar consistencia
-    await recargarProyecto();
+    try {
+      // Recargar proyecto completo desde el servidor
+      const response = await client.get(`/proyectos/${proyecto.id}`);
+      onProyectoUpdate(response.data);
+      
+      // Seleccionar automáticamente el nuevo plot plan
+      if (nuevoPlotPlan && nuevoPlotPlan.id) {
+        setSelectedPlotPlanId(nuevoPlotPlan.id);
+        console.log("✅ Plot Plan seleccionado:", nuevoPlotPlan.nombre);
+      }
+      
+      // ✅ Ocultar formulario después de subir
+      setShowUploadForm(false);
+      
+      console.log("✅ Proyecto recargado exitosamente");
+    } catch (err) {
+      console.error("❌ Error recargando proyecto:", err);
+      alert("Error recargando el proyecto");
+    }
   };
 
   const handleShapeSaved = async (cwaId, updatedCWA) => {
@@ -127,7 +139,6 @@ function ResumenTab({ proyecto, onProyectoUpdate }) {
 
   const handleCWACreada = async () => {
     console.log("✅ CWA creada, actualizando...");
-    // Reutilizamos la lógica de recarga para traer la nueva CWA
     try {
       const response = await client.get(
         `/proyectos/${proyecto.id}/plot_plans/${selectedPlotPlanId}`
@@ -136,7 +147,9 @@ function ResumenTab({ proyecto, onProyectoUpdate }) {
         pp.id === selectedPlotPlanId ? response.data : pp
       );
       onProyectoUpdate({ ...proyecto, plot_plans: updatedPlotPlans });
-    } catch (err) { console.error(err); }
+    } catch (err) { 
+      console.error(err); 
+    }
   };
 
   const handlePlotPlanChange = (newId) => {
@@ -187,7 +200,7 @@ function ResumenTab({ proyecto, onProyectoUpdate }) {
                   const cwa = currentPlotPlan.cwas.find(c => c.id === id);
                   setSelectedCWA(cwa || null);
                 }}
-                className="px-2 py-1 bg-hatch-gray border border-gray-600 rounded text-xs text-hatch-blue"
+                className="px-2 py-1 bg-white border border-hatch-gray rounded text-xs text-hatch-blue"
               >
                 <option value="">-- Seleccionar --</option>
                 {currentPlotPlan.cwas.map(cwa => (
@@ -200,10 +213,24 @@ function ResumenTab({ proyecto, onProyectoUpdate }) {
             </div>
           )}
 
+          {/* ✅ NUEVO: Botón para agregar nuevo Plot Plan */}
+          {proyecto.plot_plans && proyecto.plot_plans.length > 0 && (
+            <button
+              onClick={() => setShowUploadForm(!showUploadForm)}
+              className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium flex items-center gap-2 transition-colors"
+              title="Agregar nuevo Plot Plan"
+            >
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              {showUploadForm ? 'Ocultar' : 'Nuevo Plano'}
+            </button>
+          )}
+
           {/* Botón Recargar */}
           <button
             onClick={recargarProyecto}
-            className="px-3 py-2 bg-green-600 hover:bg-green-700 text-hatch-blue rounded-lg text-xs font-medium flex items-center gap-2 transition-colors"
+            className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-medium flex items-center gap-2 transition-colors"
             title="Recargar datos"
           >
             <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -217,7 +244,7 @@ function ResumenTab({ proyecto, onProyectoUpdate }) {
             <select
               value={selectedPlotPlanId || ''}
               onChange={(e) => handlePlotPlanChange(Number(e.target.value))}
-              className="px-3 py-2 bg-hatch-gray border border-gray-600 rounded-lg text-hatch-blue text-xs"
+              className="px-3 py-2 bg-white border border-hatch-gray rounded-lg text-hatch-blue text-xs"
               disabled={isLoadingPlotPlan}
             >
               {proyecto.plot_plans.map(pp => (
@@ -231,16 +258,28 @@ function ResumenTab({ proyecto, onProyectoUpdate }) {
       {/* --- Contenido Principal --- */}
       <div className="flex-1 overflow-y-auto">
         
-        {/* Sección de Subida */}
-        <div className="p-6 border-b border-gray-700 bg-white border-r-2 border-hatch-gray/20">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-hatch-blue uppercase">📤 Subir Nuevo Plano</h3>
+        {/* ✅ Sección de Subida - CONDICIONAL */}
+        {(showUploadForm || !proyecto.plot_plans || proyecto.plot_plans.length === 0) && (
+          <div className="p-6 border-b border-gray-700 bg-white border-r-2 border-hatch-gray/20">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-hatch-blue uppercase">
+                📤 {proyecto.plot_plans && proyecto.plot_plans.length > 0 ? 'Subir Nuevo Plano' : 'Subir Primer Plano'}
+              </h3>
+              {showUploadForm && proyecto.plot_plans && proyecto.plot_plans.length > 0 && (
+                <button
+                  onClick={() => setShowUploadForm(false)}
+                  className="text-xs text-gray-500 hover:text-gray-700"
+                >
+                  ✕ Cancelar
+                </button>
+              )}
+            </div>
+            <UploadPlotPlanForm
+              proyecto={proyecto}
+              onUploadSuccess={handlePlotPlanUploaded}
+            />
           </div>
-          <UploadPlotPlanForm
-            proyecto={proyecto}
-            onUploadSuccess={handlePlotPlanUploaded}
-          />
-        </div>
+        )}
 
         {/* Visualizador y Tabla */}
         {currentPlotPlan ? (
@@ -264,7 +303,7 @@ function ResumenTab({ proyecto, onProyectoUpdate }) {
               
               <div className="p-4">
                 <PlotPlan
-                  key={`plotplan-${selectedPlotPlanId}`} // Forzar re-render al cambiar de plano
+                  key={`plotplan-${selectedPlotPlanId}`}
                   plotPlan={currentPlotPlan}
                   cwaToAssociate={selectedCWA}
                   onShapeSaved={handleShapeSaved}

@@ -31,8 +31,7 @@ function AWPTableConsolidada({ plotPlanId, proyecto, filteredCWAId, onDataChange
     cwp: false, 
     pkg: false, 
     link: false, 
-    import: false, 
-    editItem: false 
+    import: false
   });
   
   const [isEditingCWP, setIsEditingCWP] = useState(false);
@@ -46,9 +45,6 @@ function AWPTableConsolidada({ plotPlanId, proyecto, filteredCWAId, onDataChange
   const [transversalItems, setTransversalItems] = useState([]);
   const [selectedLinkItems, setSelectedLinkItems] = useState(new Set());
   const [linkFilter, setLinkFilter] = useState("ALL");
-
-  const [editingItem, setEditingItem] = useState(null);
-  const [itemTipos, setItemTipos] = useState([]);
 
   // ============================================================================
   // 5. CARGA DE DATOS
@@ -289,25 +285,7 @@ function AWPTableConsolidada({ plotPlanId, proyecto, filteredCWAId, onDataChange
   };
 
   // ============================================================================
-  // 12. CLASIFICACIÓN
-  // ============================================================================
-  const openClassifyModal = async (item, cwpId) => { 
-    setEditingItem(item); 
-    const res = await client.get(`/awp-nuevo/cwp/${cwpId}/tipos-entregables-disponibles`); 
-    setItemTipos(res.data); 
-    setModals({...modals, editItem: true}); 
-  };
-
-  const handleSaveClassify = async () => { 
-    await client.put(`/awp-nuevo/item/${editingItem.id}`, { 
-      tipo_entregable_id: editingItem.tipo_entregable_id 
-    }); 
-    setModals({...modals, editItem: false}); 
-    loadData(); 
-  };
-
-  // ============================================================================
-  // 13. IMPORT / EXPORT
+  // 12. IMPORT / EXPORT
   // ============================================================================
   const handleExport = () => window.open(`${client.defaults.baseURL}/awp-nuevo/exportar-csv/${proyecto.id}`, '_blank');
 
@@ -333,7 +311,7 @@ function AWPTableConsolidada({ plotPlanId, proyecto, filteredCWAId, onDataChange
   };
 
   // ============================================================================
-  // 14. RENDER
+  // 13. RENDER
   // ============================================================================
   if (loading && !jerarquia) {
     return (
@@ -345,7 +323,8 @@ function AWPTableConsolidada({ plotPlanId, proyecto, filteredCWAId, onDataChange
   }
 
   const cwasToRender = jerarquia?.cwas?.filter(cwa => 
-    !filters.codigo || cwa.codigo.toLowerCase().includes(filters.codigo.toLowerCase())
+    (!filters.codigo || cwa.codigo.toLowerCase().includes(filters.codigo.toLowerCase())) &&
+    (!filteredCWAId || cwa.id === filteredCWAId)
   ).sort((a, b) => a.codigo.localeCompare(b.codigo));
 
   return (
@@ -359,6 +338,14 @@ function AWPTableConsolidada({ plotPlanId, proyecto, filteredCWAId, onDataChange
           <h3 className="text-hatch-blue font-bold text-lg">📊 Control AWP</h3>
           <div className="h-6 w-px bg-hatch-gray"></div>
           <span className="text-sm text-gray-600 font-medium">Proyecto: {proyecto.nombre}</span>
+          {filteredCWAId && (
+            <>
+              <div className="h-6 w-px bg-hatch-gray"></div>
+              <span className="text-xs bg-hatch-orange/20 text-hatch-orange px-3 py-1 rounded-full font-semibold border border-hatch-orange">
+                🔍 Filtrado por área
+              </span>
+            </>
+          )}
         </div>
         <div className="flex gap-2">
           <button 
@@ -392,6 +379,7 @@ function AWPTableConsolidada({ plotPlanId, proyecto, filteredCWAId, onDataChange
                   <input 
                     className="bg-white border-2 border-hatch-gray-dark rounded px-3 py-1 text-hatch-blue font-normal text-xs focus:border-hatch-orange outline-none placeholder-gray-400" 
                     placeholder="🔍 Filtrar por código..." 
+                    value={filters.codigo}
                     onChange={e => setFilters({...filters, codigo: e.target.value})} 
                   />
                 </div>
@@ -416,9 +404,7 @@ function AWPTableConsolidada({ plotPlanId, proyecto, filteredCWAId, onDataChange
               return (
                 <React.Fragment key={cwa.id}>
                   
-                  {/* ============================================================
-                      NIVEL 1: CWA (ÁREA DE CONSTRUCCIÓN)
-                  ============================================================ */}
+                  {/* NIVEL 1: CWA */}
                   <tr className="bg-white hover:bg-hatch-gray/30 transition-colors">
                     <td className="p-3 text-center sticky left-0 bg-inherit z-10">
                       <button 
@@ -476,9 +462,7 @@ function AWPTableConsolidada({ plotPlanId, proyecto, filteredCWAId, onDataChange
                     </td>
                   </tr>
 
-                  {/* ============================================================
-                      NIVEL 2: CWP (CONSTRUCTION WORK PACKAGE)
-                  ============================================================ */}
+                  {/* NIVEL 2: CWP */}
                   {isExp && cwa.cwps.sort((a, b) => (a.secuencia || 0) - (b.secuencia || 0)).map(cwp => {
                     const isCwpExp = expandedCWPs.has(cwp.id);
                     return (
@@ -597,9 +581,7 @@ function AWPTableConsolidada({ plotPlanId, proyecto, filteredCWAId, onDataChange
                           </td>
                         </tr>
 
-                        {/* ========================================================
-                            NIVEL 3: PAQUETES (EWP, PWP, IWP)
-                        ======================================================== */}
+                        {/* NIVEL 3: PAQUETES */}
                         {isCwpExp && cwp.paquetes.map(pkg => {
                           const isPkgExp = expandedPaquetes.has(pkg.id);
                           return (
@@ -651,9 +633,7 @@ function AWPTableConsolidada({ plotPlanId, proyecto, filteredCWAId, onDataChange
                                 </td>
                               </tr>
 
-                              {/* ==================================================
-                                  NIVEL 4: ITEMS (ENTREGABLES)
-                              ================================================== */}
+                              {/* NIVEL 4: ITEMS */}
                               {isPkgExp && (
                                 <>
                                   {pkg.items.map(item => (
@@ -669,15 +649,7 @@ function AWPTableConsolidada({ plotPlanId, proyecto, filteredCWAId, onDataChange
                                         )}
                                       </td>
                                       <td colSpan={2} className="p-2 text-hatch-blue pl-4">
-                                        <div className="flex items-center gap-2">
-                                          <span>{item.nombre}</span>
-                                          <button 
-                                            onClick={() => openClassifyModal(item, cwp.id)} 
-                                            className="text-[9px] text-gray-500 hover:text-hatch-orange border border-hatch-gray px-1.5 py-0.5 rounded hover:bg-hatch-gray transition-colors font-medium"
-                                          >
-                                            {item.tipo_entregable_codigo || "🏷️ Clasificar"}
-                                          </button>
-                                        </div>
+                                        {item.nombre}
                                       </td>
                                       <td className="p-2 text-center">
                                         <input 
@@ -699,7 +671,7 @@ function AWPTableConsolidada({ plotPlanId, proyecto, filteredCWAId, onDataChange
                                     </tr>
                                   ))}
                                   
-                                  {/* ITEMS TEMPORALES (BATCH) */}
+                                  {/* ITEMS TEMPORALES */}
                                   {pendingItems[pkg.id]?.map(t => (
                                     <tr key={t.id} className="bg-yellow-50 text-xs animate-pulse border-t border-yellow-200">
                                       <td className="sticky left-0 bg-inherit"></td>
@@ -728,7 +700,6 @@ function AWPTableConsolidada({ plotPlanId, proyecto, filteredCWAId, onDataChange
                                     </tr>
                                   ))}
                                   
-                                  {/* BOTÓN GUARDAR LOTE */}
                                   {pendingItems[pkg.id]?.length > 0 && (
                                     <tr className="bg-yellow-100 border-t-2 border-yellow-400">
                                       <td colSpan="100%" className="text-center p-3">
@@ -759,84 +730,95 @@ function AWPTableConsolidada({ plotPlanId, proyecto, filteredCWAId, onDataChange
       {/* ========================================================================
           MODALES
       ======================================================================== */}
-      
+
       {/* MODAL: CREAR/EDITAR CWP */}
       {modals.cwp && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm">
-          <div className="bg-white w-[500px] p-6 rounded-2xl border-2 border-hatch-gray shadow-2xl">
+          <div className="bg-white w-[600px] max-h-[90vh] overflow-y-auto p-6 rounded-2xl border-2 border-hatch-gray shadow-2xl">
             <h3 className="text-hatch-blue font-bold mb-4 text-xl flex items-center gap-2">
               <span className="text-hatch-orange">{isEditingCWP ? '✏️' : '➕'}</span>
               {isEditingCWP ? 'Editar' : 'Crear'} CWP
             </h3>
             
             <div className="space-y-4">
+              {/* Nombre CWP */}
               <div>
-                <label className="block text-xs text-gray-600 mb-1 font-semibold">Nombre del Paquete</label>
+                <label className="block text-xs text-gray-600 mb-1 font-semibold">Nombre del CWP *</label>
                 <input 
-                  className="w-full bg-white text-hatch-blue border-2 border-hatch-gray rounded-lg px-3 py-2 focus:border-hatch-orange outline-none transition-colors" 
-                  placeholder="Ej: Paquete de Estructuras - Edificio A" 
-                  value={formData.nombre} 
-                  onChange={e => setFormData({...formData, nombre: e.target.value})} 
+                  className="w-full bg-white border-2 border-hatch-gray rounded px-3 py-2 focus:border-hatch-orange outline-none"
+                  value={formData.nombre || ''}
+                  onChange={e => setFormData({...formData, nombre: e.target.value})}
+                  placeholder="Ej: Cimentaciones Edificio A"
+                  required
                 />
               </div>
-              
-              {!isEditingCWP && (
-                <div>
-                  <label className="block text-xs text-gray-600 mb-1 font-semibold">Disciplina</label>
-                  <select 
-                    className="w-full bg-white text-hatch-blue border-2 border-hatch-gray rounded-lg px-3 py-2 focus:border-hatch-orange outline-none transition-colors" 
-                    value={formData.disciplina_id} 
-                    onChange={e => setFormData({...formData, disciplina_id: e.target.value})}
-                  >
-                    <option value="">Seleccionar disciplina...</option>
-                    {proyecto.disciplinas?.map(d => (
-                      <option key={d.id} value={d.id}>
-                        {d.codigo} - {d.nombre}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-              
+
+              {/* Disciplina */}
+              <div>
+                <label className="block text-xs text-gray-600 mb-1 font-semibold">Disciplina *</label>
+                <select 
+                  className="w-full bg-white border-2 border-hatch-gray rounded px-3 py-2 focus:border-hatch-orange outline-none"
+                  value={formData.disciplina_id || ''}
+                  onChange={e => setFormData({...formData, disciplina_id: e.target.value})}
+                  required
+                >
+                  <option value="">Seleccionar...</option>
+                  {proyecto.disciplinas?.map(d => (
+                    <option key={d.id} value={d.id}>{d.nombre} ({d.codigo})</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Metadatos Personalizados */}
               {customColumns.length > 0 && (
                 <div className="border-t-2 border-hatch-gray pt-4">
-                  <p className="text-hatch-orange text-xs font-bold mb-3 uppercase tracking-wider">
-                    🏷️ Metadatos Personalizados
-                  </p>
-                  {customColumns.map(c => (
-                    <div key={c.id} className="mb-3">
-                      <label className="block text-xs text-gray-600 mb-1 font-semibold">{c.nombre}</label>
-                      {c.tipo_dato === 'SELECCION' ? (
-                        <select 
-                          className="w-full bg-white text-hatch-blue border-2 border-hatch-gray rounded-lg px-2 py-1.5 text-sm focus:border-hatch-orange outline-none transition-colors" 
-                          value={formData.metadata?.[c.nombre] || ''} 
-                          onChange={e => setFormData({...formData, metadata: {...formData.metadata, [c.nombre]: e.target.value}})}
-                        >
-                          <option value="">- Seleccionar -</option>
-                          {c.opciones_json?.map(o => <option key={o} value={o}>{o}</option>)}
-                        </select>
-                      ) : (
-                        <input 
-                          className="w-full bg-white text-hatch-blue border-2 border-hatch-gray rounded-lg px-2 py-1.5 text-sm focus:border-hatch-orange outline-none transition-colors" 
-                          value={formData.metadata?.[c.nombre] || ''} 
-                          onChange={e => setFormData({...formData, metadata: {...formData.metadata, [c.nombre]: e.target.value}})} 
-                        />
-                      )}
-                    </div>
-                  ))}
+                  <h4 className="text-sm font-bold text-hatch-blue mb-3">📋 Campos Personalizados</h4>
+                  <div className="space-y-3">
+                    {customColumns.map(col => (
+                      <div key={col.id}>
+                        <label className="block text-xs text-gray-600 mb-1 font-semibold">{col.nombre}</label>
+                        {col.tipo_dato === 'SELECCION' ? (
+                          <select 
+                            className="w-full bg-white border-2 border-hatch-gray rounded px-3 py-2 focus:border-hatch-orange outline-none text-sm"
+                            value={formData.metadata?.[col.nombre] || ''}
+                            onChange={e => setFormData({
+                              ...formData, 
+                              metadata: {...(formData.metadata || {}), [col.nombre]: e.target.value}
+                            })}
+                          >
+                            <option value="">Seleccionar...</option>
+                            {col.opciones_json?.map(opt => (
+                              <option key={opt} value={opt}>{opt}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input 
+                            className="w-full bg-white border-2 border-hatch-gray rounded px-3 py-2 focus:border-hatch-orange outline-none text-sm"
+                            value={formData.metadata?.[col.nombre] || ''}
+                            onChange={e => setFormData({
+                              ...formData, 
+                              metadata: {...(formData.metadata || {}), [col.nombre]: e.target.value}
+                            })}
+                            placeholder={`Ingresar ${col.nombre}...`}
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
-            
-            <div className="flex justify-end gap-3 mt-6 pt-4 border-t-2 border-hatch-gray">
+
+            <div className="flex justify-end gap-3 pt-4 border-t-2 border-hatch-gray mt-6">
               <button 
+                type="button"
                 onClick={() => setModals({...modals, cwp: false})} 
                 className="text-gray-600 hover:text-hatch-blue px-4 py-2 transition-colors font-medium"
               >
                 Cancelar
               </button>
               <button 
-                onClick={handleSaveCWP} 
+                onClick={handleSaveCWP}
                 className="bg-gradient-orange hover:shadow-lg text-white px-6 py-2 rounded-lg font-bold transition-all"
               >
                 {isEditingCWP ? 'Guardar Cambios' : 'Crear CWP'}
@@ -845,198 +827,236 @@ function AWPTableConsolidada({ plotPlanId, proyecto, filteredCWAId, onDataChange
           </div>
         </div>
       )}
-      
+
       {/* MODAL: CREAR PAQUETE */}
       {modals.pkg && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm">
-          <div className="bg-white p-6 rounded-2xl w-96 border-2 border-hatch-gray shadow-2xl">
+          <div className="bg-white w-[500px] p-6 rounded-2xl border-2 border-hatch-gray shadow-2xl">
             <h3 className="text-hatch-blue font-bold mb-4 text-xl flex items-center gap-2">
               <span className="text-hatch-orange">➕</span>
-              Nuevo {formData.tipo}
+              Nuevo Paquete {formData.tipo}
             </h3>
-            <input 
-              className="w-full mb-4 bg-white text-hatch-blue border-2 border-hatch-gray rounded-lg px-3 py-2 focus:border-hatch-orange outline-none transition-colors" 
-              placeholder="Nombre del Paquete" 
-              value={formData.nombre} 
-              onChange={e => setFormData({...formData, nombre: e.target.value})} 
-            />
-            <div className="flex justify-end gap-3">
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs text-gray-600 mb-1 font-semibold">Tipo de Paquete</label>
+                <div className="flex gap-2">
+                  {['EWP', 'PWP', 'IWP'].map(tipo => (
+                    <button
+                      key={tipo}
+                      type="button"
+                      onClick={() => setFormData({...formData, tipo})}
+                      className={`flex-1 px-4 py-2 rounded-lg border-2 font-bold text-sm transition-all ${
+                        formData.tipo === tipo
+                          ? tipo === 'EWP' ? 'bg-purple-100 border-purple-400 text-purple-700' :
+                            tipo === 'PWP' ? 'bg-teal-100 border-teal-400 text-teal-700' :
+                            'bg-orange-100 border-orange-400 text-orange-700'
+                          : 'bg-white border-hatch-gray text-gray-600 hover:border-hatch-orange'
+                      }`}
+                    >
+                      {tipo}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs text-gray-600 mb-1 font-semibold">Nombre del Paquete *</label>
+                <input 
+                  className="w-full bg-white border-2 border-hatch-gray rounded px-3 py-2 focus:border-hatch-orange outline-none"
+                  value={formData.nombre || ''}
+                  onChange={e => setFormData({...formData, nombre: e.target.value})}
+                  placeholder="Ej: Diseño estructural columnas"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs text-gray-600 mb-1 font-semibold">Responsable</label>
+                <select 
+                  className="w-full bg-white border-2 border-hatch-gray rounded px-3 py-2 focus:border-hatch-orange outline-none"
+                  value={formData.responsable || 'Firma'}
+                  onChange={e => setFormData({...formData, responsable: e.target.value})}
+                >
+                  <option value="Firma">Firma</option>
+                  <option value="Contratista">Contratista</option>
+                  <option value="Cliente">Cliente</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4 border-t-2 border-hatch-gray mt-6">
               <button 
+                type="button"
                 onClick={() => setModals({...modals, pkg: false})} 
                 className="text-gray-600 hover:text-hatch-blue px-4 py-2 transition-colors font-medium"
               >
                 Cancelar
               </button>
               <button 
-                onClick={handleSavePkg} 
+                onClick={handleSavePkg}
                 className="bg-gradient-orange hover:shadow-lg text-white px-6 py-2 rounded-lg font-bold transition-all"
               >
-                Crear
+                Crear Paquete
               </button>
             </div>
           </div>
         </div>
       )}
-      
+
       {/* MODAL: VINCULAR ITEMS */}
       {modals.link && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm">
-          <div className="bg-white w-[650px] p-6 rounded-2xl border-2 border-hatch-gray h-[85vh] flex flex-col shadow-2xl">
-            <h3 className="text-xl font-bold text-hatch-blue mb-2">🔗 Vincular Entregables</h3>
-            <p className="text-gray-600 text-sm mb-4">Selecciona items de otras áreas para traerlos a este paquete.</p>
+          <div className="bg-white w-[700px] max-h-[80vh] flex flex-col p-6 rounded-2xl border-2 border-hatch-gray shadow-2xl">
+            <h3 className="text-hatch-blue font-bold mb-4 text-xl flex items-center gap-2">
+              <span className="text-hatch-orange">🔗</span>
+              Vincular Items Transversales
+            </h3>
             
-            <div className="flex gap-2 mb-3">
-              <button 
-                onClick={() => setLinkFilter("ALL")} 
-                className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${
-                  linkFilter === "ALL" 
-                    ? 'bg-gradient-orange text-white shadow-lg' 
-                    : 'bg-hatch-gray text-hatch-blue hover:bg-hatch-gray-dark'
-                }`}
-              >
-                Todo el Proyecto
-              </button>
-              <button 
-                onClick={() => setLinkFilter("TRANSVERSAL")} 
-                className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${
-                  linkFilter === "TRANSVERSAL" 
-                    ? 'bg-gradient-orange text-white shadow-lg' 
-                    : 'bg-hatch-gray text-hatch-blue hover:bg-hatch-gray-dark'
-                }`}
-              >
-                Solo Transversales
-              </button>
+            <div className="bg-blue-50 border-l-4 border-blue-500 p-3 mb-4 text-sm text-blue-800 rounded-r">
+              ℹ️ Vincula items desde otras áreas (DWP) que este paquete necesita recibir.
             </div>
-            
-            <div className="flex-1 overflow-y-auto bg-hatch-gray/20 p-3 rounded-lg border-2 border-hatch-gray">
-              {transversalItems.filter(i => linkFilter === "ALL" || i.es_transversal).map(item => (
-                <div 
-                  key={item.id} 
-                  className={`flex items-center p-3 mb-2 rounded-lg cursor-pointer border-2 transition-all ${
-                    selectedLinkItems.has(item.id) 
-                      ? 'border-hatch-orange bg-orange-50' 
-                      : 'border-hatch-gray bg-white hover:border-hatch-orange/50'
-                  }`} 
-                  onClick={() => toggle(selectedLinkItems, item.id, setSelectedLinkItems)}
-                >
-                  <div className={`w-5 h-5 border-2 rounded mr-3 flex items-center justify-center transition-colors ${
-                    selectedLinkItems.has(item.id) 
-                      ? 'bg-hatch-orange border-hatch-orange' 
-                      : 'border-hatch-gray-dark'
-                  }`}>
-                    {selectedLinkItems.has(item.id) && <span className="text-white font-bold text-sm">✓</span>}
-                  </div>
-                  <div>
-                    <p className="text-hatch-blue text-sm font-medium">{item.nombre}</p>
-                    <p className="text-gray-500 text-xs">{item.cwa} ➝ {item.paquete}</p>
-                  </div>
-                </div>
-              ))}
+
+            {/* Filtro */}
+            <div className="mb-4">
+              <label className="block text-xs text-gray-600 mb-1 font-semibold">Filtrar por tipo</label>
+              <select 
+                className="w-full bg-white border-2 border-hatch-gray rounded px-3 py-2 focus:border-hatch-orange outline-none"
+                value={linkFilter}
+                onChange={e => setLinkFilter(e.target.value)}
+              >
+                <option value="ALL">Todos los items</option>
+                <option value="ENTREGABLE">Solo entregables</option>
+                <option value="RESTRICCION">Solo restricciones</option>
+              </select>
             </div>
-            
-            <div className="mt-4 flex justify-end gap-3 pt-4 border-t-2 border-hatch-gray">
-              <button 
-                onClick={() => setModals({...modals, link: false})} 
-                className="text-gray-600 hover:text-hatch-blue px-4 py-2 transition-colors font-medium"
-              >
-                Cancelar
-              </button>
-              <button 
-                onClick={handleLinkItems} 
-                className="bg-gradient-orange hover:shadow-lg text-white px-6 py-2 rounded-lg font-bold transition-all"
-              >
-                Vincular ({selectedLinkItems.size})
-              </button>
+
+            {/* Lista de items */}
+            <div className="flex-1 overflow-y-auto border-2 border-hatch-gray rounded-lg">
+              <table className="w-full text-sm">
+                <thead className="bg-hatch-gray text-white sticky top-0">
+                  <tr>
+                    <th className="p-2 w-10"></th>
+                    <th className="p-2 text-left">Item</th>
+                    <th className="p-2 text-left">Origen</th>
+                    <th className="p-2 text-left">Tipo</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-hatch-gray">
+                  {transversalItems
+                    .filter(item => linkFilter === 'ALL' || item.tipo === linkFilter)
+                    .map(item => (
+                      <tr 
+                        key={item.id} 
+                        className={`hover:bg-hatch-gray/10 transition-colors cursor-pointer ${
+                          selectedLinkItems.has(item.id) ? 'bg-blue-50' : ''
+                        }`}
+                        onClick={() => {
+                          const newSet = new Set(selectedLinkItems);
+                          newSet.has(item.id) ? newSet.delete(item.id) : newSet.add(item.id);
+                          setSelectedLinkItems(newSet);
+                        }}
+                      >
+                        <td className="p-2 text-center">
+                          <input 
+                            type="checkbox" 
+                            checked={selectedLinkItems.has(item.id)}
+                            onChange={() => {}}
+                            className="w-4 h-4 accent-hatch-orange"
+                          />
+                        </td>
+                        <td className="p-2 font-medium text-hatch-blue">{item.nombre}</td>
+                        <td className="p-2 text-gray-600 text-xs">{item.origen_info}</td>
+                        <td className="p-2">
+                          <span className={`text-xs px-2 py-1 rounded ${
+                            item.tipo === 'ENTREGABLE' 
+                              ? 'bg-green-100 text-green-700' 
+                              : 'bg-yellow-100 text-yellow-700'
+                          }`}>
+                            {item.tipo}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
             </div>
-          </div>
-        </div>
-      )}
-      
-      {/* MODAL: CLASIFICAR ITEM */}
-      {modals.editItem && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm">
-          <div className="bg-white p-6 rounded-2xl w-96 border-2 border-hatch-gray shadow-2xl">
-            <h3 className="text-hatch-blue font-bold mb-2 text-xl">🏷️ Clasificar Item</h3>
-            <p className="text-gray-600 text-sm mb-4 italic">"{editingItem?.nombre}"</p>
-            
-            <label className="block text-xs text-gray-600 uppercase font-bold mb-1">Tipo de Entregable</label>
-            <select 
-              className="w-full bg-white text-hatch-blue p-2 rounded-lg mb-6 border-2 border-hatch-gray focus:border-hatch-orange outline-none transition-colors" 
-              value={editingItem?.tipo_entregable_id || ''} 
-              onChange={e => setEditingItem({...editingItem, tipo_entregable_id: e.target.value})}
-            >
-              <option value="">- Sin Tipo -</option>
-              {itemTipos.map(t => (
-                <option key={t.id} value={t.id}>
-                  {t.codigo} - {t.nombre}
-                </option>
-              ))}
-            </select>
-            
-            <div className="flex justify-end gap-3">
-              <button 
-                onClick={() => setModals({...modals, editItem: false})} 
-                className="text-gray-600 hover:text-hatch-blue px-4 py-2 transition-colors font-medium"
-              >
-                Cancelar
-              </button>
-              <button 
-                onClick={handleSaveClassify} 
-                className="bg-gradient-orange hover:shadow-lg text-white px-6 py-2 rounded-lg font-bold transition-all"
-              >
-                Guardar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      
-      {/* MODAL: IMPORTAR CSV/EXCEL */}
-      {modals.import && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm">
-          <div className="bg-white p-6 rounded-2xl w-[450px] border-2 border-hatch-gray shadow-2xl">
-            <h3 className="text-hatch-blue font-bold mb-2 text-xl">📤 Importar Excel/CSV</h3>
-            <p className="text-sm text-gray-600 mb-4">Sube tu archivo para crear o actualizar registros masivamente.</p>
-            
-            <form onSubmit={handleImport}>
-              <label className="block mb-4 cursor-pointer">
-                <div className="w-full border-2 border-dashed border-hatch-gray rounded-lg p-8 text-center hover:border-hatch-orange transition-colors bg-hatch-gray/20">
-                  {importFile ? (
-                    <div className="flex flex-col items-center gap-2">
-                      <span className="text-4xl">📄</span>
-                      <span className="text-hatch-blue font-medium text-sm">{importFile.name}</span>
-                      <span className="text-xs text-gray-500">Click para cambiar</span>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center gap-2">
-                      <span className="text-4xl text-gray-400">📁</span>
-                      <span className="text-gray-600 text-sm">Haz click para seleccionar archivo</span>
-                      <span className="text-xs text-gray-400">.csv o .xlsx</span>
-                    </div>
-                  )}
-                </div>
-                <input 
-                  type="file" 
-                  accept=".csv,.xlsx" 
-                  onChange={e => setImportFile(e.target.files[0])} 
-                  className="hidden" 
-                />
-              </label>
-              
-              <div className="flex justify-end gap-3">
+
+            <div className="flex justify-between items-center pt-4 border-t-2 border-hatch-gray mt-4">
+              <span className="text-sm text-gray-600 font-medium">
+                {selectedLinkItems.size} item(s) seleccionado(s)
+              </span>
+              <div className="flex gap-3">
                 <button 
-                  type="button" 
-                  onClick={() => setModals({...modals, import: false})} 
+                  type="button"
+                  onClick={() => setModals({...modals, link: false})} 
                   className="text-gray-600 hover:text-hatch-blue px-4 py-2 transition-colors font-medium"
                 >
                   Cancelar
                 </button>
                 <button 
-                  type="submit" 
-                  disabled={importing || !importFile} 
-                  className="bg-gradient-orange hover:shadow-lg disabled:opacity-50 text-white px-6 py-2 rounded-lg font-bold transition-all disabled:cursor-not-allowed"
+                  onClick={handleLinkItems}
+                  disabled={selectedLinkItems.size === 0}
+                  className="bg-gradient-orange hover:shadow-lg text-white px-6 py-2 rounded-lg font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {importing ? 'Procesando...' : 'Importar'}
+                  Vincular {selectedLinkItems.size > 0 && `(${selectedLinkItems.size})`}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: IMPORTAR CSV */}
+      {modals.import && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm">
+          <div className="bg-white w-[600px] p-6 rounded-2xl border-2 border-hatch-gray shadow-2xl">
+            <h3 className="text-hatch-blue font-bold mb-4 text-xl flex items-center gap-2">
+              <span className="text-hatch-orange">📤</span>
+              Importar Estructura AWP desde CSV
+            </h3>
+            
+            <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 mb-4 text-sm text-yellow-800 rounded-r">
+              ⚠️ <strong>Importante:</strong> El archivo CSV debe tener las columnas: <br/>
+              <code className="bg-yellow-100 px-2 py-1 rounded mt-2 inline-block text-xs">
+                CWA, CWP, Tipo_Paquete, Codigo_Paquete, Nombre_Item, Forecast_Fin_Item
+              </code>
+            </div>
+
+            <form onSubmit={handleImport} className="space-y-4">
+              <div>
+                <label className="block text-xs text-gray-600 mb-2 font-semibold">Seleccionar archivo CSV</label>
+                <input 
+                  type="file" 
+                  accept=".csv"
+                  onChange={e => setImportFile(e.target.files[0])}
+                  className="w-full bg-white border-2 border-hatch-gray rounded px-3 py-2 focus:border-hatch-orange outline-none file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-gradient-orange file:text-white file:font-semibold hover:file:shadow-lg transition-all"
+                  required
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t-2 border-hatch-gray">
+                <button 
+                  type="button"
+                  onClick={() => setModals({...modals, import: false})} 
+                  className="text-gray-600 hover:text-hatch-blue px-4 py-2 transition-colors font-medium"
+                  disabled={importing}
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit"
+                  disabled={importing || !importFile}
+                  className="bg-gradient-orange hover:shadow-lg text-white px-6 py-2 rounded-lg font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {importing ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      Importando...
+                    </>
+                  ) : (
+                    '📤 Importar Datos'
+                  )}
                 </button>
               </div>
             </form>

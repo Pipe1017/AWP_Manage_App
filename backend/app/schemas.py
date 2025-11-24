@@ -1,6 +1,6 @@
 # backend/app/schemas.py
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List, Dict, Any
 from datetime import date
 
@@ -16,12 +16,16 @@ class DisciplinaBase(BaseModel):
 class DisciplinaCreate(DisciplinaBase):
     pass
 
+class DisciplinaUpdate(BaseModel):
+    nombre: Optional[str] = None
+    codigo: Optional[str] = None
+    descripcion: Optional[str] = None
+
 class DisciplinaResponse(DisciplinaBase):
     id: int
     proyecto_id: int
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # ============================================================================
 # 2. ESTRUCTURA AWP (CWA, CWP)
@@ -48,7 +52,7 @@ class CWAUpdate(BaseModel):
 class CWPCreate(BaseModel):
     nombre: str
     descripcion: Optional[str] = None
-    area_id: int
+    cwa: int  # ✅ CORREGIDO: era 'area_id'
     disciplina_id: int
     duracion_dias: Optional[int] = None
     fecha_inicio_prevista: Optional[date] = None
@@ -57,7 +61,6 @@ class CWPCreate(BaseModel):
     forecast_inicio: Optional[date] = None
     forecast_fin: Optional[date] = None
     metadata_json: Optional[Dict[str, Any]] = None
-    # Nota: Prioridad eliminada de aquí (es del Área)
 
 class CWPUpdate(BaseModel):
     nombre: Optional[str] = None
@@ -79,8 +82,7 @@ class CWPResponse(BaseModel):
     forecast_fin: Optional[date]
     metadata_json: Optional[Dict[str, Any]] = None
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class CWAResponse(BaseModel):
     id: int
@@ -94,8 +96,7 @@ class CWAResponse(BaseModel):
     prioridad: Optional[str]
     cwps: List[CWPResponse] = []
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # ============================================================================
 # 3. PLOT PLAN
@@ -114,8 +115,17 @@ class PlotPlanResponse(BaseModel):
     proyecto_id: int
     cwas: List[CWAResponse] = []
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
+
+class PlotPlanResponseComplete(BaseModel):
+    id: int
+    nombre: str
+    descripcion: Optional[str]
+    image_url: Optional[str]
+    proyecto_id: int
+    cwas: List[CWAResponse] = []
+    
+    model_config = ConfigDict(from_attributes=True)
 
 # ============================================================================
 # 4. TIPOS & METADATA
@@ -138,23 +148,68 @@ class TipoEntregableResponse(BaseModel):
     disciplina_id: Optional[int]
     es_generico: bool
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
+# Schemas para Columnas Metadata
 class ColumnaCreate(BaseModel):
     nombre: str
-    tipo_dato: str 
-    opciones: Optional[List[str]] = [] 
+    tipo_dato: str  # TEXTO, NUMERO, FECHA, SELECCION
+    opciones: Optional[List[str]] = []
+
+class ColumnaUpdate(BaseModel):
+    nombre: Optional[str] = None
+    tipo_dato: Optional[str] = None
+    opciones: Optional[List[str]] = None
 
 class ColumnaResponse(BaseModel):
     id: int
     nombre: str
     tipo_dato: str
     proyecto_id: int
-    opciones_json: Optional[List[str]] = [] 
+    opciones_json: Optional[List[str]] = []
+    orden: Optional[int] = 0
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
+
+# Schemas para Metadatos CWP
+class CWPColumnaMetadataCreate(BaseModel):
+    nombre: str
+    tipo_dato: str = "TEXTO"
+    opciones: Optional[List[str]] = []
+
+class CWPColumnaMetadataUpdate(BaseModel):
+    nombre: Optional[str] = None
+    tipo_dato: Optional[str] = None
+    opciones: Optional[List[str]] = None
+
+class CWPColumnaMetadataResponse(BaseModel):
+    id: int
+    nombre: str
+    tipo_dato: str
+    opciones_json: Optional[List[str]] = []
+    proyecto_id: int
+    orden: int
+    
+    model_config = ConfigDict(from_attributes=True)
+
+# Schema para Geometría Plot Plan
+class GeometriaPlotPlanCreate(BaseModel):
+    tipo: str  # rectangle, circle, polygon
+    coordenadas: Dict[str, Any]
+    cwa_id: Optional[int] = None
+    color: Optional[str] = "#FF6B35"
+    metadata: Optional[Dict[str, Any]] = None
+
+class GeometriaPlotPlanResponse(BaseModel):
+    id: int
+    tipo: str
+    coordenadas: Dict[str, Any]
+    cwa_id: Optional[int]
+    color: str
+    metadata: Optional[Dict[str, Any]]
+    plot_plan_id: int
+    
+    model_config = ConfigDict(from_attributes=True)
 
 # ============================================================================
 # 5. PROYECTO
@@ -169,13 +224,25 @@ class ProyectoBase(BaseModel):
 class ProyectoCreate(ProyectoBase):
     pass
 
+class ProyectoUpdate(BaseModel):
+    nombre: Optional[str] = None
+    descripcion: Optional[str] = None
+    fecha_inicio: Optional[date] = None
+    fecha_fin: Optional[date] = None
+
 class ProyectoResponse(ProyectoBase):
     id: int
     disciplinas: List[DisciplinaResponse] = []
     plot_plans: List[PlotPlanResponse] = []
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
+
+class ProyectoResponseComplete(ProyectoBase):
+    id: int
+    disciplinas: List[DisciplinaResponse] = []
+    plot_plans: List[PlotPlanResponse] = []
+    
+    model_config = ConfigDict(from_attributes=True)
 
 # ============================================================================
 # 6. PAQUETE & ITEM
@@ -210,8 +277,8 @@ class PaqueteResponse(BaseModel):
     cwp_id: int
     porcentaje_completitud: float
     estado: str
-    class Config:
-        from_attributes = True
+    
+    model_config = ConfigDict(from_attributes=True)
 
 class ItemCreate(BaseModel):
     nombre: str
@@ -249,8 +316,7 @@ class ItemResponse(BaseModel):
     source_item_id: Optional[int]
     forecast_fin: Optional[date]
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # ============================================================================
 # 7. VINCULOS & IMPORT
@@ -269,5 +335,11 @@ class ItemImportRow(BaseModel):
     requiere_aprobacion: Optional[bool] = True
     forecast_fin: Optional[date] = None
 
-# Actualizar referencias circulares (si las hubiera)
-PlotPlanResponse.update_forward_refs()
+# ============================================================================
+# 8. ACTUALIZAR REFERENCIAS CIRCULARES
+# ============================================================================
+
+PlotPlanResponse.model_rebuild()
+PlotPlanResponseComplete.model_rebuild()
+ProyectoResponse.model_rebuild()
+ProyectoResponseComplete.model_rebuild()

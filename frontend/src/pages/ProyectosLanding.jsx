@@ -1,147 +1,322 @@
 // frontend/src/pages/ProyectosLanding.jsx
+
 import React, { useState } from 'react';
+import client from '../api/axios';
 import HatchLogo from '../components/common/HatchLogo';
 
 function ProyectosLanding({ proyectos, onSelectProyecto, onAddProyecto, error }) {
-  const [nombreProyecto, setNombreProyecto] = useState("");
-  const [isCreating, setIsCreating] = useState(false);
-  const [filtro, setFiltro] = useState("");
+  const [modalCreate, setModalCreate] = useState(false);
+  const [modalEdit, setModalEdit] = useState(false);
+  const [editingProyecto, setEditingProyecto] = useState(null);
+  const [formData, setFormData] = useState({ nombre: '', descripcion: '' });
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e) => {
+  const handleCreateProyecto = async (e) => {
     e.preventDefault();
-    if (!nombreProyecto.trim()) return;
-    setIsCreating(true);
-    await onAddProyecto(nombreProyecto);
-    setNombreProyecto("");
-    setIsCreating(false);
+    setLoading(true);
+    try {
+      await onAddProyecto(formData.nombre);
+      setModalCreate(false);
+      setFormData({ nombre: '', descripcion: '' });
+    } catch (error) {
+      alert('Error: ' + (error.response?.data?.detail || error.message));
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const proyectosFiltrados = proyectos.filter(p =>
-    p.nombre.toLowerCase().includes(filtro.toLowerCase())
-  );
+  const openEditModal = (proyecto) => {
+    setEditingProyecto(proyecto);
+    setFormData({ nombre: proyecto.nombre, descripcion: proyecto.descripcion || '' });
+    setModalEdit(true);
+  };
+
+  const handleUpdateProyecto = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await client.put(`/proyectos/${editingProyecto.id}`, formData);
+      setModalEdit(false);
+      setFormData({ nombre: '', descripcion: '' });
+      setEditingProyecto(null);
+      alert('✅ Proyecto actualizado exitosamente');
+      window.location.reload();
+    } catch (error) {
+      alert('Error: ' + (error.response?.data?.detail || error.message));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteProyecto = async (proyectoId, nombreProyecto) => {
+    const confirmacion = window.prompt(
+      `⚠️ ADVERTENCIA: Esta acción eliminará PERMANENTEMENTE el proyecto "${nombreProyecto}" y TODA su información:\n\n` +
+      `• Todos los Plot Plans\n` +
+      `• Todas las Áreas (CWA)\n` +
+      `• Todos los CWPs\n` +
+      `• Todos los Paquetes e Items\n` +
+      `• Todas las configuraciones\n\n` +
+      `Esta acción NO SE PUEDE DESHACER.\n\n` +
+      `Para confirmar, escribe el nombre del proyecto: "${nombreProyecto}"`
+    );
+
+    if (confirmacion !== nombreProyecto) {
+      if (confirmacion !== null) {
+        alert('❌ Nombre incorrecto. Eliminación cancelada.');
+      }
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await client.delete(`/proyectos/${proyectoId}`);
+      alert('✅ Proyecto eliminado exitosamente');
+      window.location.reload();
+    } catch (error) {
+      alert('Error: ' + (error.response?.data?.detail || error.message));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <div className="bg-white text-hatch-blue min-h-screen">
-      {/* Header con branding HATCH */}
-      <div className="bg-gradient-hatch border-b border-hatch-blue-light backdrop-blur-sm sticky top-0 z-50 shadow-xl">
-        <div className="max-w-7xl mx-auto px-6 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <HatchLogo className="h-12" variant="full" />
-              <div className="border-l-2 border-hatch-orange pl-4">
-                <h1 className="text-2xl font-bold text-hatch-blue">AWP Manager</h1>
-                <p className="text-sm text-hatch-gray">Advanced Work Packaging System</p>
-              </div>
-            </div>
-            <div className="text-right">
-              <p className="text-sm text-hatch-gray">Total Proyectos</p>
-              <p className="text-3xl font-bold text-hatch-orange">{proyectos.length}</p>
-            </div>
+    <div className="min-h-screen bg-white">
+      {/* Header */}
+      <div className="bg-gradient-hatch text-white py-8 px-6 shadow-lg">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+          {/* Logo y Título */}
+          <div className="flex flex-col">
+            <HatchLogo variant="full" className="h-16 w-auto object-contain mb-1" style={{ minWidth: '150px' }} />
+            <p className="text-white/90 text-sm font-medium">Advanced Work Packaging</p>
           </div>
+
+          {/* Botón Nuevo Proyecto */}
+          <button 
+            onClick={() => setModalCreate(true)}
+            className="bg-white hover:shadow-xl text-hatch-blue px-6 py-3 rounded-lg font-bold transition-all flex items-center gap-2 whitespace-nowrap"
+          >
+            <span className="text-xl">➕</span> Nuevo Proyecto
+          </button>
         </div>
       </div>
 
       {/* Content */}
       <div className="max-w-7xl mx-auto px-6 py-12">
+        <div className="mb-8">
+          <h2 className="text-2xl font-bold text-hatch-blue mb-2">Mis Proyectos</h2>
+          <p className="text-gray-600">Selecciona un proyecto para gestionar su estructura AWP</p>
+        </div>
+
         {error && (
-          <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 rounded-r-lg text-red-700">
-            <p className="font-semibold">Error</p>
-            <p className="text-sm">{error}</p>
+          <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded-r">
+            <p className="text-red-700">{error}</p>
           </div>
         )}
 
-        {/* Create Project */}
-        <div className="mb-12 p-8 bg-gradient-to-br from-hatch-gray to-white border-2 border-hatch-orange/20 rounded-2xl shadow-xl">
-          <h2 className="text-2xl font-bold mb-4 text-hatch-blue flex items-center gap-2">
-            <span className="w-8 h-8 bg-gradient-orange rounded-lg flex items-center justify-center text-hatch-blue">+</span>
-            Crear Nuevo Proyecto
-          </h2>
-          
-          <form onSubmit={handleSubmit} className="flex gap-3">
-            <input
-              type="text"
-              value={nombreProyecto}
-              onChange={(e) => setNombreProyecto(e.target.value)}
-              placeholder="Nombre del proyecto (ej. Refinería XYZ)..."
-              className="flex-1 px-4 py-3 rounded-lg bg-white border-2 border-hatch-gray-dark text-hatch-blue placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-hatch-orange focus:border-transparent"
-              disabled={isCreating}
-            />
-            <button
-              type="submit"
-              disabled={isCreating || !nombreProyecto.trim()}
-              className="px-8 py-3 bg-gradient-orange hover:shadow-lg text-hatch-blue font-semibold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+        {proyectos.length === 0 ? (
+          <div className="text-center py-16">
+            <div className="text-6xl mb-4">📋</div>
+            <p className="text-gray-500 text-lg mb-4">No tienes proyectos creados</p>
+            <button 
+              onClick={() => setModalCreate(true)}
+              className="bg-gradient-orange hover:shadow-lg text-white px-6 py-3 rounded-lg font-medium transition-all"
             >
-              {isCreating ? "Creando..." : "Crear Proyecto"}
+              Crear tu primer proyecto
             </button>
-          </form>
-        </div>
-
-        {/* Projects Grid */}
-        <div>
-          <div className="mb-6 flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-hatch-blue">Mis Proyectos</h2>
-            {proyectos.length > 1 && (
-              <div className="relative">
-                <input
-                  type="text"
-                  value={filtro}
-                  onChange={(e) => setFiltro(e.target.value)}
-                  placeholder="Buscar proyecto..."
-                  className="px-4 py-2 pl-10 rounded-lg bg-white border-2 border-hatch-gray text-hatch-blue text-sm w-64 focus:outline-none focus:ring-2 focus:ring-hatch-orange"
-                />
-                <svg className="w-5 h-5 text-hatch-blue absolute left-3 top-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </div>
-            )}
           </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {proyectos.map(proyecto => {
+              const totalCWAs = proyecto.plot_plans?.reduce((sum, pp) => sum + (pp.cwas?.length || 0), 0) || 0;
+              const totalCWPs = proyecto.plot_plans?.reduce((sum, pp) => 
+                sum + (pp.cwas?.reduce((s, c) => s + (c.cwps?.length || 0), 0) || 0), 0) || 0;
 
-          {proyectosFiltrados.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {proyectosFiltrados.map(proyecto => (
-                <div
-                  key={proyecto.id}
-                  onClick={() => onSelectProyecto(proyecto)}
-                  className="group cursor-pointer p-6 bg-white border-2 border-hatch-gray hover:border-hatch-orange rounded-xl transition-all transform hover:scale-[1.02] hover:shadow-2xl"
+              return (
+                <div 
+                  key={proyecto.id} 
+                  className="bg-white border-2 border-hatch-gray rounded-xl p-6 hover:border-hatch-orange hover:shadow-xl transition-all cursor-pointer group relative"
                 >
-                  <div className="flex items-start justify-between mb-4">
-                    <h3 className="text-lg font-bold text-hatch-blue">{proyecto.nombre}</h3>
-                    <div className="w-10 h-10 bg-gradient-orange rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                      <svg className="w-5 h-5 text-hatch-blue" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </div>
+                  {/* Botones de Acción */}
+                  <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openEditModal(proyecto);
+                      }}
+                      className="bg-white hover:bg-hatch-gray text-hatch-blue p-2 rounded-lg border-2 border-hatch-gray hover:border-hatch-orange transition-all shadow-sm"
+                      title="Editar proyecto"
+                    >
+                      ✏️
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteProyecto(proyecto.id, proyecto.nombre);
+                      }}
+                      className="bg-white hover:bg-red-50 text-red-600 p-2 rounded-lg border-2 border-red-300 hover:border-red-500 transition-all shadow-sm"
+                      title="Eliminar proyecto"
+                    >
+                      🗑️
+                    </button>
                   </div>
-                  
-                  <div className="grid grid-cols-3 gap-3 pt-4 border-t-2 border-hatch-gray">
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-hatch-orange">{proyecto.disciplinas?.length || 0}</p>
-                      <p className="text-xs text-gray-500 mt-1">Disciplinas</p>
+
+                  <div onClick={() => onSelectProyecto(proyecto)}>
+                    <div className="flex items-start gap-3 mb-4">
+                      <div className="bg-gradient-orange text-white w-12 h-12 rounded-lg flex items-center justify-center text-2xl font-bold flex-shrink-0">
+                        {proyecto.nombre.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-xl font-bold text-hatch-blue mb-1 truncate pr-16">
+                          {proyecto.nombre}
+                        </h3>
+                        {proyecto.descripcion && (
+                          <p className="text-sm text-gray-600 line-clamp-2">{proyecto.descripcion}</p>
+                        )}
+                      </div>
                     </div>
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-hatch-blue">{proyecto.plot_plans?.length || 0}</p>
-                      <p className="text-xs text-gray-500 mt-1">Planos</p>
+
+                    <div className="border-t-2 border-hatch-gray pt-4 space-y-2">
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-gray-600">📍 Áreas (CWA)</span>
+                        <span className="font-bold text-hatch-orange">{totalCWAs}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-gray-600">📦 Paquetes CWP</span>
+                        <span className="font-bold text-blue-600">{totalCWPs}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-gray-600">🎨 Plot Plans</span>
+                        <span className="font-bold text-teal-600">{proyecto.plot_plans?.length || 0}</span>
+                      </div>
                     </div>
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-hatch-blue-light">
-                        {proyecto.plot_plans?.reduce((sum, pp) => sum + (pp.cwas?.length || 0), 0) || 0}
-                      </p>
-                      <p className="text-xs text-gray-500 mt-1">CWAs</p>
+
+                    <div className="mt-4 pt-4 border-t-2 border-hatch-gray">
+                      <button className="w-full bg-gradient-orange text-white py-2 rounded-lg font-medium hover:shadow-lg transition-all group-hover:scale-105">
+                        Abrir Proyecto →
+                      </button>
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-16 bg-hatch-gray/30 border-2 border-dashed border-hatch-gray-dark rounded-xl">
-              <svg className="w-16 h-16 text-hatch-blue mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-              </svg>
-              <p className="text-lg font-medium text-hatch-blue">No hay proyectos aún</p>
-              <p className="text-sm text-gray-500 mt-2">Crea tu primer proyecto usando el formulario de arriba</p>
-            </div>
-          )}
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Modal Crear Proyecto */}
+      {modalCreate && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm p-4">
+          <div className="bg-white w-full max-w-md p-6 rounded-2xl border-2 border-hatch-gray shadow-2xl">
+            <h3 className="text-hatch-blue font-bold mb-4 text-xl flex items-center gap-2">
+              <span className="text-hatch-orange">➕</span>
+              Nuevo Proyecto
+            </h3>
+            <form onSubmit={handleCreateProyecto} className="space-y-4">
+              <div>
+                <label className="block text-xs text-gray-600 mb-1 font-semibold">Nombre del Proyecto *</label>
+                <input 
+                  className="w-full bg-white border-2 border-hatch-gray rounded px-3 py-2 focus:border-hatch-orange outline-none"
+                  value={formData.nombre}
+                  onChange={e => setFormData({...formData, nombre: e.target.value})}
+                  placeholder="Ej: Planta Industrial XYZ"
+                  required
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-600 mb-1 font-semibold">Descripción (Opcional)</label>
+                <textarea 
+                  className="w-full bg-white border-2 border-hatch-gray rounded px-3 py-2 focus:border-hatch-orange outline-none resize-none"
+                  value={formData.descripcion}
+                  onChange={e => setFormData({...formData, descripcion: e.target.value})}
+                  placeholder="Breve descripción del proyecto..."
+                  rows={3}
+                />
+              </div>
+              <div className="flex justify-end gap-3 pt-4 border-t-2 border-hatch-gray">
+                <button 
+                  type="button"
+                  onClick={() => {
+                    setModalCreate(false);
+                    setFormData({ nombre: '', descripcion: '' });
+                  }}
+                  className="text-gray-600 hover:text-hatch-blue px-4 py-2 transition-colors font-medium"
+                  disabled={loading}
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit"
+                  disabled={loading}
+                  className="bg-gradient-orange hover:shadow-lg text-white px-6 py-2 rounded-lg font-bold transition-all disabled:opacity-50"
+                >
+                  {loading ? 'Creando...' : 'Crear Proyecto'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
+      )}
+
+      {/* Modal Editar Proyecto */}
+      {modalEdit && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm p-4">
+          <div className="bg-white w-full max-w-md p-6 rounded-2xl border-2 border-hatch-gray shadow-2xl">
+            <h3 className="text-hatch-blue font-bold mb-4 text-xl flex items-center gap-2">
+              <span className="text-hatch-orange">✏️</span>
+              Editar Proyecto
+            </h3>
+            <form onSubmit={handleUpdateProyecto} className="space-y-4">
+              <div>
+                <label className="block text-xs text-gray-600 mb-1 font-semibold">Nombre del Proyecto *</label>
+                <input 
+                  className="w-full bg-white border-2 border-hatch-gray rounded px-3 py-2 focus:border-hatch-orange outline-none"
+                  value={formData.nombre}
+                  onChange={e => setFormData({...formData, nombre: e.target.value})}
+                  placeholder="Ej: Planta Industrial XYZ"
+                  required
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-600 mb-1 font-semibold">Descripción (Opcional)</label>
+                <textarea 
+                  className="w-full bg-white border-2 border-hatch-gray rounded px-3 py-2 focus:border-hatch-orange outline-none resize-none"
+                  value={formData.descripcion}
+                  onChange={e => setFormData({...formData, descripcion: e.target.value})}
+                  placeholder="Breve descripción del proyecto..."
+                  rows={3}
+                />
+              </div>
+              <div className="flex justify-end gap-3 pt-4 border-t-2 border-hatch-gray">
+                <button 
+                  type="button"
+                  onClick={() => {
+                    setModalEdit(false);
+                    setFormData({ nombre: '', descripcion: '' });
+                    setEditingProyecto(null);
+                  }}
+                  className="text-gray-600 hover:text-hatch-blue px-4 py-2 transition-colors font-medium"
+                  disabled={loading}
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit"
+                  disabled={loading}
+                  className="bg-gradient-orange hover:shadow-lg text-white px-6 py-2 rounded-lg font-bold transition-all disabled:opacity-50"
+                >
+                  {loading ? 'Guardando...' : 'Guardar Cambios'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Footer */}
+      <div className="border-t-2 border-hatch-gray py-6 text-center text-gray-600 text-sm">
+        <p>PROTOTYPE BY <span className="text-hatch-orange font-bold">HATCH</span></p>
       </div>
     </div>
   );

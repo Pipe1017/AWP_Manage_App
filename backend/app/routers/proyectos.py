@@ -4,13 +4,12 @@ from fastapi import APIRouter, Depends, HTTPException, Form, File, UploadFile
 import os
 import shutil
 import json
+import time
 from datetime import datetime
 from sqlalchemy.orm import Session
-from typing import List
-# ✅ Importamos todo lo necesario
+from typing import List, Optional
 from .. import models, schemas, crud
 from ..database import get_db
-from ..models import CWPColumnaMetadata
 
 router = APIRouter(
     prefix="/proyectos",
@@ -23,6 +22,7 @@ router = APIRouter(
 
 @router.post("/", response_model=schemas.ProyectoResponse)
 def create_proyecto(proyecto: schemas.ProyectoCreate, db: Session = Depends(get_db)):
+    """Crear un nuevo proyecto"""
     db_proyecto = crud.get_proyecto_por_nombre(db, nombre=proyecto.nombre)
     if db_proyecto:
         raise HTTPException(status_code=400, detail="El nombre del proyecto ya existe")
@@ -30,19 +30,79 @@ def create_proyecto(proyecto: schemas.ProyectoCreate, db: Session = Depends(get_
 
 @router.get("/", response_model=List[schemas.ProyectoResponse])
 def read_proyectos(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    # ✅ CORRECCIÓN: Simplificación radical.
-    # Al devolver los objetos de SQLAlchemy directamente, Pydantic se encarga 
-    # de leer las relaciones (disciplinas, plot_plans) automáticamente 
-    # gracias a "from_attributes = True" en los schemas.
+    """Obtener lista de proyectos"""
     return crud.get_proyectos(db, skip=skip, limit=limit)
 
 @router.get("/{proyecto_id}", response_model=schemas.ProyectoResponse)
 def read_proyecto(proyecto_id: int, db: Session = Depends(get_db)):
+    """Obtener un proyecto por ID"""
     db_proyecto = crud.get_proyecto(db, proyecto_id=proyecto_id)
     if db_proyecto is None:
         raise HTTPException(status_code=404, detail="Proyecto no encontrado")
-    # Igual aquí: No necesitamos rellenar manualmente las listas.
     return db_proyecto
+
+@router.put("/{proyecto_id}", response_model=schemas.ProyectoResponse)
+def update_proyecto(
+    proyecto_id: int,
+    proyecto_update: schemas.ProyectoUpdate,
+    db: Session = Depends(get_db)
+):
+    """Actualizar un proyecto existente"""
+    print(f"\n{'='*60}")
+    print(f"📝 ACTUALIZAR PROYECTO")
+    print(f"{'='*60}")
+    print(f"Proyecto ID: {proyecto_id}")
+    print(f"Datos: {proyecto_update.model_dump(exclude_unset=True)}")
+    
+    db_proyecto = crud.get_proyecto(db, proyecto_id=proyecto_id)
+    if not db_proyecto:
+        raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+    
+    # Actualizar solo los campos proporcionados
+    update_data = proyecto_update.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(db_proyecto, field, value)
+    
+    db.commit()
+    db.refresh(db_proyecto)
+    
+    print(f"✅ Proyecto actualizado: {db_proyecto.nombre}")
+    print(f"{'='*60}\n")
+    
+    return db_proyecto
+
+@router.delete("/{proyecto_id}")
+def delete_proyecto(proyecto_id: int, db: Session = Depends(get_db)):
+    """Eliminar un proyecto"""
+    print(f"\n{'='*60}")
+    print(f"🗑️ ELIMINAR PROYECTO")
+    print(f"{'='*60}")
+    print(f"Proyecto ID: {proyecto_id}")
+    
+    db_proyecto = crud.get_proyecto(db, proyecto_id=proyecto_id)
+    if not db_proyecto:
+        raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+    
+    # Verificar si tiene datos relacionados
+    plot_plans_count = len(db_proyecto.plot_plans)
+    disciplinas_count = len(db_proyecto.disciplinas)
+    
+    if plot_plans_count > 0 or disciplinas_count > 0:
+        print(f"⚠️ Proyecto tiene datos relacionados:")
+        print(f"   - Plot Plans: {plot_plans_count}")
+        print(f"   - Disciplinas: {disciplinas_count}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"No se puede eliminar. El proyecto tiene {plot_plans_count} plot plan(s) y {disciplinas_count} disciplina(s) asociados."
+        )
+    
+    db.delete(db_proyecto)
+    db.commit()
+    
+    print(f"✅ Proyecto eliminado exitosamente")
+    print(f"{'='*60}\n")
+    
+    return {"message": "Proyecto eliminado exitosamente", "id": proyecto_id}
 
 # ============================================================================
 # 2. ENDPOINTS DE DISCIPLINAS
@@ -54,6 +114,7 @@ def create_disciplina(
     disciplina: schemas.DisciplinaCreate,
     db: Session = Depends(get_db)
 ):
+    """Crear una nueva disciplina"""
     db_proyecto = crud.get_proyecto(db, proyecto_id=proyecto_id)
     if db_proyecto is None:
         raise HTTPException(status_code=404, detail="Proyecto no encontrado")
@@ -61,10 +122,97 @@ def create_disciplina(
 
 @router.get("/{proyecto_id}/disciplinas/", response_model=List[schemas.DisciplinaResponse])
 def read_disciplinas(proyecto_id: int, db: Session = Depends(get_db)):
+    """Obtener disciplinas de un proyecto"""
     db_proyecto = crud.get_proyecto(db, proyecto_id=proyecto_id)
     if db_proyecto is None:
         raise HTTPException(status_code=404, detail="Proyecto no encontrado")
     return db.query(models.Disciplina).filter(models.Disciplina.proyecto_id == proyecto_id).all()
+
+@router.put("/{proyecto_id}/disciplinas/{disciplina_id}", response_model=schemas.DisciplinaResponse)
+def update_disciplina(
+    proyecto_id: int,
+    disciplina_id: int,
+    disciplina_update: schemas.DisciplinaUpdate,
+    db: Session = Depends(get_db)
+):
+    """Actualizar una disciplina"""
+    print(f"\n{'='*60}")
+    print(f"📝 ACTUALIZAR DISCIPLINA")
+    print(f"{'='*60}")
+    print(f"Proyecto ID: {proyecto_id}")
+    print(f"Disciplina ID: {disciplina_id}")
+    print(f"Datos: {disciplina_update.model_dump(exclude_unset=True)}")
+    
+    # Verificar proyecto
+    db_proyecto = crud.get_proyecto(db, proyecto_id=proyecto_id)
+    if not db_proyecto:
+        raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+    
+    # Buscar disciplina
+    db_disciplina = db.query(models.Disciplina).filter(
+        models.Disciplina.id == disciplina_id,
+        models.Disciplina.proyecto_id == proyecto_id
+    ).first()
+    
+    if not db_disciplina:
+        raise HTTPException(status_code=404, detail="Disciplina no encontrada")
+    
+    # Actualizar campos
+    update_data = disciplina_update.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(db_disciplina, field, value)
+    
+    db.commit()
+    db.refresh(db_disciplina)
+    
+    print(f"✅ Disciplina actualizada: {db_disciplina.nombre}")
+    print(f"{'='*60}\n")
+    
+    return db_disciplina
+
+@router.delete("/{proyecto_id}/disciplinas/{disciplina_id}")
+def delete_disciplina(
+    proyecto_id: int,
+    disciplina_id: int,
+    db: Session = Depends(get_db)
+):
+    """Eliminar una disciplina"""
+    print(f"\n{'='*60}")
+    print(f"🗑️ ELIMINAR DISCIPLINA")
+    print(f"{'='*60}")
+    print(f"Proyecto ID: {proyecto_id}")
+    print(f"Disciplina ID: {disciplina_id}")
+    
+    # Verificar proyecto
+    db_proyecto = crud.get_proyecto(db, proyecto_id=proyecto_id)
+    if not db_proyecto:
+        raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+    
+    # Buscar disciplina
+    db_disciplina = db.query(models.Disciplina).filter(
+        models.Disciplina.id == disciplina_id,
+        models.Disciplina.proyecto_id == proyecto_id
+    ).first()
+    
+    if not db_disciplina:
+        raise HTTPException(status_code=404, detail="Disciplina no encontrada")
+    
+    # Verificar si tiene tipos de entregables asociados
+    tipos_count = len(db_disciplina.tipos_entregables)
+    if tipos_count > 0:
+        print(f"⚠️ Disciplina tiene {tipos_count} tipo(s) de entregable asociados")
+        raise HTTPException(
+            status_code=400,
+            detail=f"No se puede eliminar. La disciplina tiene {tipos_count} tipo(s) de entregable asociados."
+        )
+    
+    db.delete(db_disciplina)
+    db.commit()
+    
+    print(f"✅ Disciplina eliminada exitosamente")
+    print(f"{'='*60}\n")
+    
+    return {"message": "Disciplina eliminada exitosamente", "id": disciplina_id}
 
 # ============================================================================
 # 3. ENDPOINTS DE TIPOS DE ENTREGABLES
@@ -77,6 +225,7 @@ def create_tipo_entregable(
     tipo: schemas.TipoEntregableCreate,
     db: Session = Depends(get_db)
 ):
+    """Crear un tipo de entregable"""
     db_proyecto = crud.get_proyecto(db, proyecto_id=proyecto_id)
     if db_proyecto is None:
         raise HTTPException(status_code=404, detail="Proyecto no encontrado")
@@ -97,6 +246,7 @@ def create_tipo_entregable_generico(
     tipo: schemas.TipoEntregableCreate,
     db: Session = Depends(get_db)
 ):
+    """Crear un tipo de entregable genérico"""
     db_proyecto = crud.get_proyecto(db, proyecto_id=proyecto_id)
     if db_proyecto is None:
         raise HTTPException(status_code=404, detail="Proyecto no encontrado")
@@ -118,6 +268,7 @@ def read_tipos_entregables_proyecto(
     proyecto_id: int,
     db: Session = Depends(get_db)
 ):
+    """Obtener tipos de entregables de un proyecto"""
     db_proyecto = crud.get_proyecto(db, proyecto_id=proyecto_id)
     if db_proyecto is None:
         raise HTTPException(status_code=404, detail="Proyecto no encontrado")
@@ -133,48 +284,115 @@ def read_tipos_entregables_proyecto(
     return tipos_disciplinas + tipos_genericos
 
 # ============================================================================
-# 4. ENDPOINTS DE PLOT PLANS (Rutas Absolutas)
+# 4. ENDPOINTS DE PLOT PLANS
 # ============================================================================
 
-@router.post("/{proyecto_id}/plot_plans/", response_model=schemas.PlotPlanResponse)
-def create_plot_plan(
+@router.post("/{proyecto_id}/plot_plans/")
+async def create_plot_plan(
     proyecto_id: int,
     nombre: str = Form(...),
     file: UploadFile = File(...),
     db: Session = Depends(get_db)
 ):
+    """Crear un nuevo Plot Plan con imagen"""
+    print(f"\n{'='*60}")
+    print(f"📥 CREATE PLOT PLAN")
+    print(f"{'='*60}")
+    print(f"Proyecto ID: {proyecto_id}")
+    print(f"Nombre: {nombre}")
+    print(f"Archivo: {file.filename}")
+    print(f"Content-Type: {file.content_type}")
+    print(f"{'='*60}\n")
+    
+    # Validar proyecto
     db_proyecto = crud.get_proyecto(db, proyecto_id=proyecto_id)
     if db_proyecto is None:
         raise HTTPException(status_code=404, detail="Proyecto no encontrado")
     
-    # Configuración de rutas absolutas para evitar errores en Docker
-    BASE_DIR = os.getcwd()
-    UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    # Validar tipo de archivo
+    allowed_types = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp', 'image/gif']
+    if file.content_type not in allowed_types:
+        print(f"❌ Tipo de archivo rechazado: {file.content_type}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Tipo de archivo no permitido: {file.content_type}"
+        )
     
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    # Leer contenido del archivo
+    file_content = await file.read()
+    
+    # Validar tamaño (10MB max)
+    if len(file_content) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Archivo muy grande (máx 10MB)")
+    
+    # Configuración de rutas
+    upload_dir = "/app/uploads"
+    os.makedirs(upload_dir, exist_ok=True)
+    
+    # Generar nombre único
+    timestamp = int(time.time())
     safe_filename = file.filename.replace(" ", "_")
-    file_name = f"{timestamp}_{safe_filename}"
-    file_path_absolute = os.path.join(UPLOAD_DIR, file_name)
-    file_url_db = f"/uploads/{file_name}"
+    unique_filename = f"{timestamp}_{safe_filename}"
+    file_path = os.path.join(upload_dir, unique_filename)
     
     try:
-        print(f"💾 Guardando archivo en: {file_path_absolute}")
-        with open(file_path_absolute, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+        # Guardar archivo
+        with open(file_path, "wb") as f:
+            f.write(file_content)
+        
+        file_size = os.path.getsize(file_path)
+        print(f"✅ Archivo guardado: {file_path} ({file_size} bytes)")
+        
+        # URL relativa para la BD
+        file_url = f"/uploads/{unique_filename}"
+        
+        # Crear Plot Plan en BD
+        db_plot_plan = models.PlotPlan(
+            nombre=nombre,
+            image_url=file_url,
+            proyecto_id=proyecto_id
+        )
+        db.add(db_plot_plan)
+        db.commit()
+        db.refresh(db_plot_plan)
+        
+        print(f"✅ Plot Plan creado: ID={db_plot_plan.id}")
+        print(f"   - Nombre: {db_plot_plan.nombre}")
+        print(f"   - image_url (BD): {db_plot_plan.image_url}")
+        
+        # MAPEO: backend (image_url) → frontend (imagen_url)
+        result = {
+            "id": db_plot_plan.id,
+            "nombre": db_plot_plan.nombre,
+            "descripcion": db_plot_plan.descripcion,
+            "imagen_url": db_plot_plan.image_url,
+            "proyecto_id": db_plot_plan.proyecto_id,
+            "cwas": []
+        }
+        
+        print(f"📤 Retornando al frontend:")
+        print(f"   imagen_url: {result['imagen_url']}")
+        print(f"{'='*60}\n")
+        
+        return result
+        
     except Exception as e:
-        print(f"❌ Error guardando archivo: {e}")
-        raise HTTPException(status_code=500, detail=f"Error guardando archivo: {str(e)}")
+        print(f"❌ Error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        
+        # Limpiar archivo si hubo error
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        
+        raise HTTPException(status_code=500, detail=f"Error creando Plot Plan: {str(e)}")
     
-    plot_plan_data = schemas.PlotPlanCreate(
-        nombre=nombre,
-        image_url=file_url_db
-    )
-    
-    return crud.create_plot_plan(db=db, plot_plan=plot_plan_data, proyecto_id=proyecto_id)
+    finally:
+        await file.close()
 
 @router.get("/{proyecto_id}/plot_plans/", response_model=List[schemas.PlotPlanResponse])
 def read_plot_plans(proyecto_id: int, db: Session = Depends(get_db)):
+    """Obtener plot plans de un proyecto"""
     db_proyecto = crud.get_proyecto(db, proyecto_id=proyecto_id)
     if db_proyecto is None:
         raise HTTPException(status_code=404, detail="Proyecto no encontrado")
@@ -182,7 +400,13 @@ def read_plot_plans(proyecto_id: int, db: Session = Depends(get_db)):
 
 @router.get("/{proyecto_id}/plot_plans/{plot_plan_id}", response_model=dict)
 def get_plot_plan_with_cwas(proyecto_id: int, plot_plan_id: int, db: Session = Depends(get_db)):
-    # Este endpoint devuelve un dict específico con jerarquía, no usamos schema directo
+    """Obtener un plot plan con sus CWAs"""
+    print(f"\n{'='*60}")
+    print(f"📥 GET PLOT PLAN CON CWAS")
+    print(f"{'='*60}")
+    print(f"Proyecto ID: {proyecto_id}")
+    print(f"Plot Plan ID: {plot_plan_id}")
+    
     db_proyecto = crud.get_proyecto(db, proyecto_id)
     if not db_proyecto:
         raise HTTPException(status_code=404, detail="Proyecto no encontrado")
@@ -191,16 +415,19 @@ def get_plot_plan_with_cwas(proyecto_id: int, plot_plan_id: int, db: Session = D
     if not db_plot_plan or db_plot_plan.proyecto_id != proyecto_id:
         raise HTTPException(status_code=404, detail="Plot Plan no encontrado")
     
-    # Usamos la función optimizada que ya tiene toda la jerarquía
-    cwas = crud.get_cwas_por_plot_plan(db, plot_plan_id)
+    print(f"✅ Plot Plan encontrado:")
+    print(f"   - Nombre: {db_plot_plan.nombre}")
+    print(f"   - image_url (BD): {db_plot_plan.image_url}")
     
-    # Construimos respuesta manual para incluir todo el árbol de dependencias si es necesario
-    # o usamos el helper de jerarquía
-    return {
+    cwas = crud.get_cwas_por_plot_plan(db, plot_plan_id)
+    print(f"   - CWAs: {len(cwas)}")
+    
+    # MAPEO: backend (image_url) → frontend (imagen_url)
+    result = {
         "id": db_plot_plan.id,
         "nombre": db_plot_plan.nombre,
         "descripcion": db_plot_plan.descripcion,
-        "image_url": db_plot_plan.image_url,
+        "imagen_url": db_plot_plan.image_url,
         "proyecto_id": db_plot_plan.proyecto_id,
         "cwas": [
             {
@@ -208,6 +435,7 @@ def get_plot_plan_with_cwas(proyecto_id: int, plot_plan_id: int, db: Session = D
                 "nombre": cwa.nombre,
                 "codigo": cwa.codigo,
                 "es_transversal": cwa.es_transversal,
+                "prioridad": cwa.prioridad,
                 "shape_type": cwa.shape_type,
                 "shape_data": cwa.shape_data,
                 "cwps": [
@@ -222,6 +450,11 @@ def get_plot_plan_with_cwas(proyecto_id: int, plot_plan_id: int, db: Session = D
             for cwa in cwas
         ]
     }
+    
+    print(f"📤 Retornando imagen_url: {result['imagen_url']}")
+    print(f"{'='*60}\n")
+    
+    return result
 
 # ============================================================================
 # 5. ENDPOINTS DE CWA
@@ -234,6 +467,7 @@ def create_cwa(
     cwa: schemas.CWACreate,
     db: Session = Depends(get_db)
 ):
+    """Crear un CWA"""
     db_proyecto = crud.get_proyecto(db, proyecto_id=proyecto_id)
     if db_proyecto is None:
         raise HTTPException(status_code=404, detail="Proyecto no encontrado")
@@ -259,6 +493,7 @@ def update_cwa(
     cwa_update: schemas.CWAUpdate,
     db: Session = Depends(get_db)
 ):
+    """Actualizar un CWA"""
     db_proyecto = crud.get_proyecto(db, proyecto_id=proyecto_id)
     if db_proyecto is None:
         raise HTTPException(status_code=404, detail="Proyecto no encontrado")
@@ -280,6 +515,7 @@ def delete_cwa(
     cwa_id: int,
     db: Session = Depends(get_db)
 ):
+    """Eliminar un CWA"""
     db_proyecto = crud.get_proyecto(db, proyecto_id=proyecto_id)
     if db_proyecto is None:
         raise HTTPException(status_code=404, detail="Proyecto no encontrado")
@@ -307,6 +543,7 @@ def read_cwas(
     plot_plan_id: int,
     db: Session = Depends(get_db)
 ):
+    """Obtener CWAs de un plot plan"""
     db_proyecto = crud.get_proyecto(db, proyecto_id=proyecto_id)
     if db_proyecto is None:
         raise HTTPException(status_code=404, detail="Proyecto no encontrado")
@@ -321,7 +558,7 @@ def read_cwas(
     return db.query(models.CWA).filter(models.CWA.plot_plan_id == plot_plan_id).all()
 
 @router.put("/{proyecto_id}/plot_plans/{plot_plan_id}/cwa/{cwa_id}/geometry")
-def update_cwa_geometry(
+async def update_cwa_geometry(
     proyecto_id: int,
     plot_plan_id: int,
     cwa_id: int,
@@ -329,6 +566,7 @@ def update_cwa_geometry(
     shape_data: str = Form(...),
     db: Session = Depends(get_db)
 ):
+    """Actualizar geometría de un CWA"""
     db_proyecto = crud.get_proyecto(db, proyecto_id)
     if not db_proyecto:
         raise HTTPException(status_code=404, detail="Proyecto no encontrado")
@@ -338,28 +576,45 @@ def update_cwa_geometry(
         raise HTTPException(status_code=404, detail="CWA no encontrado")
     
     try:
+        # Parsear el JSON
         shape_data_dict = json.loads(shape_data)
+        
+        # Actualizar en BD
         updated_cwa = crud.update_cwa_geometry(db, cwa_id, shape_type, shape_data_dict)
-        return updated_cwa
+        
+        # Devolver respuesta serializada
+        return {
+            "id": updated_cwa.id,
+            "nombre": updated_cwa.nombre,
+            "codigo": updated_cwa.codigo,
+            "shape_type": updated_cwa.shape_type,
+            "shape_data": updated_cwa.shape_data,
+            "plot_plan_id": updated_cwa.plot_plan_id,
+            "prioridad": updated_cwa.prioridad,
+            "es_transversal": updated_cwa.es_transversal
+        }
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=400, detail=f"JSON inválido en shape_data: {str(e)}")
     except Exception as e:
+        print(f"❌ Error en update_cwa_geometry: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 
 # ============================================================================
-# ✨ NUEVO: ENDPOINTS PARA METADATOS DINÁMICOS
+# 6. METADATOS CUSTOM
 # ============================================================================
 
 @router.post("/{proyecto_id}/config/columnas", response_model=dict)
 def crear_columna_personalizada(
     proyecto_id: int,
-    columna: schemas.ColumnaCreate, # Schema correcto importado de schemas.py
+    columna: schemas.ColumnaCreate,
     db: Session = Depends(get_db)
 ):
-    """Crea una nueva definición de metadato para los CWPs del proyecto"""
+    """Crear una columna personalizada"""
     db_proyecto = crud.get_proyecto(db, proyecto_id=proyecto_id)
     if not db_proyecto:
         raise HTTPException(status_code=404, detail="Proyecto no encontrado")
 
-    nueva_col = CWPColumnaMetadata(
+    nueva_col = models.CWPColumnaMetadata(
         nombre=columna.nombre,
         tipo_dato=columna.tipo_dato,
         opciones_json=columna.opciones,
@@ -375,11 +630,86 @@ def obtener_columnas_personalizadas(
     proyecto_id: int,
     db: Session = Depends(get_db)
 ):
-    """Obtiene la lista de columnas configuradas"""
+    """Obtener columnas personalizadas"""
     db_proyecto = crud.get_proyecto(db, proyecto_id=proyecto_id)
     if not db_proyecto:
         raise HTTPException(status_code=404, detail="Proyecto no encontrado")
 
-    return db.query(CWPColumnaMetadata).filter(
-        CWPColumnaMetadata.proyecto_id == proyecto_id
+    return db.query(models.CWPColumnaMetadata).filter(
+        models.CWPColumnaMetadata.proyecto_id == proyecto_id
     ).all()
+
+@router.put("/{proyecto_id}/config/columnas/{columna_id}", response_model=schemas.ColumnaResponse)
+def actualizar_columna_personalizada(
+    proyecto_id: int,
+    columna_id: int,
+    columna_update: schemas.ColumnaUpdate,
+    db: Session = Depends(get_db)
+):
+    """Actualizar una columna personalizada"""
+    print(f"\n{'='*60}")
+    print(f"📝 ACTUALIZAR COLUMNA")
+    print(f"{'='*60}")
+    print(f"Proyecto ID: {proyecto_id}")
+    print(f"Columna ID: {columna_id}")
+    
+    db_proyecto = crud.get_proyecto(db, proyecto_id=proyecto_id)
+    if not db_proyecto:
+        raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+    
+    db_columna = db.query(models.CWPColumnaMetadata).filter(
+        models.CWPColumnaMetadata.id == columna_id,
+        models.CWPColumnaMetadata.proyecto_id == proyecto_id
+    ).first()
+    
+    if not db_columna:
+        raise HTTPException(status_code=404, detail="Columna no encontrada")
+    
+    # Actualizar campos
+    update_data = columna_update.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        if field == "opciones":
+            setattr(db_columna, "opciones_json", value)
+        else:
+            setattr(db_columna, field, value)
+    
+    db.commit()
+    db.refresh(db_columna)
+    
+    print(f"✅ Columna actualizada: {db_columna.nombre}")
+    print(f"{'='*60}\n")
+    
+    return db_columna
+
+@router.delete("/{proyecto_id}/config/columnas/{columna_id}")
+def eliminar_columna_personalizada(
+    proyecto_id: int,
+    columna_id: int,
+    db: Session = Depends(get_db)
+):
+    """Eliminar una columna personalizada"""
+    print(f"\n{'='*60}")
+    print(f"🗑️ ELIMINAR COLUMNA")
+    print(f"{'='*60}")
+    print(f"Proyecto ID: {proyecto_id}")
+    print(f"Columna ID: {columna_id}")
+    
+    db_proyecto = crud.get_proyecto(db, proyecto_id=proyecto_id)
+    if not db_proyecto:
+        raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+    
+    db_columna = db.query(models.CWPColumnaMetadata).filter(
+        models.CWPColumnaMetadata.id == columna_id,
+        models.CWPColumnaMetadata.proyecto_id == proyecto_id
+    ).first()
+    
+    if not db_columna:
+        raise HTTPException(status_code=404, detail="Columna no encontrada")
+    
+    db.delete(db_columna)
+    db.commit()
+    
+    print(f"✅ Columna eliminada exitosamente")
+    print(f"{'='*60}\n")
+    
+    return {"message": "Columna eliminada exitosamente", "id": columna_id}

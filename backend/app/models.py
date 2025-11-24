@@ -85,8 +85,8 @@ class CWP(Base):
     descripcion = Column(Text, nullable=True)
     cwa_id = Column(Integer, ForeignKey("cwa.id"))
     disciplina_id = Column(Integer, ForeignKey("disciplinas.id"))
-    cwa = relationship("CWA", back_populates="cwps")
-    disciplina = relationship("Disciplina")
+    cwa = Column(Integer, ForeignKey("cwa.id"))  # ✅ Debe ser 'cwa_id'
+    disciplina = Column(Integer, ForeignKey("disciplinas.id"))
     paquetes = relationship("Paquete", back_populates="cwp", cascade="all, delete-orphan")
     
     # ✅ Gestión de Construcción
