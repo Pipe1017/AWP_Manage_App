@@ -1,5 +1,3 @@
-# backend/app/routers/proyectos.py
-
 from fastapi import APIRouter, Depends, HTTPException, Form, File, UploadFile
 import os
 import shutil
@@ -7,7 +5,6 @@ import json
 from datetime import datetime
 from sqlalchemy.orm import Session
 from typing import List
-# ✅ Importamos todo lo necesario
 from .. import models, schemas, crud
 from ..database import get_db
 from ..models import CWPColumnaMetadata
@@ -30,10 +27,6 @@ def create_proyecto(proyecto: schemas.ProyectoCreate, db: Session = Depends(get_
 
 @router.get("/", response_model=List[schemas.ProyectoResponse])
 def read_proyectos(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    # ✅ CORRECCIÓN: Simplificación radical.
-    # Al devolver los objetos de SQLAlchemy directamente, Pydantic se encarga 
-    # de leer las relaciones (disciplinas, plot_plans) automáticamente 
-    # gracias a "from_attributes = True" en los schemas.
     return crud.get_proyectos(db, skip=skip, limit=limit)
 
 @router.get("/{proyecto_id}", response_model=schemas.ProyectoResponse)
@@ -41,8 +34,23 @@ def read_proyecto(proyecto_id: int, db: Session = Depends(get_db)):
     db_proyecto = crud.get_proyecto(db, proyecto_id=proyecto_id)
     if db_proyecto is None:
         raise HTTPException(status_code=404, detail="Proyecto no encontrado")
-    # Igual aquí: No necesitamos rellenar manualmente las listas.
     return db_proyecto
+
+# ✅ UPDATE: Editar Proyecto
+@router.put("/{proyecto_id}", response_model=schemas.ProyectoResponse)
+def update_proyecto_endpoint(proyecto_id: int, proyecto: schemas.ProyectoCreate, db: Session = Depends(get_db)):
+    updated = crud.update_proyecto(db, proyecto_id, proyecto)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+    return updated
+
+# ✅ DELETE: Eliminar Proyecto
+@router.delete("/{proyecto_id}")
+def delete_proyecto_endpoint(proyecto_id: int, db: Session = Depends(get_db)):
+    success = crud.delete_proyecto(db, proyecto_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+    return {"message": "Proyecto eliminado correctamente"}
 
 # ============================================================================
 # 2. ENDPOINTS DE DISCIPLINAS
@@ -159,11 +167,9 @@ def create_plot_plan(
     file_url_db = f"/uploads/{file_name}"
     
     try:
-        print(f"💾 Guardando archivo en: {file_path_absolute}")
         with open(file_path_absolute, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
     except Exception as e:
-        print(f"❌ Error guardando archivo: {e}")
         raise HTTPException(status_code=500, detail=f"Error guardando archivo: {str(e)}")
     
     plot_plan_data = schemas.PlotPlanCreate(
@@ -182,7 +188,6 @@ def read_plot_plans(proyecto_id: int, db: Session = Depends(get_db)):
 
 @router.get("/{proyecto_id}/plot_plans/{plot_plan_id}", response_model=dict)
 def get_plot_plan_with_cwas(proyecto_id: int, plot_plan_id: int, db: Session = Depends(get_db)):
-    # Este endpoint devuelve un dict específico con jerarquía, no usamos schema directo
     db_proyecto = crud.get_proyecto(db, proyecto_id)
     if not db_proyecto:
         raise HTTPException(status_code=404, detail="Proyecto no encontrado")
@@ -191,11 +196,8 @@ def get_plot_plan_with_cwas(proyecto_id: int, plot_plan_id: int, db: Session = D
     if not db_plot_plan or db_plot_plan.proyecto_id != proyecto_id:
         raise HTTPException(status_code=404, detail="Plot Plan no encontrado")
     
-    # Usamos la función optimizada que ya tiene toda la jerarquía
     cwas = crud.get_cwas_por_plot_plan(db, plot_plan_id)
     
-    # Construimos respuesta manual para incluir todo el árbol de dependencias si es necesario
-    # o usamos el helper de jerarquía
     return {
         "id": db_plot_plan.id,
         "nombre": db_plot_plan.nombre,
@@ -224,7 +226,7 @@ def get_plot_plan_with_cwas(proyecto_id: int, plot_plan_id: int, db: Session = D
     }
 
 # ============================================================================
-# 5. ENDPOINTS DE CWA
+# 5. ENDPOINTS DE CWA (CON VALIDACIÓN CORREGIDA)
 # ============================================================================
 
 @router.post("/{proyecto_id}/plot_plans/{plot_plan_id}/cwa/", response_model=schemas.CWAResponse)
@@ -245,9 +247,14 @@ def create_cwa(
     if db_plot_plan is None:
         raise HTTPException(status_code=404, detail="Plot plan no encontrado")
     
-    db_cwa_existing = db.query(models.CWA).filter(models.CWA.codigo == cwa.codigo).first()
-    if db_cwa_existing:
-        raise HTTPException(status_code=400, detail="El código del CWA ya existe")
+    # ⚠️ VALIDACIÓN CORRECTA: Chequear código solo dentro de ESTE Plot Plan
+    existing = db.query(models.CWA).filter(
+        models.CWA.codigo == cwa.codigo, 
+        models.CWA.plot_plan_id == plot_plan_id
+    ).first()
+    
+    if existing:
+        raise HTTPException(status_code=400, detail=f"El código '{cwa.codigo}' ya existe en este plano.")
     
     return crud.create_cwa(db=db, cwa=cwa, plot_plan_id=plot_plan_id)
 
@@ -345,13 +352,13 @@ def update_cwa_geometry(
         raise HTTPException(status_code=400, detail=str(e))
 
 # ============================================================================
-# ✨ NUEVO: ENDPOINTS PARA METADATOS DINÁMICOS
+# 6. ENDPOINTS PARA METADATOS DINÁMICOS
 # ============================================================================
 
 @router.post("/{proyecto_id}/config/columnas", response_model=dict)
 def crear_columna_personalizada(
     proyecto_id: int,
-    columna: schemas.ColumnaCreate, # Schema correcto importado de schemas.py
+    columna: schemas.ColumnaCreate,
     db: Session = Depends(get_db)
 ):
     """Crea una nueva definición de metadato para los CWPs del proyecto"""
