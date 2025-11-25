@@ -1,5 +1,3 @@
-# backend/app/main.py
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -16,10 +14,23 @@ app = FastAPI(
     version="2.0.0"
 )
 
-# Configuración de CORS
+# ==========================================
+# 🛡️ CONFIGURACIÓN DE CORS (ESPECÍFICA)
+# ==========================================
+# Definimos explícitamente quién puede conectarse.
+# El "Origin" es la dirección del FRONTEND (Puerto 3000).
+
+origins = [
+    "http://localhost:3000",       # Para desarrollo local en tu Mac
+    "http://127.0.0.1:3000",       # Alternativa local
+    "http://192.168.1.4:3000",     # ✅ TU IP DE CASA (Frontend)
+    # Si despliegas en la empresa, agrega aquí esa IP:
+    # "http://10.XX.XX.XX:3000",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # En producción cambiar por la IP del frontend
+    allow_origins=origins,     # Usamos la lista explícita en lugar de regex
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -41,7 +52,6 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 print(f"📂 [Main] Montando uploads desde: {UPLOAD_DIR}")
 
 # 4. Montar la ruta para que sea accesible vía web
-# Ejemplo: http://localhost:8000/uploads/imagen.jpg -> /app/uploads/imagen.jpg
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 # ==========================================
