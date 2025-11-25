@@ -4,55 +4,93 @@ import React, { useState, useEffect } from 'react';
 import client from '../../../api/axios';
 
 function AWPTableConsolidada({ plotPlanId, proyecto, filteredCWAId, onDataChange }) {
-  // ... (ESTADOS Y LÓGICA DE DATOS SE MANTIENEN IGUAL) ...
+  // ============================================================================
+  // 1. ESTADO DE DATOS
+  // ============================================================================
   const [jerarquia, setJerarquia] = useState(null);
   const [loading, setLoading] = useState(true);
   const [customColumns, setCustomColumns] = useState([]);
+
+  // ============================================================================
+  // 2. ESTADOS DE FILTROS Y EXPANSIÓN
+  // ============================================================================
   const [filters, setFilters] = useState({ codigo: '', nombre: '' });
   const [expandedCWAs, setExpandedCWAs] = useState(new Set()); 
   const [expandedCWPs, setExpandedCWPs] = useState(new Set());
   const [expandedPaquetes, setExpandedPaquetes] = useState(new Set());
+
+  // ============================================================================
+  // 3. ITEMS TEMPORALES (Batch Create)
+  // ============================================================================
   const [pendingItems, setPendingItems] = useState({});
-  const [modals, setModals] = useState({ cwp: false, pkg: false, link: false, import: false, editItem: false });
+  
+  // ============================================================================
+  // 4. MODALES Y FORMULARIOS
+  // ============================================================================
+  const [modals, setModals] = useState({ 
+    cwp: false, 
+    pkg: false, 
+    link: false, 
+    import: false, 
+    editItem: false 
+  });
+  
   const [isEditingCWP, setIsEditingCWP] = useState(false);
   const [editingCWPId, setEditingCWPId] = useState(null);
   const [selectedParent, setSelectedParent] = useState(null);
   const [formData, setFormData] = useState({});
+  
   const [importFile, setImportFile] = useState(null);
   const [importing, setImporting] = useState(false);
+
   const [transversalItems, setTransversalItems] = useState([]);
   const [selectedLinkItems, setSelectedLinkItems] = useState(new Set());
   const [linkFilter, setLinkFilter] = useState("ALL");
+
   const [editingItem, setEditingItem] = useState(null);
   const [itemTipos, setItemTipos] = useState([]);
 
-  useEffect(() => { if (proyecto?.id) loadData(); }, [plotPlanId, proyecto.id]);
+  // ============================================================================
+  // 5. CARGA DE DATOS
+  // ============================================================================
+  useEffect(() => {
+    if (proyecto?.id) {
+        loadData();
+    }
+  }, [plotPlanId, proyecto.id]);
 
   const loadData = async () => {
     if (!jerarquia) setLoading(true);
+    
     try {
       const colsRes = await client.get(`/proyectos/${proyecto.id}/config/columnas`);
       setCustomColumns(colsRes.data);
+
       const url = `/awp-nuevo/proyectos/${proyecto.id}/jerarquia-global`;
       const res = await client.get(url);
       setJerarquia(res.data);
+      
+      // ✅ CAMBIO: Lógica de expansión por defecto
       if (!jerarquia && res.data.cwas) {
+        // Solo expandimos CWAs (Nivel 1)
         const allCwaIds = new Set(res.data.cwas.map(c => c.id));
-        const allCwpIds = new Set();
-        const allPkgIds = new Set();
-        res.data.cwas.forEach(c => {
-            c.cwps?.forEach(p => {
-                allCwpIds.add(p.id);
-                p.paquetes?.forEach(pkg => allPkgIds.add(pkg.id));
-            });
-        });
         setExpandedCWAs(allCwaIds);
-        setExpandedCWPs(allCwpIds);
-        setExpandedPaquetes(allPkgIds);
+        
+        // Los niveles inferiores inician cerrados (vacíos)
+        setExpandedCWPs(new Set());
+        setExpandedPaquetes(new Set());
       }
-    } catch (error) { console.error(error); } finally { setLoading(false); }
+      
+    } catch (error) { 
+      console.error(error); 
+    } finally { 
+      setLoading(false); 
+    }
   };
 
+  // ============================================================================
+  // 6. LÓGICA DE FILTRADO
+  // ============================================================================
   const cwasToRender = jerarquia?.cwas?.filter(cwa => {
     const matchText = !filters.codigo || cwa.codigo.toLowerCase().includes(filters.codigo.toLowerCase());
     const matchSelection = !filteredCWAId || cwa.id === filteredCWAId;
@@ -71,18 +109,50 @@ function AWPTableConsolidada({ plotPlanId, proyecto, filteredCWAId, onDataChange
     }
   }, [filteredCWAId, jerarquia]);
 
-  // Helpers
-  const toggle = (set, id, setFn) => { const newSet = new Set(set); newSet.has(id) ? newSet.delete(id) : newSet.add(id); setFn(newSet); };
-  const updateCWAField = async (id, field, value) => { try { await client.put(`/awp-nuevo/cwa/${id}`, { [field]: value }); loadData(); } catch(e) { console.error(e); } };
-  const updateCWPField = async (id, field, value) => { try { await client.put(`/awp-nuevo/cwp/${id}`, { [field]: value }); loadData(); } catch(e) { console.error(e); } };
-  const updateItemForecast = async (id, date) => { try { await client.put(`/awp-nuevo/item/${id}`, { forecast_fin: date }); loadData(); } catch(e) { console.error(e); } };
+  // ============================================================================
+  // 7. HELPERS & UPDATES
+  // ============================================================================
+  const toggle = (set, id, setFn) => { 
+    const newSet = new Set(set); 
+    newSet.has(id) ? newSet.delete(id) : newSet.add(id); 
+    setFn(newSet); 
+  };
 
-  // Modales handlers
+  const updateCWAField = async (id, field, value) => {
+    try { await client.put(`/awp-nuevo/cwa/${id}`, { [field]: value }); loadData(); } catch(e) { console.error(e); }
+  };
+
+  const updateCWPField = async (id, field, value) => {
+    try { await client.put(`/awp-nuevo/cwp/${id}`, { [field]: value }); loadData(); } catch(e) { console.error(e); }
+  };
+
+  // ✅ NUEVO: Helper para actualizar metadatos directamente desde la tabla
+  const updateCWPMetadata = async (id, key, value) => {
+    try { 
+        // Enviamos solo el fragmento JSON que cambió, el backend hace el merge
+        await client.put(`/awp-nuevo/cwp/${id}`, { metadata_json: { [key]: value } }); 
+        loadData(); 
+    } catch(e) { console.error(e); }
+  };
+
+  const updateItemForecast = async (id, date) => {
+    try { await client.put(`/awp-nuevo/item/${id}`, { forecast_fin: date }); loadData(); } catch(e) { console.error(e); }
+  };
+
+  // ============================================================================
+  // 8. HANDLERS MODALES
+  // ============================================================================
   const openCWPModal = (cwa=null, cwp=null) => {
-    if(cwp) { setIsEditingCWP(true); setEditingCWPId(cwp.id); setFormData({ nombre: cwp.nombre, disciplina_id: cwp.disciplina_id, metadata: cwp.metadata_json || {} }); } 
-    else { setIsEditingCWP(false); setSelectedParent(cwa); setFormData({ nombre: '', disciplina_id: proyecto.disciplinas?.[0]?.id || '', metadata: {} }); }
+    if(cwp) { 
+      setIsEditingCWP(true); setEditingCWPId(cwp.id); 
+      setFormData({ nombre: cwp.nombre, disciplina_id: cwp.disciplina_id, metadata: cwp.metadata_json || {} }); 
+    } else { 
+      setIsEditingCWP(false); setSelectedParent(cwa); 
+      setFormData({ nombre: '', disciplina_id: proyecto.disciplinas?.[0]?.id || '', metadata: {} }); 
+    }
     setModals({...modals, cwp: true});
   };
+
   const handleSaveCWP = async () => {
     try {
       const payload = { ...formData, area_id: selectedParent?.id || 0, descripcion: '', metadata_json: formData.metadata };
@@ -91,10 +161,24 @@ function AWPTableConsolidada({ plotPlanId, proyecto, filteredCWAId, onDataChange
       setModals({...modals, cwp: false}); loadData(); if(onDataChange) onDataChange();
     } catch(e) { alert("Error: " + e.message); }
   };
-  const handleDeleteCWP = async (id) => { if(!confirm("¿Eliminar CWP?")) return; try { await client.delete(`/awp-nuevo/cwp/${id}`); loadData(); } catch(e) { alert("Error borrando CWP"); } };
-  const openPkgModal = (cwp, tipo) => { setSelectedParent(cwp); setFormData({ nombre: '', tipo, responsable: 'Firma' }); setModals({...modals, pkg: true}); };
-  const handleSavePkg = async () => { try { await client.post(`/awp-nuevo/cwp/${selectedParent.id}/paquete`, formData); setModals({...modals, pkg: false}); loadData(); } catch(e) { alert("Error creando paquete"); } };
-  const handleDeletePkg = async (id) => { if(confirm("¿Borrar Paquete?")) { await client.delete(`/awp-nuevo/paquete/${id}`); loadData(); } };
+
+  const handleDeleteCWP = async (id) => {
+    if(!confirm("¿Eliminar CWP y todo su contenido?")) return;
+    try { await client.delete(`/awp-nuevo/cwp/${id}`); loadData(); } catch(e) { alert("Error borrando CWP"); }
+  };
+
+  const openPkgModal = (cwp, tipo) => { 
+    setSelectedParent(cwp); setFormData({ nombre: '', tipo, responsable: 'Firma' }); setModals({...modals, pkg: true}); 
+  };
+
+  const handleSavePkg = async () => { 
+    try { await client.post(`/awp-nuevo/cwp/${selectedParent.id}/paquete`, formData); setModals({...modals, pkg: false}); loadData(); } catch(e) { alert("Error creando paquete"); } 
+  };
+
+  const handleDeletePkg = async (id) => { 
+    if(confirm("¿Borrar Paquete y sus items?")) { await client.delete(`/awp-nuevo/paquete/${id}`); loadData(); } 
+  };
+
   const addBatch = (pkgId) => {
     const count = parseInt(prompt("Cantidad de items:", "5")) || 0; 
     if(count <= 0) return;
@@ -103,19 +187,59 @@ function AWPTableConsolidada({ plotPlanId, proyecto, filteredCWAId, onDataChange
     setPendingItems({...pendingItems, [pkgId]: [...current, ...newRows]});
     setExpandedPaquetes(prev => new Set(prev).add(pkgId));
   };
-  const changeBatch = (pkgId, tempId, val) => { const list = pendingItems[pkgId].map(i => i.id === tempId ? {...i, nombre: val} : i); setPendingItems({...pendingItems, [pkgId]: list}); };
+
+  const changeBatch = (pkgId, tempId, val) => { 
+    const list = pendingItems[pkgId].map(i => i.id === tempId ? {...i, nombre: val} : i); 
+    setPendingItems({...pendingItems, [pkgId]: list}); 
+  };
+
   const saveBatch = async (pkg) => {
     const toSave = pendingItems[pkg.id]?.filter(i => i.nombre.trim()) || [];
     if(!toSave.length) return;
-    try { await Promise.all(toSave.map(i => client.post(`/awp-nuevo/paquete/${pkg.id}/item`, { nombre: i.nombre }))); const newP = {...pendingItems}; delete newP[pkg.id]; setPendingItems(newP); loadData(); } catch(e) { alert("Error guardando lote"); }
+    try {
+      await Promise.all(toSave.map(i => client.post(`/awp-nuevo/paquete/${pkg.id}/item`, { nombre: i.nombre })));
+      const newP = {...pendingItems}; delete newP[pkg.id]; setPendingItems(newP); loadData();
+    } catch(e) { alert("Error guardando lote de items"); }
   };
-  const handleDeleteItem = async (id) => { if(confirm("¿Borrar item?")) { await client.delete(`/awp-nuevo/item/${id}`); loadData(); } };
-  const openLinkModal = async (pkg) => { setSelectedParent(pkg); const res = await client.get(`/awp-nuevo/proyectos/${proyecto.id}/items-disponibles?filter_type=ALL`); setTransversalItems(res.data); setSelectedLinkItems(new Set()); setLinkFilter("ALL"); setModals({...modals, link: true}); };
-  const handleLinkItems = async () => { await client.post(`/awp-nuevo/paquete/${selectedParent.id}/vincular-items`, { source_item_ids: Array.from(selectedLinkItems) }); setModals({...modals, link: false}); loadData(); };
-  const handleExport = () => window.open(`${client.defaults.baseURL}/awp-nuevo/exportar-csv/${proyecto.id}`, '_blank');
-  const handleImport = async (e) => { e.preventDefault(); if(!importFile) return; setImporting(true); const fd = new FormData(); fd.append('file', importFile); try { await client.post(`/awp-nuevo/importar-csv/${proyecto.id}`, fd); alert("Importación exitosa"); setModals({...modals, import: false}); loadData(); if(onDataChange) onDataChange(); } catch(e) { alert("Error: " + (e.response?.data?.detail || e.message)); } finally { setImporting(false); } };
 
-  if (loading && !jerarquia) return <div className="p-10 text-center text-hatch-blue">Cargando...</div>;
+  const handleDeleteItem = async (id) => { 
+    if(confirm("¿Borrar este item?")) { await client.delete(`/awp-nuevo/item/${id}`); loadData(); } 
+  };
+
+  const openLinkModal = async (pkg) => { 
+    setSelectedParent(pkg); 
+    const res = await client.get(`/awp-nuevo/proyectos/${proyecto.id}/items-disponibles?filter_type=ALL`); 
+    setTransversalItems(res.data); setSelectedLinkItems(new Set()); setLinkFilter("ALL"); setModals({...modals, link: true}); 
+  };
+
+  const handleLinkItems = async () => { 
+    await client.post(`/awp-nuevo/paquete/${selectedParent.id}/vincular-items`, { source_item_ids: Array.from(selectedLinkItems) }); 
+    setModals({...modals, link: false}); loadData(); 
+  };
+
+  const handleExport = () => window.open(`${client.defaults.baseURL}/awp-nuevo/exportar-csv/${proyecto.id}`, '_blank');
+
+  const handleImport = async (e) => { 
+    e.preventDefault(); 
+    if(!importFile) return; 
+    setImporting(true); const fd = new FormData(); fd.append('file', importFile); 
+    try { 
+      await client.post(`/awp-nuevo/importar-csv/${proyecto.id}`, fd); 
+      alert("✅ Importación exitosa"); setModals({...modals, import: false}); loadData(); if(onDataChange) onDataChange(); 
+    } catch(e) { alert("Error: " + (e.response?.data?.detail || e.message)); } finally { setImporting(false); } 
+  };
+
+  // ============================================================================
+  // 9. RENDER
+  // ============================================================================
+  if (loading && !jerarquia) {
+    return (
+      <div className="p-10 text-center">
+        <div className="w-12 h-12 border-4 border-hatch-orange border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+        <p className="text-hatch-blue font-semibold">Cargando estructura AWP...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full gap-2 bg-white">
@@ -138,32 +262,23 @@ function AWPTableConsolidada({ plotPlanId, proyecto, filteredCWAId, onDataChange
         <table className="text-left border-collapse relative w-full min-w-max">
           
           {/* HEADER FIXED (STICKY) */}
-          {/* Nota: Quitamos sticky de thead y lo dejamos solo en th para mayor compatibilidad */}
           <thead className="text-[10px] uppercase font-bold text-hatch-blue bg-hatch-gray">
             <tr className="h-8">
-              {/* 1. Expandir (Fija: Left 0, Top 0, Z-50) */}
               <th className="p-1 w-8 min-w-[32px] sticky left-0 top-0 z-50 bg-hatch-gray border-b border-r border-hatch-gray-dark text-center"></th>
-              
-              {/* 2. Jerarquía (Fija: Left 8, Top 0, Z-50) */}
               <th className="p-1 w-72 min-w-[288px] sticky left-8 top-0 z-50 bg-hatch-gray border-r-2 border-b border-hatch-gray-dark shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
                 <div className="flex items-center gap-2">
                   <span>Jerarquía</span>
                   <input className="bg-white border border-gray-300 rounded px-1 py-0.5 text-hatch-blue font-normal text-[10px] w-full focus:border-hatch-orange outline-none h-5" placeholder="Filtro..." onChange={e => setFilters({...filters, codigo: e.target.value})} />
                 </div>
               </th>
-              
-              {/* Datos Scrollables (Sticky Top 0, Z-40) */}
               <th className="p-1 w-24 min-w-[96px] text-center border-b border-hatch-gray-dark bg-hatch-gray sticky top-0 z-40">Prioridad<br/><span className="text-[8px] font-normal text-gray-600">(Área)</span></th>
               <th className="p-1 w-12 min-w-[48px] text-center border-b border-hatch-gray-dark bg-hatch-gray sticky top-0 z-40">Seq</th>
               <th className="p-1 w-40 min-w-[160px] text-center border-b border-hatch-gray-dark bg-hatch-gray sticky top-0 z-40">Forecasts<br/><span className="text-[8px] font-normal text-gray-600">(Inicio ➜ Fin)</span></th>
-              
-              {/* Columnas Dinámicas (Sticky Top 0, Z-40) */}
               {customColumns.map(c => (
                 <th key={c.id} className="p-1 border-l border-b border-hatch-gray-dark text-hatch-orange whitespace-normal w-32 min-w-[128px] break-words bg-hatch-gray align-top sticky top-0 z-40">
                   {c.nombre}
                 </th>
               ))}
-              
               <th className="p-1 text-right border-b border-hatch-gray-dark w-32 min-w-[128px] bg-hatch-gray sticky top-0 z-40">Acciones</th>
             </tr>
           </thead>
@@ -233,11 +348,27 @@ function AWPTableConsolidada({ plotPlanId, proyecto, filteredCWAId, onDataChange
                               <input type="date" className="border border-gray-300 rounded w-full text-[9px] px-0.5 py-0 bg-white h-6" value={cwp.forecast_fin?.split('T')[0] || ''} onChange={e => updateCWPField(cwp.id, 'forecast_fin', e.target.value)} />
                             </div>
                           </td>
+                          {/* ✅ RENDERIZADO INTELIGENTE DE METADATOS */}
                           {customColumns.map(c => (
                             <td key={c.id} className={`p-1 border-l border-gray-200 align-top ${cwpBg}`}>
-                              <span className="text-[10px] bg-white px-1 py-0.5 rounded border border-gray-200 block w-full min-h-[20px] break-words">
-                                {cwp.metadata_json?.[c.nombre] || ''}
-                              </span>
+                              {c.tipo_dato === 'SELECCION' ? (
+                                <select
+                                    className="w-full border border-gray-300 rounded text-[10px] h-6 bg-white focus:border-hatch-orange outline-none"
+                                    value={cwp.metadata_json?.[c.nombre] || ''}
+                                    onChange={e => updateCWPMetadata(cwp.id, c.nombre, e.target.value)}
+                                >
+                                    <option value="">-</option>
+                                    {c.opciones_json?.map(opt => (
+                                        <option key={opt} value={opt}>{opt}</option>
+                                    ))}
+                                </select>
+                              ) : (
+                                <input
+                                    className="w-full border border-gray-300 rounded text-[10px] h-6 bg-white px-1 focus:border-hatch-orange outline-none"
+                                    value={cwp.metadata_json?.[c.nombre] || ''}
+                                    onChange={e => updateCWPMetadata(cwp.id, c.nombre, e.target.value)}
+                                />
+                              )}
                             </td>
                           ))}
                           <td className={`p-1 text-right align-top ${cwpBg}`}>
@@ -375,7 +506,14 @@ function AWPTableConsolidada({ plotPlanId, proyecto, filteredCWAId, onDataChange
                         {customColumns.map(c => (
                             <div key={c.id} className="mb-1">
                                 <label className="text-[10px] block text-gray-600">{c.nombre}</label>
-                                <input className="w-full border p-1 rounded text-xs" value={formData.metadata?.[c.nombre] || ''} onChange={e => setFormData({...formData, metadata: {...formData.metadata, [c.nombre]: e.target.value}})} />
+                                {c.tipo_dato === 'SELECCION' ? (
+                                    <select className="w-full border p-1 rounded text-xs" value={formData.metadata?.[c.nombre] || ''} onChange={e => setFormData({...formData, metadata: {...formData.metadata, [c.nombre]: e.target.value}})}>
+                                        <option value="">-</option>
+                                        {c.opciones_json?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                    </select>
+                                ) : (
+                                    <input className="w-full border p-1 rounded text-xs" value={formData.metadata?.[c.nombre] || ''} onChange={e => setFormData({...formData, metadata: {...formData.metadata, [c.nombre]: e.target.value}})} />
+                                )}
                             </div>
                         ))}
                     </div>

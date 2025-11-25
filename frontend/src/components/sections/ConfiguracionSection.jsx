@@ -1,5 +1,3 @@
-// frontend/src/components/sections/ConfiguracionSection.jsx
-
 import React, { useState, useEffect } from 'react';
 import client from '../../api/axios.js';
 
@@ -7,18 +5,17 @@ function ConfiguracionSection({ proyecto, onProyectoUpdate }) {
   const [activeTab, setActiveTab] = useState('disciplinas');
   const [loading, setLoading] = useState(false);
   
-  // Estados
+  // --- ESTADOS FORMULARIOS ---
   const [disciplinaForm, setDisciplinaForm] = useState({ nombre: '', codigo: '' });
-  const [cwaForm, setCwaForm] = useState({
-    nombre: '',
-    codigo: '',
-    descripcion: '',
-    es_transversal: false,
-    plot_plan_id: ''
-  });
+  const [editingDisciplina, setEditingDisciplina] = useState(null);
+
+  const [cwaForm, setCwaForm] = useState({ nombre: '', codigo: '', descripcion: '', es_transversal: false, plot_plan_id: '' });
   const [editingCWA, setEditingCWA] = useState(null);
+
   const [columnasMetadata, setColumnasMetadata] = useState([]);
+  // Estado para editar Metadata
   const [metaForm, setMetaForm] = useState({ nombre: '', tipo_dato: 'TEXTO', opciones: '' });
+  const [editingMeta, setEditingMeta] = useState(null);
 
   useEffect(() => {
     if (activeTab === 'metadata') {
@@ -30,123 +27,120 @@ function ConfiguracionSection({ proyecto, onProyectoUpdate }) {
     try {
       const res = await client.get(`/proyectos/${proyecto.id}/config/columnas`);
       setColumnasMetadata(res.data);
-    } catch (err) {
-      console.error("Error cargando metadatos:", err);
-    }
+    } catch (err) { console.error(err); }
   };
 
   const recargarProyecto = async () => {
     try {
       const response = await client.get(`/proyectos/${proyecto.id}`);
       onProyectoUpdate(response.data);
-    } catch (err) {
-      console.error("Error recargando proyecto:", err);
-    }
+    } catch (err) { console.error(err); }
   };
 
-  const handleCreateDisciplina = async (e) => {
+  // --- HANDLERS DISCIPLINAS ---
+  const handleSaveDisciplina = async (e) => {
     e.preventDefault();
-    if (!disciplinaForm.nombre || !disciplinaForm.codigo) return alert("Completa todos los campos");
+    if (!disciplinaForm.nombre || !disciplinaForm.codigo) return;
     
     setLoading(true);
     try {
-      await client.post(`/proyectos/${proyecto.id}/disciplinas/`, disciplinaForm);
+      if (editingDisciplina) {
+        await client.put(`/proyectos/${proyecto.id}/disciplinas/${editingDisciplina.id}`, disciplinaForm);
+        alert("✅ Disciplina actualizada");
+      } else {
+        await client.post(`/proyectos/${proyecto.id}/disciplinas/`, disciplinaForm);
+        alert("✅ Disciplina creada");
+      }
       setDisciplinaForm({ nombre: '', codigo: '' });
+      setEditingDisciplina(null);
       await recargarProyecto();
-      alert("✅ Disciplina creada");
-    } catch (err) {
-      alert("Error: " + (err.response?.data?.detail || err.message));
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) { alert("Error: " + err.message); } finally { setLoading(false); }
   };
 
-  const handleCreateCWA = async (e) => {
-    e.preventDefault();
-    if (!cwaForm.nombre || !cwaForm.codigo || !cwaForm.plot_plan_id) return alert("Completa campos obligatorios");
-    
-    setLoading(true);
+  const handleDeleteDisciplina = async (id) => {
+    if (!confirm("¿Eliminar disciplina? Se perderá la asociación en los paquetes.")) return;
     try {
-      await client.post(`/proyectos/${proyecto.id}/plot_plans/${cwaForm.plot_plan_id}/cwa/`, cwaForm);
-      setCwaForm({ ...cwaForm, nombre: '', codigo: '', descripcion: '', es_transversal: false });
+      await client.delete(`/proyectos/${proyecto.id}/disciplinas/${id}`);
       await recargarProyecto();
-      alert("✅ CWA creado");
-    } catch (err) {
-      alert("Error: " + (err.response?.data?.detail || err.message));
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) { alert("Error eliminando"); }
   };
 
-  const handleUpdateCWA = async (e) => {
+  const startEditDisciplina = (d) => {
+    setEditingDisciplina(d);
+    setDisciplinaForm({ nombre: d.nombre, codigo: d.codigo });
+  };
+
+  // --- HANDLERS CWA ---
+  const handleSaveCWA = async (e) => {
     e.preventDefault();
-    if (!editingCWA) return;
-    
     setLoading(true);
     try {
-      await client.put(
-        `/proyectos/${proyecto.id}/plot_plans/${editingCWA.plot_plan_id}/cwa/${editingCWA.id}`,
-        cwaForm
-      );
-      setCwaForm({ ...cwaForm, nombre: '', codigo: '', descripcion: '', es_transversal: false });
-      setEditingCWA(null);
-      await recargarProyecto();
-      alert("✅ CWA actualizado");
-    } catch (err) {
-      alert("Error: " + (err.response?.data?.detail || err.message));
-    } finally {
-      setLoading(false);
-    }
+        if(editingCWA) {
+            await client.put(`/proyectos/${proyecto.id}/plot_plans/${editingCWA.plot_plan_id}/cwa/${editingCWA.id}`, cwaForm);
+        } else {
+            await client.post(`/proyectos/${proyecto.id}/plot_plans/${cwaForm.plot_plan_id}/cwa/`, cwaForm);
+        }
+        setCwaForm({ ...cwaForm, nombre: '', codigo: '', descripcion: '', es_transversal: false });
+        setEditingCWA(null);
+        await recargarProyecto();
+        alert("✅ CWA Guardado");
+    } catch(err) { alert("Error: " + err.message); } finally { setLoading(false); }
   };
 
   const handleDeleteCWA = async (cwaId, plotPlanId) => {
     if (!confirm("¿Eliminar este CWA?")) return;
-    setLoading(true);
     try {
       await client.delete(`/proyectos/${proyecto.id}/plot_plans/${plotPlanId}/cwa/${cwaId}`);
       await recargarProyecto();
-      alert("✅ CWA eliminado");
-    } catch (err) {
-      alert("Error: " + (err.response?.data?.detail || err.message));
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) { alert("Error: " + err.message); }
   };
 
   const startEditCWA = (cwa, plotPlanId) => {
     setEditingCWA({ ...cwa, plot_plan_id: plotPlanId });
-    setCwaForm({
-      nombre: cwa.nombre,
-      codigo: cwa.codigo,
-      descripcion: cwa.descripcion || '',
-      es_transversal: cwa.es_transversal,
-      plot_plan_id: plotPlanId
-    });
+    setCwaForm({ nombre: cwa.nombre, codigo: cwa.codigo, descripcion: cwa.descripcion || '', es_transversal: cwa.es_transversal, plot_plan_id: plotPlanId });
   };
 
-  const handleCreateMetadata = async (e) => {
+  // --- HANDLERS METADATA ---
+  const handleSaveMetadata = async (e) => {
     e.preventDefault();
-    if (!metaForm.nombre) return alert("Nombre requerido");
-
-    const opcionesArray = metaForm.tipo_dato === 'SELECCION' 
-      ? metaForm.opciones.split(',').map(s => s.trim()) 
-      : [];
-
+    const opcionesArray = metaForm.tipo_dato === 'SELECCION' ? metaForm.opciones.split(',').map(s => s.trim()) : [];
     setLoading(true);
     try {
-      await client.post(`/proyectos/${proyecto.id}/config/columnas`, {
+      const payload = {
         nombre: metaForm.nombre,
         tipo_dato: metaForm.tipo_dato,
         opciones: opcionesArray
-      });
+      };
+
+      if (editingMeta) {
+        await client.put(`/proyectos/${proyecto.id}/config/columnas/${editingMeta.id}`, payload);
+        alert("✅ Columna actualizada (Datos migrados)");
+      } else {
+        await client.post(`/proyectos/${proyecto.id}/config/columnas`, payload);
+        alert("✅ Columna creada");
+      }
+      
       setMetaForm({ nombre: '', tipo_dato: 'TEXTO', opciones: '' });
+      setEditingMeta(null);
       cargarColumnasMetadata();
-      alert("✅ Columna creada");
-    } catch (err) {
-      alert("Error: " + (err.response?.data?.detail || err.message));
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) { alert("Error: " + err.message); } finally { setLoading(false); }
+  };
+
+  const startEditMetadata = (col) => {
+    setEditingMeta(col);
+    setMetaForm({
+        nombre: col.nombre,
+        tipo_dato: col.tipo_dato,
+        opciones: col.opciones_json ? col.opciones_json.join(', ') : ''
+    });
+  };
+
+  const handleDeleteMetadata = async (id) => {
+    if (!confirm("¿Eliminar esta columna? Los datos guardados en los CWPs bajo esta columna podrían perderse visualmente.")) return;
+    try {
+        await client.delete(`/proyectos/${proyecto.id}/config/columnas/${id}`);
+        cargarColumnasMetadata();
+    } catch(err) { alert("Error eliminando columna"); }
   };
 
   const tabs = [
@@ -172,9 +166,7 @@ function ConfiguracionSection({ proyecto, onProyectoUpdate }) {
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === tab.id 
-                ? 'border-hatch-orange text-hatch-orange' 
-                : 'border-transparent text-gray-600 hover:text-hatch-blue'
+              activeTab === tab.id ? 'border-hatch-orange text-hatch-orange' : 'border-transparent text-gray-600 hover:text-hatch-blue'
             }`}
           >
             <span className="mr-2">{tab.icon}</span>{tab.name}
@@ -182,53 +174,43 @@ function ConfiguracionSection({ proyecto, onProyectoUpdate }) {
         ))}
       </div>
 
-      {/* Content Area */}
+      {/* Content */}
       <div className="flex-1 overflow-y-auto p-6 bg-hatch-gray/20">
         
         {/* TAB: DISCIPLINAS */}
         {activeTab === 'disciplinas' && (
           <div className="max-w-4xl space-y-6">
-            {/* Formulario */}
             <div className="bg-white p-6 rounded-lg border-2 border-hatch-gray shadow-md">
-              <h3 className="text-lg font-bold mb-4 text-hatch-blue">➕ Nueva Disciplina</h3>
-              <form onSubmit={handleCreateDisciplina} className="flex gap-4 items-end">
+              <h3 className="text-lg font-bold mb-4 text-hatch-blue">{editingDisciplina ? '✏️ Editar Disciplina' : '➕ Nueva Disciplina'}</h3>
+              <form onSubmit={handleSaveDisciplina} className="flex gap-4 items-end">
                 <div className="flex-1">
                   <label className="block text-xs text-gray-600 mb-1 font-semibold">Nombre</label>
-                  <input 
-                    className="w-full bg-white border-2 border-hatch-gray rounded px-3 py-2 focus:border-hatch-orange focus:outline-none"
-                    value={disciplinaForm.nombre}
-                    onChange={e => setDisciplinaForm({...disciplinaForm, nombre: e.target.value})}
-                    placeholder="Ej: Civil" required
-                  />
+                  <input className="w-full bg-white border-2 border-hatch-gray rounded px-3 py-2 focus:border-hatch-orange outline-none" value={disciplinaForm.nombre} onChange={e => setDisciplinaForm({...disciplinaForm, nombre: e.target.value})} placeholder="Ej: Civil" required />
                 </div>
                 <div className="w-32">
                   <label className="block text-xs text-gray-600 mb-1 font-semibold">Código</label>
-                  <input 
-                    className="w-full bg-white border-2 border-hatch-gray rounded px-3 py-2 uppercase focus:border-hatch-orange focus:outline-none"
-                    value={disciplinaForm.codigo}
-                    onChange={e => setDisciplinaForm({...disciplinaForm, codigo: e.target.value.toUpperCase()})}
-                    placeholder="CIV" required maxLength={5}
-                  />
+                  <input className="w-full bg-white border-2 border-hatch-gray rounded px-3 py-2 uppercase focus:border-hatch-orange outline-none" value={disciplinaForm.codigo} onChange={e => setDisciplinaForm({...disciplinaForm, codigo: e.target.value.toUpperCase()})} placeholder="CIV" required maxLength={5} />
                 </div>
-                <button disabled={loading} className="bg-gradient-orange hover:shadow-lg text-white px-4 py-2 rounded font-medium transition-all">
-                  Crear
+                <button disabled={loading} className="bg-gradient-orange text-white px-4 py-2 rounded font-medium hover:shadow-lg transition-all">
+                  {editingDisciplina ? 'Guardar' : 'Crear'}
                 </button>
+                {editingDisciplina && <button type="button" onClick={() => {setEditingDisciplina(null); setDisciplinaForm({nombre:'', codigo:''})}} className="bg-gray-300 text-gray-700 px-4 py-2 rounded">Cancelar</button>}
               </form>
             </div>
 
-            {/* Lista */}
             <div className="grid grid-cols-2 gap-3">
               {proyecto.disciplinas?.map(d => (
-                <div key={d.id} className="p-4 bg-white border-2 border-hatch-gray rounded shadow-sm flex justify-between items-center hover:border-hatch-orange transition-colors">
+                <div key={d.id} className="p-4 bg-white border-2 border-hatch-gray rounded shadow-sm flex justify-between items-center hover:border-hatch-orange transition-colors group">
                   <div>
                     <span className="text-hatch-orange font-mono text-xs bg-hatch-gray px-2 py-1 rounded mr-2">{d.codigo}</span>
                     <span className="font-medium text-hatch-blue">{d.nombre}</span>
                   </div>
+                  <div className="flex gap-2 opacity-50 group-hover:opacity-100 transition-opacity">
+                    <button onClick={() => startEditDisciplina(d)} className="text-blue-500 hover:bg-blue-50 p-1 rounded">✏️</button>
+                    <button onClick={() => handleDeleteDisciplina(d.id)} className="text-red-500 hover:bg-red-50 p-1 rounded">🗑️</button>
+                  </div>
                 </div>
               ))}
-              {(!proyecto.disciplinas || proyecto.disciplinas.length === 0) && (
-                <p className="text-gray-500 col-span-2 text-center py-8">No hay disciplinas configuradas.</p>
-              )}
             </div>
           </div>
         )}
@@ -236,63 +218,30 @@ function ConfiguracionSection({ proyecto, onProyectoUpdate }) {
         {/* TAB: ÁREAS (CWA) */}
         {activeTab === 'areas' && (
           <div className="max-w-4xl space-y-6">
-            {/* Formulario */}
             <div className="bg-white p-6 rounded-lg border-2 border-hatch-gray shadow-md">
               <h3 className="text-lg font-bold mb-4 text-hatch-blue">{editingCWA ? '✏️ Editar Área' : '➕ Nueva Área (CWA)'}</h3>
-              <form onSubmit={editingCWA ? handleUpdateCWA : handleCreateCWA} className="space-y-4">
+              <form onSubmit={handleSaveCWA} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs text-gray-600 mb-1 font-semibold">Plot Plan *</label>
-                    <select 
-                      className="w-full bg-white border-2 border-hatch-gray rounded px-3 py-2 focus:border-hatch-orange focus:outline-none"
-                      value={cwaForm.plot_plan_id}
-                      onChange={e => setCwaForm({...cwaForm, plot_plan_id: e.target.value})}
-                      disabled={!!editingCWA} required
-                    >
+                    <select className="w-full bg-white border-2 border-hatch-gray rounded px-3 py-2 focus:border-hatch-orange outline-none" value={cwaForm.plot_plan_id} onChange={e => setCwaForm({...cwaForm, plot_plan_id: e.target.value})} disabled={!!editingCWA} required>
                       <option value="">Seleccionar...</option>
                       {proyecto.plot_plans?.map(pp => <option key={pp.id} value={pp.id}>{pp.nombre}</option>)}
                     </select>
                   </div>
                   <div>
                     <label className="block text-xs text-gray-600 mb-1 font-semibold">Código *</label>
-                    <input 
-                      className="w-full bg-white border-2 border-hatch-gray rounded px-3 py-2 uppercase focus:border-hatch-orange focus:outline-none"
-                      value={cwaForm.codigo}
-                      onChange={e => setCwaForm({...cwaForm, codigo: e.target.value.toUpperCase()})}
-                      placeholder="CWA-01" required
-                    />
+                    <input className="w-full bg-white border-2 border-hatch-gray rounded px-3 py-2 uppercase focus:border-hatch-orange outline-none" value={cwaForm.codigo} onChange={e => setCwaForm({...cwaForm, codigo: e.target.value.toUpperCase()})} placeholder="CWA-01" required />
                   </div>
                 </div>
-                <div>
-                  <label className="block text-xs text-gray-600 mb-1 font-semibold">Nombre *</label>
-                  <input 
-                    className="w-full bg-white border-2 border-hatch-gray rounded px-3 py-2 focus:border-hatch-orange focus:outline-none"
-                    value={cwaForm.nombre}
-                    onChange={e => setCwaForm({...cwaForm, nombre: e.target.value})}
-                    placeholder="Ej: Planta de Procesos" required
-                  />
-                </div>
-                <div className="flex items-center gap-2">
-                  <input 
-                    type="checkbox" 
-                    checked={cwaForm.es_transversal}
-                    onChange={e => setCwaForm({...cwaForm, es_transversal: e.target.checked})}
-                    className="w-4 h-4"
-                  />
-                  <label className="text-sm text-gray-700">Es Área Transversal (Diseño/Ingeniería Global)</label>
-                </div>
+                <input className="w-full bg-white border-2 border-hatch-gray rounded px-3 py-2 focus:border-hatch-orange outline-none" value={cwaForm.nombre} onChange={e => setCwaForm({...cwaForm, nombre: e.target.value})} placeholder="Nombre del Área" required />
+                <div className="flex items-center gap-2"><input type="checkbox" checked={cwaForm.es_transversal} onChange={e => setCwaForm({...cwaForm, es_transversal: e.target.checked})} /> <label className="text-sm text-gray-700">Es Área Transversal</label></div>
                 <div className="flex gap-2">
-                  <button disabled={loading} className="bg-gradient-orange hover:shadow-lg text-white px-6 py-2 rounded font-medium transition-all">
-                    {editingCWA ? 'Actualizar' : 'Crear'}
-                  </button>
-                  {editingCWA && (
-                    <button type="button" onClick={() => { setEditingCWA(null); setCwaForm({ nombre: '', codigo: '', descripcion: '', es_transversal: false, plot_plan_id: '' }); }} className="bg-gray-300 hover:bg-gray-400 text-hatch-blue px-4 py-2 rounded">Cancelar</button>
-                  )}
+                    <button disabled={loading} className="bg-gradient-orange text-white px-6 py-2 rounded font-medium hover:shadow-lg transition-all">{editingCWA ? 'Actualizar' : 'Crear'}</button>
+                    {editingCWA && <button type="button" onClick={() => { setEditingCWA(null); setCwaForm({ nombre: '', codigo: '', descripcion: '', es_transversal: false, plot_plan_id: '' }); }} className="bg-gray-300 text-gray-700 px-4 py-2 rounded">Cancelar</button>}
                 </div>
               </form>
             </div>
-
-            {/* Lista */}
             <div className="space-y-4">
               {proyecto.plot_plans?.map(pp => (
                 pp.cwas && pp.cwas.length > 0 && (
@@ -300,15 +249,15 @@ function ConfiguracionSection({ proyecto, onProyectoUpdate }) {
                     <h4 className="font-bold text-hatch-orange mb-3 border-b-2 border-hatch-gray pb-2">📍 {pp.nombre}</h4>
                     <div className="space-y-2">
                       {pp.cwas.map(cwa => (
-                        <div key={cwa.id} className="flex justify-between items-center bg-hatch-gray/30 p-3 rounded border-2 border-hatch-gray hover:border-hatch-orange transition-colors">
+                        <div key={cwa.id} className="flex justify-between items-center bg-hatch-gray/30 p-3 rounded border-2 border-hatch-gray hover:border-hatch-orange transition-colors group">
                           <div>
                             <span className="text-xs font-mono bg-white border-2 border-hatch-gray px-2 py-1 rounded mr-2">{cwa.codigo}</span>
                             <span className="font-medium">{cwa.nombre}</span>
                             {cwa.es_transversal && <span className="ml-2 text-xs bg-hatch-orange text-white px-2 py-0.5 rounded">Transversal</span>}
                           </div>
-                          <div className="flex gap-2">
-                            <button onClick={() => startEditCWA(cwa, pp.id)} className="text-hatch-blue hover:text-hatch-orange text-xs font-medium">✏️ Editar</button>
-                            <button onClick={() => handleDeleteCWA(cwa.id, pp.id)} className="text-red-600 hover:text-red-800 text-xs font-medium">🗑️ Borrar</button>
+                          <div className="flex gap-2 opacity-50 group-hover:opacity-100 transition-opacity">
+                            <button onClick={() => startEditCWA(cwa, pp.id)} className="text-blue-500 hover:bg-blue-50 p-1 rounded">✏️</button>
+                            <button onClick={() => handleDeleteCWA(cwa.id, pp.id)} className="text-red-500 hover:bg-red-50 p-1 rounded">🗑️</button>
                           </div>
                         </div>
                       ))}
@@ -323,56 +272,33 @@ function ConfiguracionSection({ proyecto, onProyectoUpdate }) {
         {/* TAB: METADATOS */}
         {activeTab === 'metadata' && (
           <div className="max-w-4xl space-y-6">
-            {/* Explicación */}
-            <div className="bg-hatch-orange/10 border-l-4 border-hatch-orange p-4 rounded-r text-sm text-hatch-blue">
-              ℹ️ Aquí puedes definir columnas personalizadas para tus CWPs (ej: "Fase", "Contrato", "Prioridad").
-              Estas columnas aparecerán en la tabla principal y en los formularios.
-            </div>
-
-            {/* Formulario */}
             <div className="bg-white p-6 rounded-lg border-2 border-hatch-gray shadow-md">
-              <h3 className="text-lg font-bold mb-4 text-hatch-blue">➕ Nueva Columna Personalizada</h3>
-              <form onSubmit={handleCreateMetadata} className="flex gap-4 items-end flex-wrap">
+              <h3 className="text-lg font-bold mb-4 text-hatch-blue">{editingMeta ? '✏️ Editar Columna' : '➕ Nueva Columna'}</h3>
+              <form onSubmit={handleSaveMetadata} className="flex gap-4 items-end flex-wrap">
                 <div className="w-1/3">
                   <label className="block text-xs text-gray-600 mb-1 font-semibold">Nombre Columna</label>
-                  <input 
-                    className="w-full bg-white border-2 border-hatch-gray rounded px-3 py-2 focus:border-hatch-orange focus:outline-none"
-                    value={metaForm.nombre}
-                    onChange={e => setMetaForm({...metaForm, nombre: e.target.value})}
-                    placeholder="Ej: Fase de Ejecución" required
-                  />
+                  <input className="w-full bg-white border-2 border-hatch-gray rounded px-3 py-2 focus:border-hatch-orange outline-none" value={metaForm.nombre} onChange={e => setMetaForm({...metaForm, nombre: e.target.value})} placeholder="Ej: Fase" required />
                 </div>
                 <div className="w-1/4">
-                  <label className="block text-xs text-gray-600 mb-1 font-semibold">Tipo de Dato</label>
-                  <select 
-                    className="w-full bg-white border-2 border-hatch-gray rounded px-3 py-2 focus:border-hatch-orange focus:outline-none"
-                    value={metaForm.tipo_dato}
-                    onChange={e => setMetaForm({...metaForm, tipo_dato: e.target.value})}
-                  >
+                  <label className="block text-xs text-gray-600 mb-1 font-semibold">Tipo</label>
+                  <select className="w-full bg-white border-2 border-hatch-gray rounded px-3 py-2 focus:border-hatch-orange outline-none" value={metaForm.tipo_dato} onChange={e => setMetaForm({...metaForm, tipo_dato: e.target.value})}>
                     <option value="TEXTO">Texto Libre</option>
                     <option value="SELECCION">Lista de Opciones</option>
                   </select>
                 </div>
-                
                 {metaForm.tipo_dato === 'SELECCION' && (
                   <div className="flex-1 min-w-[200px]">
-                    <label className="block text-xs text-gray-600 mb-1 font-semibold">Opciones (separar por coma)</label>
-                    <input 
-                      className="w-full bg-white border-2 border-hatch-gray rounded px-3 py-2 focus:border-hatch-orange focus:outline-none"
-                      value={metaForm.opciones}
-                      onChange={e => setMetaForm({...metaForm, opciones: e.target.value})}
-                      placeholder="Preparada, Parada, Post-Parada"
-                    />
+                    <label className="block text-xs text-gray-600 mb-1 font-semibold">Opciones (coma)</label>
+                    <input className="w-full bg-white border-2 border-hatch-gray rounded px-3 py-2 focus:border-hatch-orange outline-none" value={metaForm.opciones} onChange={e => setMetaForm({...metaForm, opciones: e.target.value})} placeholder="A, B, C" />
                   </div>
                 )}
-                
-                <button disabled={loading} className="bg-gradient-orange hover:shadow-lg text-white px-4 py-2 rounded font-medium transition-all">
-                  Agregar
+                <button disabled={loading} className="bg-gradient-orange text-white px-4 py-2 rounded font-medium hover:shadow-lg transition-all">
+                    {editingMeta ? 'Actualizar' : 'Agregar'}
                 </button>
+                {editingMeta && <button type="button" onClick={() => { setEditingMeta(null); setMetaForm({ nombre: '', tipo_dato: 'TEXTO', opciones: '' }); }} className="bg-gray-300 text-gray-700 px-4 py-2 rounded">Cancelar</button>}
               </form>
             </div>
 
-            {/* Lista de Columnas */}
             <div className="bg-white rounded border-2 border-hatch-gray overflow-hidden shadow-sm">
               <table className="w-full text-sm text-left">
                 <thead className="bg-hatch-gray text-hatch-blue uppercase text-xs font-bold">
@@ -380,27 +306,26 @@ function ConfiguracionSection({ proyecto, onProyectoUpdate }) {
                     <th className="px-4 py-3">Nombre</th>
                     <th className="px-4 py-3">Tipo</th>
                     <th className="px-4 py-3">Opciones</th>
+                    <th className="px-4 py-3 text-right">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-hatch-gray">
                   {columnasMetadata.map(col => (
-                    <tr key={col.id} className="hover:bg-hatch-gray/20">
+                    <tr key={col.id} className="hover:bg-hatch-gray/20 group">
                       <td className="px-4 py-3 font-medium">{col.nombre}</td>
                       <td className="px-4 py-3"><span className="bg-hatch-gray px-2 py-1 rounded text-xs">{col.tipo_dato}</span></td>
-                      <td className="px-4 py-3 text-gray-600">
-                        {col.opciones_json ? col.opciones_json.join(', ') : '-'}
+                      <td className="px-4 py-3 text-gray-600 text-xs">{col.opciones_json ? col.opciones_json.join(', ') : '-'}</td>
+                      <td className="px-4 py-3 text-right opacity-50 group-hover:opacity-100">
+                        <button onClick={() => startEditMetadata(col)} className="text-blue-500 hover:bg-blue-50 p-1 rounded mr-2">✏️</button>
+                        <button onClick={() => handleDeleteMetadata(col.id)} className="text-red-500 hover:bg-red-50 p-1 rounded">🗑️</button>
                       </td>
                     </tr>
                   ))}
-                  {columnasMetadata.length === 0 && (
-                    <tr><td colSpan="3" className="px-4 py-4 text-center text-gray-500">No hay columnas personalizadas.</td></tr>
-                  )}
                 </tbody>
               </table>
             </div>
           </div>
         )}
-
       </div>
     </div>
   );

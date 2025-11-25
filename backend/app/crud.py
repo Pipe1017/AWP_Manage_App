@@ -23,13 +23,11 @@ def create_proyecto(db: Session, proyecto: schemas.ProyectoCreate):
     db.refresh(db_proyecto)
     return db_proyecto
 
-# ✅ NUEVO: Actualizar Proyecto
 def update_proyecto(db: Session, proyecto_id: int, proyecto_update: schemas.ProyectoCreate):
     db_proyecto = get_proyecto(db, proyecto_id)
     if not db_proyecto:
         return None
     
-    # Actualizamos campos
     if proyecto_update.nombre:
         db_proyecto.nombre = proyecto_update.nombre
     if proyecto_update.descripcion:
@@ -39,7 +37,6 @@ def update_proyecto(db: Session, proyecto_id: int, proyecto_update: schemas.Proy
     db.refresh(db_proyecto)
     return db_proyecto
 
-# ✅ NUEVO: Eliminar Proyecto (Cascade Delete se maneja en el modelo)
 def delete_proyecto(db: Session, proyecto_id: int):
     db_proyecto = get_proyecto(db, proyecto_id)
     if not db_proyecto:
@@ -49,8 +46,9 @@ def delete_proyecto(db: Session, proyecto_id: int):
     db.commit()
     return True
 
-# ... (Resto de funciones de Disciplinas y Tipos se mantienen igual) ...
-# Solo voy a reescribir la función de jerarquía que tenía el BUG
+# ============================================================================
+# DISCIPLINAS (CRUD COMPLETO)
+# ============================================================================
 
 def create_disciplina(db: Session, disciplina: schemas.DisciplinaCreate, proyecto_id: int):
     db_disciplina = models.Disciplina(**disciplina.model_dump(), proyecto_id=proyecto_id)
@@ -59,58 +57,36 @@ def create_disciplina(db: Session, disciplina: schemas.DisciplinaCreate, proyect
     db.refresh(db_disciplina)
     return db_disciplina
 
-# ... (Mantener funciones de plot plan, CWA, etc.) ...
-def get_plot_plan(db: Session, plot_plan_id: int):
-    return db.query(models.PlotPlan).filter(models.PlotPlan.id == plot_plan_id).first()
+def get_disciplina(db: Session, disciplina_id: int):
+    return db.query(models.Disciplina).filter(models.Disciplina.id == disciplina_id).first()
 
-def get_cwas_por_plot_plan(db: Session, plot_plan_id: int):
-    return db.query(models.CWA).filter(models.CWA.plot_plan_id == plot_plan_id).all()
+def get_disciplinas_por_proyecto(db: Session, proyecto_id: int):
+    return db.query(models.Disciplina).filter(models.Disciplina.proyecto_id == proyecto_id).all()
 
-def get_cwps_por_cwa(db: Session, cwa_id: int):
-    return db.query(models.CWP).filter(models.CWP.cwa_id == cwa_id).all()
-
-def create_plot_plan(db: Session, plot_plan: schemas.PlotPlanCreate, proyecto_id: int):
-    db_plot_plan = models.PlotPlan(**plot_plan.model_dump(), proyecto_id=proyecto_id)
-    db.add(db_plot_plan)
+def update_disciplina(db: Session, disciplina_id: int, disciplina_update: schemas.DisciplinaCreate):
+    db_disc = db.query(models.Disciplina).filter(models.Disciplina.id == disciplina_id).first()
+    if not db_disc: return None
+    
+    db_disc.nombre = disciplina_update.nombre
+    db_disc.codigo = disciplina_update.codigo
+    # Si tuvieras descripción en el schema:
+    # if disciplina_update.descripcion: db_disc.descripcion = disciplina_update.descripcion
+    
     db.commit()
-    db.refresh(db_plot_plan)
-    return db_plot_plan
+    db.refresh(db_disc)
+    return db_disc
 
-def create_cwa(db: Session, cwa: schemas.CWACreate, plot_plan_id: int):
-    db_cwa = models.CWA(**cwa.model_dump(), plot_plan_id=plot_plan_id)
-    db.add(db_cwa)
-    db.commit()
-    db.refresh(db_cwa)
-    return db_cwa
-
-def get_cwa(db: Session, cwa_id: int):
-    return db.query(models.CWA).filter(models.CWA.id == cwa_id).first()
-
-def update_cwa(db: Session, cwa_id: int, cwa_update: schemas.CWAUpdate):
-    db_cwa = get_cwa(db, cwa_id)
-    if not db_cwa: raise ValueError("CWA no encontrado")
-    update_data = cwa_update.model_dump(exclude_unset=True)
-    for key, value in update_data.items(): setattr(db_cwa, key, value)
-    db.commit()
-    db.refresh(db_cwa)
-    return db_cwa
-
-def delete_cwa(db: Session, cwa_id: int):
-    db_cwa = get_cwa(db, cwa_id)
-    if not db_cwa: raise ValueError("CWA no encontrado")
-    db.delete(db_cwa)
+def delete_disciplina(db: Session, disciplina_id: int):
+    db_disc = db.query(models.Disciplina).filter(models.Disciplina.id == disciplina_id).first()
+    if not db_disc: return False
+    db.delete(db_disc)
     db.commit()
     return True
 
-def update_cwa_geometry(db: Session, cwa_id: int, shape_type: str, shape_data: dict):
-    db_cwa = get_cwa(db, cwa_id)
-    if not db_cwa: raise ValueError(f"CWA con id {cwa_id} no encontrado")
-    db_cwa.shape_type = shape_type
-    db_cwa.shape_data = shape_data
-    db.commit()
-    db.refresh(db_cwa)
-    return db_cwa
-    
+# ============================================================================
+# TIPOS DE ENTREGABLE
+# ============================================================================
+
 def create_tipo_entregable(db: Session, tipo: schemas.TipoEntregableCreate, disciplina_id: int = None):
     db_tipo = models.TipoEntregable(
         nombre=tipo.nombre, codigo=tipo.codigo, categoria_awp=tipo.categoria_awp,
@@ -122,15 +98,118 @@ def create_tipo_entregable(db: Session, tipo: schemas.TipoEntregableCreate, disc
     db.refresh(db_tipo)
     return db_tipo
 
-def create_disciplina(db: Session, disciplina: schemas.DisciplinaCreate, proyecto_id: int):
-    db_disciplina = models.Disciplina(**disciplina.model_dump(), proyecto_id=proyecto_id)
-    db.add(db_disciplina)
+def get_tipo_entregable(db: Session, tipo_id: int):
+    return db.query(models.TipoEntregable).filter(models.TipoEntregable.id == tipo_id).first()
+
+# ============================================================================
+# PLOT PLAN Y CWA
+# ============================================================================
+
+def create_plot_plan(db: Session, plot_plan: schemas.PlotPlanCreate, proyecto_id: int):
+    db_plot_plan = models.PlotPlan(**plot_plan.model_dump(), proyecto_id=proyecto_id)
+    db.add(db_plot_plan)
     db.commit()
-    db.refresh(db_disciplina)
-    return db_disciplina
+    db.refresh(db_plot_plan)
+    return db_plot_plan
 
+def get_plot_plan(db: Session, plot_plan_id: int):
+    return db.query(models.PlotPlan).filter(models.PlotPlan.id == plot_plan_id).first()
 
-# 🔴 CORRECCIÓN BUG PRIORIDAD
+def get_plot_plans_por_proyecto(db: Session, proyecto_id: int):
+    return db.query(models.PlotPlan).filter(models.PlotPlan.proyecto_id == proyecto_id).all()
+
+def create_cwa(db: Session, cwa: schemas.CWACreate, plot_plan_id: int):
+    db_cwa = models.CWA(**cwa.model_dump(), plot_plan_id=plot_plan_id)
+    db.add(db_cwa)
+    db.commit()
+    db.refresh(db_cwa)
+    return db_cwa
+
+def get_cwa(db: Session, cwa_id: int):
+    return db.query(models.CWA).filter(models.CWA.id == cwa_id).first()
+
+def get_cwas_por_plot_plan(db: Session, plot_plan_id: int):
+    return db.query(models.CWA).filter(models.CWA.plot_plan_id == plot_plan_id).all()
+
+def update_cwa(db: Session, cwa_id: int, cwa_update: schemas.CWAUpdate):
+    db_cwa = get_cwa(db, cwa_id)
+    if not db_cwa: raise ValueError("CWA no encontrado")
+    update_data = cwa_update.model_dump(exclude_unset=True)
+    for key, value in update_data.items(): setattr(db_cwa, key, value)
+    db.commit()
+    db.refresh(db_cwa)
+    return db_cwa
+
+def update_cwa_geometry(db: Session, cwa_id: int, shape_type: str, shape_data: dict):
+    db_cwa = get_cwa(db, cwa_id)
+    if not db_cwa: raise ValueError(f"CWA con id {cwa_id} no encontrado")
+    db_cwa.shape_type = shape_type
+    db_cwa.shape_data = shape_data
+    db.commit()
+    db.refresh(db_cwa)
+    return db_cwa
+
+def delete_cwa(db: Session, cwa_id: int):
+    db_cwa = get_cwa(db, cwa_id)
+    if not db_cwa: raise ValueError("CWA no encontrado")
+    db.delete(db_cwa)
+    db.commit()
+    return True
+
+def get_cwp(db: Session, cwp_id: int):
+    return db.query(models.CWP).filter(models.CWP.id == cwp_id).first()
+
+def get_cwps_por_cwa(db: Session, cwa_id: int):
+    return db.query(models.CWP).filter(models.CWP.cwa_id == cwa_id).all()
+
+# ============================================================================
+# METADATOS (CRUD EXTRA)
+# ============================================================================
+
+# ✅ NUEVO: Update Metadata con Migración de Datos
+def update_columna_metadata(db: Session, columna_id: int, columna_update: schemas.ColumnaCreate):
+    db_col = db.query(models.CWPColumnaMetadata).filter(models.CWPColumnaMetadata.id == columna_id).first()
+    if not db_col:
+        return None
+    
+    old_name = db_col.nombre
+    new_name = columna_update.nombre
+    
+    # 1. Actualizar la definición de la columna
+    db_col.nombre = new_name
+    db_col.tipo_dato = columna_update.tipo_dato
+    db_col.opciones_json = columna_update.opciones
+    
+    # 2. MIGRACIÓN INTELIGENTE: Si el nombre cambió, actualizar los datos en los CWPs
+    if old_name != new_name:
+        cwps = db.query(models.CWP).join(models.CWA).join(models.PlotPlan).filter(
+            models.PlotPlan.proyecto_id == db_col.proyecto_id
+        ).all()
+        
+        for cwp in cwps:
+            if cwp.metadata_json and old_name in cwp.metadata_json:
+                # Crear copia mutable del dict
+                new_meta = dict(cwp.metadata_json)
+                # Mover el valor a la nueva llave
+                new_meta[new_name] = new_meta.pop(old_name)
+                # Guardar
+                cwp.metadata_json = new_meta
+                
+    db.commit()
+    db.refresh(db_col)
+    return db_col
+
+def delete_columna_metadata(db: Session, columna_id: int):
+    col = db.query(models.CWPColumnaMetadata).filter(models.CWPColumnaMetadata.id == columna_id).first()
+    if not col: return False
+    db.delete(col)
+    db.commit()
+    return True
+
+# ============================================================================
+# JERARQUÍA COMPLETA (CORREGIDA - SIN BUG DE PRIORIDAD)
+# ============================================================================
+
 def obtener_jerarquia_completa(db: Session, plot_plan_id: int):
     db_plot_plan = get_plot_plan(db, plot_plan_id)
     if not db_plot_plan: raise ValueError("Plot plan no encontrado")
@@ -182,7 +261,25 @@ def obtener_jerarquia_completa(db: Session, plot_plan_id: int):
                     "tipo": paquete.tipo,
                     "items": []
                 }
-                # (Simplificado para brevedad, la lógica de items sigue igual)
+                
+                items = db.query(models.Item).filter(models.Item.paquete_id == paquete.id).all()
+                
+                for item in items:
+                    tipo = db.query(models.TipoEntregable).filter(models.TipoEntregable.id == item.tipo_entregable_id).first()
+                    item_data = {
+                        "id": item.id,
+                        "nombre": item.nombre,
+                        "descripcion": item.descripcion,
+                        "estado": item.estado,
+                        "porcentaje_completitud": item.porcentaje_completitud,
+                        "version": item.version,
+                        "tipo_entregable_codigo": tipo.codigo if tipo else None,
+                        "tipo_entregable_nombre": tipo.nombre if tipo else None,
+                        "es_entregable_cliente": item.es_entregable_cliente,
+                        "archivo_url": item.archivo_url,
+                        "metadata_json": item.metadata_json
+                    }
+                    paquete_data["items"].append(item_data)
                 cwp_data["paquetes"].append(paquete_data)
             cwa_data["cwps"].append(cwp_data)
         jerarquia["cwas"].append(cwa_data)

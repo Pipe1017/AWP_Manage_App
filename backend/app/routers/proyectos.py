@@ -15,7 +15,7 @@ router = APIRouter(
 )
 
 # ============================================================================
-# 1. ENDPOINTS DE PROYECTOS
+# 1. ENDPOINTS DE PROYECTOS (CRUD COMPLETO)
 # ============================================================================
 
 @router.post("/", response_model=schemas.ProyectoResponse)
@@ -53,7 +53,7 @@ def delete_proyecto_endpoint(proyecto_id: int, db: Session = Depends(get_db)):
     return {"message": "Proyecto eliminado correctamente"}
 
 # ============================================================================
-# 2. ENDPOINTS DE DISCIPLINAS
+# 2. ENDPOINTS DE DISCIPLINAS (CRUD COMPLETO)
 # ============================================================================
 
 @router.post("/{proyecto_id}/disciplinas/", response_model=schemas.DisciplinaResponse)
@@ -73,6 +73,22 @@ def read_disciplinas(proyecto_id: int, db: Session = Depends(get_db)):
     if db_proyecto is None:
         raise HTTPException(status_code=404, detail="Proyecto no encontrado")
     return db.query(models.Disciplina).filter(models.Disciplina.proyecto_id == proyecto_id).all()
+
+# ✅ UPDATE: Editar Disciplina
+@router.put("/{proyecto_id}/disciplinas/{disciplina_id}", response_model=schemas.DisciplinaResponse)
+def update_disciplina_endpoint(proyecto_id: int, disciplina_id: int, disciplina: schemas.DisciplinaCreate, db: Session = Depends(get_db)):
+    updated = crud.update_disciplina(db, disciplina_id, disciplina)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Disciplina no encontrada")
+    return updated
+
+# ✅ DELETE: Eliminar Disciplina
+@router.delete("/{proyecto_id}/disciplinas/{disciplina_id}")
+def delete_disciplina_endpoint(proyecto_id: int, disciplina_id: int, db: Session = Depends(get_db)):
+    success = crud.delete_disciplina(db, disciplina_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Disciplina no encontrada")
+    return {"message": "Eliminado"}
 
 # ============================================================================
 # 3. ENDPOINTS DE TIPOS DE ENTREGABLES
@@ -188,6 +204,7 @@ def read_plot_plans(proyecto_id: int, db: Session = Depends(get_db)):
 
 @router.get("/{proyecto_id}/plot_plans/{plot_plan_id}", response_model=dict)
 def get_plot_plan_with_cwas(proyecto_id: int, plot_plan_id: int, db: Session = Depends(get_db)):
+    # Este endpoint devuelve un dict específico con jerarquía, no usamos schema directo
     db_proyecto = crud.get_proyecto(db, proyecto_id)
     if not db_proyecto:
         raise HTTPException(status_code=404, detail="Proyecto no encontrado")
@@ -196,8 +213,11 @@ def get_plot_plan_with_cwas(proyecto_id: int, plot_plan_id: int, db: Session = D
     if not db_plot_plan or db_plot_plan.proyecto_id != proyecto_id:
         raise HTTPException(status_code=404, detail="Plot Plan no encontrado")
     
+    # Usamos la función optimizada que ya tiene toda la jerarquía
     cwas = crud.get_cwas_por_plot_plan(db, plot_plan_id)
     
+    # Construimos respuesta manual para incluir todo el árbol de dependencias si es necesario
+    # o usamos el helper de jerarquía
     return {
         "id": db_plot_plan.id,
         "nombre": db_plot_plan.nombre,
@@ -226,7 +246,7 @@ def get_plot_plan_with_cwas(proyecto_id: int, plot_plan_id: int, db: Session = D
     }
 
 # ============================================================================
-# 5. ENDPOINTS DE CWA (CON VALIDACIÓN CORREGIDA)
+# 5. ENDPOINTS DE CWA
 # ============================================================================
 
 @router.post("/{proyecto_id}/plot_plans/{plot_plan_id}/cwa/", response_model=schemas.CWAResponse)
@@ -346,8 +366,7 @@ def update_cwa_geometry(
     
     try:
         shape_data_dict = json.loads(shape_data)
-        updated_cwa = crud.update_cwa_geometry(db, cwa_id, shape_type, shape_data_dict)
-        return updated_cwa
+        return crud.update_cwa_geometry(db, cwa_id, shape_type, shape_data_dict)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -390,3 +409,38 @@ def obtener_columnas_personalizadas(
     return db.query(CWPColumnaMetadata).filter(
         CWPColumnaMetadata.proyecto_id == proyecto_id
     ).all()
+
+@router.get("/{proyecto_id}/config/columnas", response_model=List[schemas.ColumnaResponse])
+def obtener_columnas_personalizadas(
+    proyecto_id: int,
+    db: Session = Depends(get_db)
+):
+    """Obtiene la lista de columnas configuradas"""
+    db_proyecto = crud.get_proyecto(db, proyecto_id=proyecto_id)
+    if not db_proyecto:
+        raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+
+    return db.query(CWPColumnaMetadata).filter(
+        CWPColumnaMetadata.proyecto_id == proyecto_id
+    ).all()
+
+# ✅ NUEVO: Editar Metadato
+@router.put("/{proyecto_id}/config/columnas/{columna_id}", response_model=dict)
+def update_columna_personalizada(
+    proyecto_id: int,
+    columna_id: int,
+    columna: schemas.ColumnaCreate,
+    db: Session = Depends(get_db)
+):
+    updated = crud.update_columna_metadata(db, columna_id, columna)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Columna no encontrada")
+    return {"mensaje": "Columna actualizada y datos migrados", "id": updated.id, "nombre": updated.nombre}
+
+# ✅ DELETE: Eliminar Metadato
+@router.delete("/{proyecto_id}/config/columnas/{columna_id}")
+def delete_columna_personalizada(proyecto_id: int, columna_id: int, db: Session = Depends(get_db)):
+    success = crud.delete_columna_metadata(db, columna_id)
+    if not success: raise HTTPException(404, "Columna no encontrada")
+    return {"message": "Columna eliminada"}
+
