@@ -30,7 +30,6 @@ const useImageLoader = (src) => {
   return { image, error };
 };
 
-// --- BARRA DE HERRAMIENTAS MEJORADA ---
 function Toolbar({ activeTool, setActiveTool, color, setColor, onZoom, onReset, onClear, onUndo }) { 
   const [showColorPicker, setShowColorPicker] = useState(false);
   
@@ -44,8 +43,6 @@ function Toolbar({ activeTool, setActiveTool, color, setColor, onZoom, onReset, 
 
   return (
     <div className="p-2 border-b border-gray-600 flex flex-wrap justify-between items-center gap-2" style={{ backgroundColor: '#333333' }}>
-      
-      {/* GRUPO 1: HERRAMIENTAS DE DIBUJO */}
       <div className="flex items-center gap-1 bg-black/20 p-1 rounded-lg border border-gray-600">
         {tools.map(tool => (
           <button
@@ -64,10 +61,7 @@ function Toolbar({ activeTool, setActiveTool, color, setColor, onZoom, onReset, 
         ))}
       </div>
 
-      {/* GRUPO 2: ACCIONES Y ZOOM */}
       <div className="flex items-center gap-3">
-        
-        {/* Color Picker Dropdown */}
         <div className="relative">
           <button 
             onClick={() => setShowColorPicker(!showColorPicker)} 
@@ -81,7 +75,6 @@ function Toolbar({ activeTool, setActiveTool, color, setColor, onZoom, onReset, 
           
           {showColorPicker && (
             <div className="absolute right-0 top-full mt-2 p-3 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 w-48 animate-in fade-in zoom-in duration-200">
-              <p className="text-xs font-bold text-gray-500 mb-2 uppercase tracking-wider">Seleccionar Color</p>
               <div className="grid grid-cols-4 gap-2">
                 {allColors.map((c, idx) => (
                   <button 
@@ -98,37 +91,25 @@ function Toolbar({ activeTool, setActiveTool, color, setColor, onZoom, onReset, 
 
         <div className="h-6 w-px bg-gray-500"></div>
 
-        {/* Botones de Acción Zoom */}
         <div className="flex items-center gap-1">
             <button onClick={() => onZoom(1.2)} className="p-2 bg-gray-600 text-gray-300 hover:text-white hover:bg-gray-500 rounded" title="Acercar">➕</button>
             <button onClick={() => onZoom(0.8)} className="p-2 bg-gray-600 text-gray-300 hover:text-white hover:bg-gray-500 rounded" title="Alejar">➖</button>
-            {/* ✅ NUEVO: Botón Reset Zoom */}
             <button onClick={onReset} className="p-2 bg-gray-600 text-gray-300 hover:text-white hover:bg-gray-500 rounded" title="Resetear Vista">⟲</button>
         </div>
 
         <div className="flex items-center gap-1 ml-2">
-            {onUndo && (
-                <button onClick={onUndo} className="p-2 text-gray-400 hover:text-white hover:bg-gray-600 rounded" title="Deshacer">
-                    ↶
-                </button>
-            )}
-            {onClear && (
-                <button onClick={onClear} className="p-2 text-red-400 hover:text-red-200 hover:bg-red-900/30 rounded" title="Limpiar Todo">
-                    🗑️
-                </button>
-            )}
+            {onUndo && <button onClick={onUndo} className="p-2 text-gray-400 hover:text-white hover:bg-gray-600 rounded" title="Deshacer">↶</button>}
+            {onClear && <button onClick={onClear} className="p-2 text-red-400 hover:text-red-200 hover:bg-red-900/30 rounded" title="Limpiar Todo">🗑️</button>}
         </div>
       </div>
     </div>
   );
 }
 
-// === COMPONENTE PRINCIPAL ===
-function PlotPlan({ plotPlan, cwaToAssociate, onShapeSaved, onShapeClick }) {
+function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShapeClick }) {
   const { image, error } = useImageLoader(plotPlan?.image_url);
   const containerRef = useRef(null);
   
-  // Estados
   const [containerSize, setContainerSize] = useState({ width: 800, height: 600 });
   const [activeTool, setActiveTool] = useState('pan');
   const [currentColor, setCurrentColor] = useState(HATCH_COLORS.primary[0]);
@@ -136,21 +117,15 @@ function PlotPlan({ plotPlan, cwaToAssociate, onShapeSaved, onShapeClick }) {
   const [shapes, setShapes] = useState([]);
   const [history, setHistory] = useState([]); 
   const [newShape, setNewShape] = useState(null);
-  
-  // Estados para Polígono Avanzado
   const [polygonPoints, setPolygonPoints] = useState([]);
   const [isDrawingPolygon, setIsDrawingPolygon] = useState(false);
-  const [cursorPos, setCursorPos] = useState(null); // Para la línea guía (rubber band)
-
+  const [cursorPos, setCursorPos] = useState(null);
   const startPoint = useRef({ x: 0, y: 0 });
   
   const [stageState, setStageState] = useState({ scale: 1, x: 0, y: 0 });
   const [selectedShapeKey, setSelectedShapeKey] = useState(null);
-  
-  // Estado para el Tooltip HTML
   const [tooltip, setTooltip] = useState({ visible: false, x: 0, y: 0, content: null });
 
-  // Cálculo de geometría de la imagen para centrarla
   const imageDim = image ? { width: image.width, height: image.height } : { width: 0, height: 0 };
   const scaleRatio = image ? Math.min(containerSize.width / imageDim.width, containerSize.height / imageDim.height) : 1;
   const groupX = (containerSize.width - imageDim.width * scaleRatio) / 2;
@@ -186,13 +161,26 @@ function PlotPlan({ plotPlan, cwaToAssociate, onShapeSaved, onShapeClick }) {
     setShapes(loadedShapes);
   }, [plotPlan?.id, plotPlan?.cwas]);
 
+  // ✅ EFECTO NUEVO: Sincronizar selección externa (dropdown/tabla)
+  useEffect(() => {
+    if (activeCWAId) {
+        const shapeToSelect = shapes.find(s => s.cwaId === activeCWAId);
+        if (shapeToSelect) {
+            setSelectedShapeKey(shapeToSelect.key);
+        } else {
+            setSelectedShapeKey(null);
+        }
+    } else {
+        setSelectedShapeKey(null);
+    }
+  }, [activeCWAId, shapes]);
+
   // Helpers
   const handleZoom = (scaleFactor) => setStageState(s => ({ ...s, scale: s.scale * scaleFactor }));
-  const handleResetZoom = () => setStageState({ scale: 1, x: 0, y: 0 }); // ✅ NUEVO: Handler para resetear
-  const handleClear = () => { if(confirm('¿Limpiar todas las áreas locales?')) { setHistory([...history, shapes]); setShapes([]); }};
+  const handleResetZoom = () => setStageState({ scale: 1, x: 0, y: 0 });
+  const handleClear = () => { if(confirm('¿Limpiar?')) { setHistory([...history, shapes]); setShapes([]); }};
   const handleUndo = () => { if(history.length > 0) { setShapes(history[history.length-1]); setHistory(history.slice(0,-1)); }};
 
-  // Conversión Coordenadas
   const getRelativePointerPosition = (node) => {
     const stage = node.getStage();
     const pointerPosition = stage.getPointerPosition();
@@ -203,8 +191,7 @@ function PlotPlan({ plotPlan, cwaToAssociate, onShapeSaved, onShapeClick }) {
     return { x: relativeX, y: relativeY };
   };
 
-  // --- LÓGICA DE DIBUJO MEJORADA ---
-
+  // Eventos Mouse
   const handleMouseDown = (e) => {
     if (activeTool === 'pan' || !image || e.evt.button !== 0) {
       if (activeTool === 'pan' && !e.target.findAncestor('Shape')) setSelectedShapeKey(null);
@@ -214,46 +201,35 @@ function PlotPlan({ plotPlan, cwaToAssociate, onShapeSaved, onShapeClick }) {
     setSelectedShapeKey(null);
     const pos = getRelativePointerPosition(e.target);
     
-    // Lógica Rect/Circle (Arrastrar)
     if (activeTool === 'rect' || activeTool === 'circle') {
       startPoint.current = pos;
       setIsDrawing(true);
       setNewShape({ type: activeTool, color: currentColor, x: pos.x, y: pos.y, width: 0, height: 0, radius: 0 });
     }
     
-    // Lógica Polígonos (Clic a Clic)
     if (activeTool === 'polygon' || activeTool === 'ortho') {
       setIsDrawingPolygon(true);
       let newX = pos.x;
       let newY = pos.y;
 
-      // Si es ortogonal y ya tenemos un punto, ajustamos el nuevo punto
       if (activeTool === 'ortho' && polygonPoints.length >= 2) {
         const lastX = polygonPoints[polygonPoints.length - 2];
         const lastY = polygonPoints[polygonPoints.length - 1];
-        const dx = Math.abs(newX - lastX);
-        const dy = Math.abs(newY - lastY);
-        
-        if (dx > dy) newY = lastY; // Forzar horizontal
-        else newX = lastX;         // Forzar vertical
+        if (Math.abs(newX - lastX) > Math.abs(newY - lastY)) newY = lastY; else newX = lastX;
       }
 
       const newPoints = [...polygonPoints, newX, newY];
       setPolygonPoints(newPoints);
 
-      // Detectar cierre del polígono (si vuelve al inicio)
       if (newPoints.length > 4) {
         const startX = newPoints[0];
         const startY = newPoints[1];
-        // Tolerancia visual ajustada por zoom (5px de pantalla)
         const tolerance = 10 / (scaleRatio * stageState.scale);
         
         if (Math.hypot(startX - newX, startY - newY) < tolerance) {
           setIsDrawingPolygon(false);
           setCursorPos(null);
-          // Quitamos el último punto que era el intento de cierre y cerramos con el original
-          handleSaveShape({ type: 'polygon', color: currentColor, points: newPoints.slice(0, -2) }); // Slice para quitar el click de cierre duplicado si queremos
-          // En realidad Konva cierra solo, así que pasamos los puntos
+          handleSaveShape({ type: 'polygon', color: currentColor, points: newPoints.slice(0, -2) });
           setPolygonPoints([]);
         }
       }
@@ -265,7 +241,6 @@ function PlotPlan({ plotPlan, cwaToAssociate, onShapeSaved, onShapeClick }) {
     
     const pos = getRelativePointerPosition(e.target);
 
-    // Preview para Polígonos (Línea Guía)
     if (isDrawingPolygon) {
         let guideX = pos.x;
         let guideY = pos.y;
@@ -273,16 +248,11 @@ function PlotPlan({ plotPlan, cwaToAssociate, onShapeSaved, onShapeClick }) {
         if (activeTool === 'ortho' && polygonPoints.length >= 2) {
             const lastX = polygonPoints[polygonPoints.length - 2];
             const lastY = polygonPoints[polygonPoints.length - 1];
-            const dx = Math.abs(guideX - lastX);
-            const dy = Math.abs(guideY - lastY);
-            
-            if (dx > dy) guideY = lastY;
-            else guideX = lastX;
+            if (Math.abs(guideX - lastX) > Math.abs(guideY - lastY)) guideY = lastY; else guideX = lastX;
         }
         setCursorPos({ x: guideX, y: guideY });
     }
     
-    // Preview para Arrastre (Rect/Circle)
     if (isDrawing && activeTool !== 'pan') {
         if (activeTool === 'rect') {
             setNewShape({ ...newShape, width: pos.x - startPoint.current.x, height: pos.y - startPoint.current.y });
@@ -297,7 +267,6 @@ function PlotPlan({ plotPlan, cwaToAssociate, onShapeSaved, onShapeClick }) {
   const handleMouseUp = () => {
     if (!image || activeTool === 'pan') return;
     
-    // Solo terminar si es Rect o Circle (Polígono termina al cerrar loop)
     if (activeTool === 'rect' || activeTool === 'circle') {
         setIsDrawing(false);
         if (newShape && (Math.abs(newShape.width) > 5 || newShape.radius > 5)) {
@@ -310,7 +279,7 @@ function PlotPlan({ plotPlan, cwaToAssociate, onShapeSaved, onShapeClick }) {
   const handleSaveShape = async (finalShape) => {
     if (!cwaToAssociate) { 
         alert("⚠️ Selecciona un CWA arriba para asignar esta área."); 
-        setPolygonPoints([]); // Limpiar si falla
+        setPolygonPoints([]);
         setIsDrawingPolygon(false);
         return; 
     }
@@ -322,7 +291,6 @@ function PlotPlan({ plotPlan, cwaToAssociate, onShapeSaved, onShapeClick }) {
 
     try {
       const formData = new FormData();
-      // Guardamos ambos tipos de polígono como 'polygon' en la DB
       const typeToSend = (finalShape.type === 'ortho' || finalShape.type === 'polygon') ? 'polygon' : finalShape.type;
       
       formData.append('shape_type', typeToSend);
@@ -343,7 +311,6 @@ function PlotPlan({ plotPlan, cwaToAssociate, onShapeSaved, onShapeClick }) {
     }
   };
 
-  // ... (Tooltip handlers igual que antes) ...
   const handleShapeMouseEnter = (e, shape) => {
     const stage = e.target.getStage();
     const pointerPos = stage.getPointerPosition();
@@ -368,8 +335,6 @@ function PlotPlan({ plotPlan, cwaToAssociate, onShapeSaved, onShapeClick }) {
     handleMouseMove(e);
   };
 
-  // Calculamos el grosor de línea dinámico para que siempre se vea fino
-  // Si haces zoom x2, el grosor baja a la mitad para mantenerse de 2px visuales
   const dynamicStroke = 2 / (scaleRatio * stageState.scale);
 
   return (
@@ -379,7 +344,6 @@ function PlotPlan({ plotPlan, cwaToAssociate, onShapeSaved, onShapeClick }) {
       <div ref={containerRef} className="w-full relative flex-1 overflow-hidden cursor-crosshair" style={{ backgroundColor: '#262626' }}>
         {!image && <div className="flex items-center justify-center h-full text-white">⏳ Cargando plano...</div>}
         
-        {/* Tooltip */}
         {tooltip.visible && (
             <div 
                 className="absolute z-50 bg-black/90 text-white px-3 py-2 rounded-lg shadow-xl border border-gray-600 pointer-events-none transform -translate-x-1/2 -translate-y-full"
@@ -419,7 +383,6 @@ function PlotPlan({ plotPlan, cwaToAssociate, onShapeSaved, onShapeClick }) {
                   listening={false} 
                 />
                 
-                {/* Formas Existentes */}
                 {shapes.map(shape => {
                   const isSel = shape.key === selectedShapeKey;
                   const props = {
@@ -437,17 +400,12 @@ function PlotPlan({ plotPlan, cwaToAssociate, onShapeSaved, onShapeClick }) {
                   return null;
                 })}
 
-                {/* Dibujo Temporal: Rect/Circ */}
                 {newShape && activeTool === 'rect' && <Rect {...newShape} fill={`${newShape.color}40`} stroke={newShape.color} strokeWidth={dynamicStroke} />}
                 {newShape && activeTool === 'circle' && <Circle {...newShape} fill={`${newShape.color}40`} stroke={newShape.color} strokeWidth={dynamicStroke} />}
                 
-                {/* Dibujo Temporal: Polígonos + Línea Guía */}
                 {isDrawingPolygon && polygonPoints.length > 0 && (
                     <>
-                        {/* Líneas ya confirmadas */}
                         <Line points={polygonPoints} stroke={currentColor} strokeWidth={dynamicStroke} />
-                        
-                        {/* Línea Guía (Rubber Band) al cursor */}
                         {cursorPos && (
                             <Line 
                                 points={[
@@ -458,14 +416,12 @@ function PlotPlan({ plotPlan, cwaToAssociate, onShapeSaved, onShapeClick }) {
                                 ]} 
                                 stroke={currentColor} 
                                 strokeWidth={dynamicStroke} 
-                                dash={[dynamicStroke * 2, dynamicStroke * 2]} // Línea punteada fina
+                                dash={[dynamicStroke * 2, dynamicStroke * 2]} 
                                 opacity={0.7}
                             />
                         )}
-                        
-                        {/* Puntos vértices para mejor visibilidad mientras dibujas */}
                         {polygonPoints.map((_, i) => {
-                            if(i % 2 !== 0) return null; // Solo pares X,Y
+                            if(i % 2 !== 0) return null; 
                             return <Circle key={i} x={polygonPoints[i]} y={polygonPoints[i+1]} radius={dynamicStroke * 1.5} fill="white" stroke={currentColor} strokeWidth={1} />
                         })}
                     </>
