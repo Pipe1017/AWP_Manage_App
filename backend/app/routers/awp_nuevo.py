@@ -1,5 +1,3 @@
-# backend/app/routers/awp_nuevo.py
-
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
@@ -116,23 +114,84 @@ def get_available_items(proyecto_id: int, filter_type: str = "ALL", db: Session 
 def get_jerarquia_global(proyecto_id: int, db: Session = Depends(get_db)):
     return obtener_jerarquia_global(db, proyecto_id)
 
-# --- IMPORT/EXPORT ---
+# --- IMPORT/EXPORT MEJORADO ---
 @router.get("/exportar-csv/{proyecto_id}")
 def exportar_csv_proyecto(proyecto_id: int, db: Session = Depends(get_db)):
     proyecto = crud.get_proyecto(db, proyecto_id)
     if not proyecto: raise HTTPException(404)
+    
+    # 1. Obtener columnas personalizadas (Restricciones)
+    meta_cols = db.query(models.CWPColumnaMetadata).filter(models.CWPColumnaMetadata.proyecto_id == proyecto_id).all()
+    meta_names = [col.nombre for col in meta_cols]
+
     data_rows = []
+    
     for pp in proyecto.plot_plans:
         for cwa in pp.cwas:
-            if not cwa.cwps: data_rows.append({"ID_Item": "", "CWA": cwa.codigo, "CWP": "", "Tipo_Paquete": "", "Codigo_Paquete": "", "Tipo_Item_Codigo": "", "Nombre_Item": "", "Descripcion": "", "Forecast_Fin": ""})
+            # Base data para CWA
+            cwa_data = {
+                "CWA": cwa.codigo,
+                "Prioridad_Area": cwa.prioridad
+            }
+            
+            if not cwa.cwps:
+                data_rows.append({**cwa_data})
+                continue
+
             for cwp in cwa.cwps:
-                if not cwp.paquetes: data_rows.append({"ID_Item": "", "CWA": cwa.codigo, "CWP": cwp.codigo, "Tipo_Paquete": "", "Codigo_Paquete": "", "Tipo_Item_Codigo": "", "Nombre_Item": "", "Descripcion": "", "Forecast_Fin": ""})
+                # Base data para CWP
+                cwp_data = {
+                    **cwa_data,
+                    "CWP": cwp.codigo,
+                    "Secuencia_CWP": cwp.secuencia,
+                    "Forecast_Inicio_CWP": str(cwp.forecast_inicio) if cwp.forecast_inicio else "",
+                    "Forecast_Fin_CWP": str(cwp.forecast_fin) if cwp.forecast_fin else "",
+                }
+                
+                # Agregar columnas dinámicas (Restricciones)
+                for meta_name in meta_names:
+                    cwp_data[meta_name] = cwp.metadata_json.get(meta_name, "") if cwp.metadata_json else ""
+
+                if not cwp.paquetes:
+                    data_rows.append(cwp_data)
+                    continue
+
                 for pkg in cwp.paquetes:
-                    if not pkg.items: data_rows.append({"ID_Item": "", "CWA": cwa.codigo, "CWP": cwp.codigo, "Tipo_Paquete": pkg.tipo, "Codigo_Paquete": pkg.codigo, "Tipo_Item_Codigo": "", "Nombre_Item": "", "Descripcion": "", "Forecast_Fin": ""})
+                    pkg_data = {
+                        **cwp_data,
+                        "Tipo_Paquete": pkg.tipo,
+                        "Codigo_Paquete": pkg.codigo
+                    }
+
+                    if not pkg.items:
+                        data_rows.append(pkg_data)
+                        continue
+
                     for item in pkg.items:
-                        tipo = db.query(models.TipoEntregable).filter(models.TipoEntregable.id == item.tipo_entregable_id).first() if item.tipo_entregable_id else None
-                        data_rows.append({"ID_Item": item.id, "CWA": cwa.codigo, "CWP": cwp.codigo, "Tipo_Paquete": pkg.tipo, "Codigo_Paquete": pkg.codigo, "Tipo_Item_Codigo": tipo.codigo if tipo else "", "Nombre_Item": item.nombre, "Descripcion": item.descripcion or "", "Forecast_Fin": str(item.forecast_fin) if item.forecast_fin else ""})
+                        # Row completo con Item
+                        row = {
+                            **pkg_data,
+                            "ID_Item": item.source_item_id if item.source_item_id else item.id, # Usar Source ID si es vínculo
+                            "Nombre_Item": item.nombre,
+                            "Forecast_Fin_Item": str(item.forecast_fin) if item.forecast_fin else ""
+                        }
+                        data_rows.append(row)
+
     df = pd.DataFrame(data_rows)
+    
+    # Ordenar columnas para que las fijas salgan primero
+    fixed_cols = ["CWA", "Prioridad_Area", "CWP", "Secuencia_CWP", "Forecast_Inicio_CWP", "Forecast_Fin_CWP"]
+    fixed_cols += meta_names # Restricciones del usuario
+    fixed_cols += ["Tipo_Paquete", "Codigo_Paquete", "ID_Item", "Nombre_Item", "Forecast_Fin_Item"]
+    
+    # Asegurar que todas las columnas existan en el DF (por si hay filas vacías)
+    for col in fixed_cols:
+        if col not in df.columns:
+            df[col] = ""
+            
+    # Reordenar
+    df = df[fixed_cols]
+
     stream = io.StringIO(); df.to_csv(stream, index=False)
     response = StreamingResponse(iter([stream.getvalue()]), media_type="text/csv")
     response.headers["Content-Disposition"] = f"attachment; filename=awp_export_{proyecto.nombre}.csv"
