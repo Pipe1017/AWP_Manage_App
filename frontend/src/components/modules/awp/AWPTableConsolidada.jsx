@@ -4,99 +4,55 @@ import React, { useState, useEffect } from 'react';
 import client from '../../../api/axios';
 
 function AWPTableConsolidada({ plotPlanId, proyecto, filteredCWAId, onDataChange }) {
-  // ============================================================================
-  // 1. ESTADO DE DATOS
-  // ============================================================================
+  // ... (ESTADOS Y LÓGICA DE DATOS SE MANTIENEN IGUAL) ...
   const [jerarquia, setJerarquia] = useState(null);
   const [loading, setLoading] = useState(true);
   const [customColumns, setCustomColumns] = useState([]);
-
-  // ============================================================================
-  // 2. ESTADOS DE FILTROS Y EXPANSIÓN
-  // ============================================================================
   const [filters, setFilters] = useState({ codigo: '', nombre: '' });
   const [expandedCWAs, setExpandedCWAs] = useState(new Set()); 
   const [expandedCWPs, setExpandedCWPs] = useState(new Set());
   const [expandedPaquetes, setExpandedPaquetes] = useState(new Set());
-
-  // ============================================================================
-  // 3. ITEMS TEMPORALES (Batch Create)
-  // ============================================================================
   const [pendingItems, setPendingItems] = useState({});
-  
-  // ============================================================================
-  // 4. MODALES Y FORMULARIOS
-  // ============================================================================
-  const [modals, setModals] = useState({ 
-    cwp: false, 
-    pkg: false, 
-    link: false, 
-    import: false, 
-    editItem: false 
-  });
-  
+  const [modals, setModals] = useState({ cwp: false, pkg: false, link: false, import: false, editItem: false });
   const [isEditingCWP, setIsEditingCWP] = useState(false);
   const [editingCWPId, setEditingCWPId] = useState(null);
   const [selectedParent, setSelectedParent] = useState(null);
   const [formData, setFormData] = useState({});
-  
   const [importFile, setImportFile] = useState(null);
   const [importing, setImporting] = useState(false);
-
   const [transversalItems, setTransversalItems] = useState([]);
   const [selectedLinkItems, setSelectedLinkItems] = useState(new Set());
   const [linkFilter, setLinkFilter] = useState("ALL");
-
   const [editingItem, setEditingItem] = useState(null);
   const [itemTipos, setItemTipos] = useState([]);
 
-  // ============================================================================
-  // 5. CARGA DE DATOS
-  // ============================================================================
-  useEffect(() => {
-    if (proyecto?.id) {
-        loadData();
-    }
-  }, [plotPlanId, proyecto.id]);
+  useEffect(() => { if (proyecto?.id) loadData(); }, [plotPlanId, proyecto.id]);
 
   const loadData = async () => {
     if (!jerarquia) setLoading(true);
-    
     try {
       const colsRes = await client.get(`/proyectos/${proyecto.id}/config/columnas`);
       setCustomColumns(colsRes.data);
-
       const url = `/awp-nuevo/proyectos/${proyecto.id}/jerarquia-global`;
       const res = await client.get(url);
       setJerarquia(res.data);
-      
       if (!jerarquia && res.data.cwas) {
         const allCwaIds = new Set(res.data.cwas.map(c => c.id));
         const allCwpIds = new Set();
         const allPkgIds = new Set();
-        
         res.data.cwas.forEach(c => {
             c.cwps?.forEach(p => {
                 allCwpIds.add(p.id);
                 p.paquetes?.forEach(pkg => allPkgIds.add(pkg.id));
             });
         });
-        
         setExpandedCWAs(allCwaIds);
         setExpandedCWPs(allCwpIds);
         setExpandedPaquetes(allPkgIds);
       }
-      
-    } catch (error) { 
-      console.error(error); 
-    } finally { 
-      setLoading(false); 
-    }
+    } catch (error) { console.error(error); } finally { setLoading(false); }
   };
 
-  // ============================================================================
-  // 6. LÓGICA DE FILTRADO
-  // ============================================================================
   const cwasToRender = jerarquia?.cwas?.filter(cwa => {
     const matchText = !filters.codigo || cwa.codigo.toLowerCase().includes(filters.codigo.toLowerCase());
     const matchSelection = !filteredCWAId || cwa.id === filteredCWAId;
@@ -115,41 +71,18 @@ function AWPTableConsolidada({ plotPlanId, proyecto, filteredCWAId, onDataChange
     }
   }, [filteredCWAId, jerarquia]);
 
-  // ============================================================================
-  // 7. HELPERS & UPDATES
-  // ============================================================================
-  const toggle = (set, id, setFn) => { 
-    const newSet = new Set(set); 
-    newSet.has(id) ? newSet.delete(id) : newSet.add(id); 
-    setFn(newSet); 
-  };
+  // Helpers
+  const toggle = (set, id, setFn) => { const newSet = new Set(set); newSet.has(id) ? newSet.delete(id) : newSet.add(id); setFn(newSet); };
+  const updateCWAField = async (id, field, value) => { try { await client.put(`/awp-nuevo/cwa/${id}`, { [field]: value }); loadData(); } catch(e) { console.error(e); } };
+  const updateCWPField = async (id, field, value) => { try { await client.put(`/awp-nuevo/cwp/${id}`, { [field]: value }); loadData(); } catch(e) { console.error(e); } };
+  const updateItemForecast = async (id, date) => { try { await client.put(`/awp-nuevo/item/${id}`, { forecast_fin: date }); loadData(); } catch(e) { console.error(e); } };
 
-  const updateCWAField = async (id, field, value) => {
-    try { await client.put(`/awp-nuevo/cwa/${id}`, { [field]: value }); loadData(); } catch(e) { console.error(e); }
-  };
-
-  const updateCWPField = async (id, field, value) => {
-    try { await client.put(`/awp-nuevo/cwp/${id}`, { [field]: value }); loadData(); } catch(e) { console.error(e); }
-  };
-
-  const updateItemForecast = async (id, date) => {
-    try { await client.put(`/awp-nuevo/item/${id}`, { forecast_fin: date }); loadData(); } catch(e) { console.error(e); }
-  };
-
-  // ============================================================================
-  // 8. HANDLERS MODALES
-  // ============================================================================
+  // Modales handlers
   const openCWPModal = (cwa=null, cwp=null) => {
-    if(cwp) { 
-      setIsEditingCWP(true); setEditingCWPId(cwp.id); 
-      setFormData({ nombre: cwp.nombre, disciplina_id: cwp.disciplina_id, metadata: cwp.metadata_json || {} }); 
-    } else { 
-      setIsEditingCWP(false); setSelectedParent(cwa); 
-      setFormData({ nombre: '', disciplina_id: proyecto.disciplinas?.[0]?.id || '', metadata: {} }); 
-    }
+    if(cwp) { setIsEditingCWP(true); setEditingCWPId(cwp.id); setFormData({ nombre: cwp.nombre, disciplina_id: cwp.disciplina_id, metadata: cwp.metadata_json || {} }); } 
+    else { setIsEditingCWP(false); setSelectedParent(cwa); setFormData({ nombre: '', disciplina_id: proyecto.disciplinas?.[0]?.id || '', metadata: {} }); }
     setModals({...modals, cwp: true});
   };
-
   const handleSaveCWP = async () => {
     try {
       const payload = { ...formData, area_id: selectedParent?.id || 0, descripcion: '', metadata_json: formData.metadata };
@@ -158,195 +91,163 @@ function AWPTableConsolidada({ plotPlanId, proyecto, filteredCWAId, onDataChange
       setModals({...modals, cwp: false}); loadData(); if(onDataChange) onDataChange();
     } catch(e) { alert("Error: " + e.message); }
   };
-
-  const handleDeleteCWP = async (id) => {
-    if(!confirm("¿Eliminar CWP y todo su contenido?")) return;
-    try { await client.delete(`/awp-nuevo/cwp/${id}`); loadData(); } catch(e) { alert("Error borrando CWP"); }
-  };
-
-  const openPkgModal = (cwp, tipo) => { 
-    setSelectedParent(cwp); setFormData({ nombre: '', tipo, responsable: 'Firma' }); setModals({...modals, pkg: true}); 
-  };
-
-  const handleSavePkg = async () => { 
-    try { await client.post(`/awp-nuevo/cwp/${selectedParent.id}/paquete`, formData); setModals({...modals, pkg: false}); loadData(); } catch(e) { alert("Error creando paquete"); } 
-  };
-
-  const handleDeletePkg = async (id) => { 
-    if(confirm("¿Borrar Paquete y sus items?")) { await client.delete(`/awp-nuevo/paquete/${id}`); loadData(); } 
-  };
-
+  const handleDeleteCWP = async (id) => { if(!confirm("¿Eliminar CWP?")) return; try { await client.delete(`/awp-nuevo/cwp/${id}`); loadData(); } catch(e) { alert("Error borrando CWP"); } };
+  const openPkgModal = (cwp, tipo) => { setSelectedParent(cwp); setFormData({ nombre: '', tipo, responsable: 'Firma' }); setModals({...modals, pkg: true}); };
+  const handleSavePkg = async () => { try { await client.post(`/awp-nuevo/cwp/${selectedParent.id}/paquete`, formData); setModals({...modals, pkg: false}); loadData(); } catch(e) { alert("Error creando paquete"); } };
+  const handleDeletePkg = async (id) => { if(confirm("¿Borrar Paquete?")) { await client.delete(`/awp-nuevo/paquete/${id}`); loadData(); } };
   const addBatch = (pkgId) => {
-    const count = parseInt(prompt("¿Cuántos items deseas crear?", "5")) || 0; 
+    const count = parseInt(prompt("Cantidad de items:", "5")) || 0; 
     if(count <= 0) return;
     const current = pendingItems[pkgId] || [];
     const newRows = Array.from({length: count}).map((_, i) => ({ id: `temp_${Date.now()}_${i}`, nombre: '' }));
     setPendingItems({...pendingItems, [pkgId]: [...current, ...newRows]});
     setExpandedPaquetes(prev => new Set(prev).add(pkgId));
   };
-
-  const changeBatch = (pkgId, tempId, val) => { 
-    const list = pendingItems[pkgId].map(i => i.id === tempId ? {...i, nombre: val} : i); 
-    setPendingItems({...pendingItems, [pkgId]: list}); 
-  };
-
+  const changeBatch = (pkgId, tempId, val) => { const list = pendingItems[pkgId].map(i => i.id === tempId ? {...i, nombre: val} : i); setPendingItems({...pendingItems, [pkgId]: list}); };
   const saveBatch = async (pkg) => {
     const toSave = pendingItems[pkg.id]?.filter(i => i.nombre.trim()) || [];
     if(!toSave.length) return;
-    try {
-      await Promise.all(toSave.map(i => client.post(`/awp-nuevo/paquete/${pkg.id}/item`, { nombre: i.nombre })));
-      const newP = {...pendingItems}; delete newP[pkg.id]; setPendingItems(newP); loadData();
-    } catch(e) { alert("Error guardando lote de items"); }
+    try { await Promise.all(toSave.map(i => client.post(`/awp-nuevo/paquete/${pkg.id}/item`, { nombre: i.nombre }))); const newP = {...pendingItems}; delete newP[pkg.id]; setPendingItems(newP); loadData(); } catch(e) { alert("Error guardando lote"); }
   };
-
-  const handleDeleteItem = async (id) => { 
-    if(confirm("¿Borrar este item?")) { await client.delete(`/awp-nuevo/item/${id}`); loadData(); } 
-  };
-
-  const openLinkModal = async (pkg) => { 
-    setSelectedParent(pkg); 
-    const res = await client.get(`/awp-nuevo/proyectos/${proyecto.id}/items-disponibles?filter_type=ALL`); 
-    setTransversalItems(res.data); setSelectedLinkItems(new Set()); setLinkFilter("ALL"); setModals({...modals, link: true}); 
-  };
-
-  const handleLinkItems = async () => { 
-    await client.post(`/awp-nuevo/paquete/${selectedParent.id}/vincular-items`, { source_item_ids: Array.from(selectedLinkItems) }); 
-    setModals({...modals, link: false}); loadData(); 
-  };
-
+  const handleDeleteItem = async (id) => { if(confirm("¿Borrar item?")) { await client.delete(`/awp-nuevo/item/${id}`); loadData(); } };
+  const openLinkModal = async (pkg) => { setSelectedParent(pkg); const res = await client.get(`/awp-nuevo/proyectos/${proyecto.id}/items-disponibles?filter_type=ALL`); setTransversalItems(res.data); setSelectedLinkItems(new Set()); setLinkFilter("ALL"); setModals({...modals, link: true}); };
+  const handleLinkItems = async () => { await client.post(`/awp-nuevo/paquete/${selectedParent.id}/vincular-items`, { source_item_ids: Array.from(selectedLinkItems) }); setModals({...modals, link: false}); loadData(); };
   const handleExport = () => window.open(`${client.defaults.baseURL}/awp-nuevo/exportar-csv/${proyecto.id}`, '_blank');
+  const handleImport = async (e) => { e.preventDefault(); if(!importFile) return; setImporting(true); const fd = new FormData(); fd.append('file', importFile); try { await client.post(`/awp-nuevo/importar-csv/${proyecto.id}`, fd); alert("Importación exitosa"); setModals({...modals, import: false}); loadData(); if(onDataChange) onDataChange(); } catch(e) { alert("Error: " + (e.response?.data?.detail || e.message)); } finally { setImporting(false); } };
 
-  const handleImport = async (e) => { 
-    e.preventDefault(); 
-    if(!importFile) return; 
-    setImporting(true); const fd = new FormData(); fd.append('file', importFile); 
-    try { 
-      await client.post(`/awp-nuevo/importar-csv/${proyecto.id}`, fd); 
-      alert("✅ Importación exitosa"); setModals({...modals, import: false}); loadData(); if(onDataChange) onDataChange(); 
-    } catch(e) { alert("Error: " + (e.response?.data?.detail || e.message)); } finally { setImporting(false); } 
-  };
-
-  // ============================================================================
-  // 9. RENDER
-  // ============================================================================
-  if (loading && !jerarquia) {
-    return (
-      <div className="p-10 text-center">
-        <div className="w-12 h-12 border-4 border-hatch-orange border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-        <p className="text-hatch-blue font-semibold">Cargando estructura AWP...</p>
-      </div>
-    );
-  }
+  if (loading && !jerarquia) return <div className="p-10 text-center text-hatch-blue">Cargando...</div>;
 
   return (
-    <div className="flex flex-col h-full gap-4 bg-white">
+    <div className="flex flex-col h-full gap-2 bg-white">
       
-      {/* HEADER */}
-      <div className="flex justify-between items-center p-4 bg-white rounded-lg border-2 border-hatch-gray shadow-sm">
+      {/* HEADER COMPACTO */}
+      <div className="flex justify-between items-center px-4 py-2 bg-white rounded border border-hatch-gray shadow-sm shrink-0">
         <div className="flex items-center gap-4">
-          <h3 className="text-hatch-blue font-bold text-lg">📊 Control AWP</h3>
-          <div className="h-6 w-px bg-hatch-gray"></div>
-          <span className="text-sm text-gray-600 font-medium">Proyecto: {proyecto.nombre}</span>
+          <h3 className="text-hatch-blue font-bold text-sm">📊 Control AWP</h3>
+          <div className="h-4 w-px bg-hatch-gray"></div>
+          <span className="text-xs text-gray-600 font-medium">{proyecto.nombre}</span>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => setModals({...modals, import: true})} className="bg-white hover:bg-hatch-gray text-hatch-blue px-4 py-2 rounded-lg text-sm font-medium transition-colors border-2 border-hatch-gray">📤 Importar</button>
-          <button onClick={handleExport} className="bg-gradient-orange hover:shadow-lg text-white px-4 py-2 rounded-lg text-sm font-medium transition-all">📥 Exportar CSV</button>
+          <button onClick={() => setModals({...modals, import: true})} className="bg-white hover:bg-gray-50 text-hatch-blue px-3 py-1 rounded text-xs border border-hatch-gray">📤 Importar</button>
+          <button onClick={handleExport} className="bg-hatch-blue hover:bg-hatch-blue-dark text-white px-3 py-1 rounded text-xs transition-all">📥 Exportar CSV</button>
         </div>
       </div>
 
-      {/* TABLA */}
-      <div className="flex-1 overflow-auto border-2 border-hatch-gray rounded-lg bg-white shadow-md">
-        {/* Usamos table-fixed para que las columnas respeten anchos y el texto haga wrap */}
-        <table className="w-full text-left border-collapse relative table-fixed">
+      {/* TABLA WRAPPER */}
+      <div className="flex-1 overflow-auto border border-hatch-gray rounded bg-white shadow-sm relative">
+        <table className="text-left border-collapse relative w-full min-w-max">
           
-          <thead className="bg-hatch-gray text-xs uppercase font-bold text-hatch-blue sticky top-0 z-20 shadow-sm">
-            <tr>
-              <th className="p-3 w-12 sticky left-0 bg-hatch-gray z-30 border-b-2 border-hatch-gray-dark"></th>
-              <th className="p-3 w-1/3 sticky left-12 bg-hatch-gray z-30 border-r-2 border-b-2 border-hatch-gray-dark">
-                <div className="flex flex-col gap-2">
-                  <span>Jerarquía AWP</span>
-                  <input className="bg-white border-2 border-hatch-gray-dark rounded px-2 py-1 text-hatch-blue font-normal text-xs w-full focus:border-hatch-orange outline-none" placeholder="🔍 Filtrar..." onChange={e => setFilters({...filters, codigo: e.target.value})} />
+          {/* HEADER FIXED (STICKY) */}
+          {/* Nota: Quitamos sticky de thead y lo dejamos solo en th para mayor compatibilidad */}
+          <thead className="text-[10px] uppercase font-bold text-hatch-blue bg-hatch-gray">
+            <tr className="h-8">
+              {/* 1. Expandir (Fija: Left 0, Top 0, Z-50) */}
+              <th className="p-1 w-8 min-w-[32px] sticky left-0 top-0 z-50 bg-hatch-gray border-b border-r border-hatch-gray-dark text-center"></th>
+              
+              {/* 2. Jerarquía (Fija: Left 8, Top 0, Z-50) */}
+              <th className="p-1 w-72 min-w-[288px] sticky left-8 top-0 z-50 bg-hatch-gray border-r-2 border-b border-hatch-gray-dark shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
+                <div className="flex items-center gap-2">
+                  <span>Jerarquía</span>
+                  <input className="bg-white border border-gray-300 rounded px-1 py-0.5 text-hatch-blue font-normal text-[10px] w-full focus:border-hatch-orange outline-none h-5" placeholder="Filtro..." onChange={e => setFilters({...filters, codigo: e.target.value})} />
                 </div>
               </th>
-              <th className="p-3 w-24 text-center border-b-2 border-hatch-gray-dark">Prioridad<br/><span className="text-[9px] font-normal text-gray-600">(Área)</span></th>
-              <th className="p-3 w-16 text-center border-b-2 border-hatch-gray-dark">Seq</th>
-              <th className="p-3 w-48 text-center border-b-2 border-hatch-gray-dark">Forecasts<br/><span className="text-[9px] font-normal text-gray-600">(CWP/Item)</span></th>
-              {/* Se eliminó Progreso y Tipo */}
-              {customColumns.map(c => (<th key={c.id} className="p-3 border-l-2 border-b-2 border-hatch-gray-dark text-hatch-orange whitespace-normal w-32 break-words">{c.nombre}</th>))}
-              <th className="p-3 text-right border-b-2 border-hatch-gray-dark w-40">Acciones</th>
+              
+              {/* Datos Scrollables (Sticky Top 0, Z-40) */}
+              <th className="p-1 w-24 min-w-[96px] text-center border-b border-hatch-gray-dark bg-hatch-gray sticky top-0 z-40">Prioridad<br/><span className="text-[8px] font-normal text-gray-600">(Área)</span></th>
+              <th className="p-1 w-12 min-w-[48px] text-center border-b border-hatch-gray-dark bg-hatch-gray sticky top-0 z-40">Seq</th>
+              <th className="p-1 w-40 min-w-[160px] text-center border-b border-hatch-gray-dark bg-hatch-gray sticky top-0 z-40">Forecasts<br/><span className="text-[8px] font-normal text-gray-600">(Inicio ➜ Fin)</span></th>
+              
+              {/* Columnas Dinámicas (Sticky Top 0, Z-40) */}
+              {customColumns.map(c => (
+                <th key={c.id} className="p-1 border-l border-b border-hatch-gray-dark text-hatch-orange whitespace-normal w-32 min-w-[128px] break-words bg-hatch-gray align-top sticky top-0 z-40">
+                  {c.nombre}
+                </th>
+              ))}
+              
+              <th className="p-1 text-right border-b border-hatch-gray-dark w-32 min-w-[128px] bg-hatch-gray sticky top-0 z-40">Acciones</th>
             </tr>
           </thead>
 
-          <tbody className="text-sm text-hatch-blue divide-y-2 divide-hatch-gray">
+          {/* BODY COMPACTO */}
+          <tbody className="text-xs text-hatch-blue divide-y divide-gray-200">
             {cwasToRender?.map(cwa => {
               const isExp = expandedCWAs.has(cwa.id);
+              const rowBg = filteredCWAId === cwa.id ? 'bg-yellow-50' : 'bg-white';
+              const stickyClass = `sticky left-0 z-30 ${rowBg} border-r border-gray-200 align-top`;
+              const stickyClass2 = `sticky left-8 z-30 ${rowBg} border-r-2 border-hatch-gray shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] align-top break-words whitespace-normal`;
+
               return (
                 <React.Fragment key={cwa.id}>
                   {/* CWA ROW */}
-                  <tr className={`transition-colors ${filteredCWAId === cwa.id ? 'bg-yellow-50 border-l-4 border-yellow-400' : 'bg-white hover:bg-hatch-gray/30'}`}>
-                    <td className="p-3 text-center sticky left-0 bg-inherit z-10 align-top">
-                      <button onClick={() => toggle(expandedCWAs, cwa.id, setExpandedCWAs)} className="text-hatch-blue hover:text-hatch-orange font-bold text-lg w-full transition-colors">{isExp ? '▼' : '▶'}</button>
+                  <tr className={`hover:bg-gray-50 group ${filteredCWAId === cwa.id ? 'border-l-2 border-yellow-400' : ''}`}>
+                    <td className={`p-1 text-center ${stickyClass}`}>
+                      <button onClick={() => toggle(expandedCWAs, cwa.id, setExpandedCWAs)} className="text-hatch-blue hover:text-hatch-orange font-bold w-full h-full flex items-center justify-center">{isExp ? '▼' : '▶'}</button>
                     </td>
-                    <td className="p-3 font-bold text-hatch-blue sticky left-12 bg-inherit z-10 border-r-2 border-hatch-gray align-top break-words whitespace-normal">
-                      <div className="flex flex-col md:flex-row md:items-start gap-2">
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold self-start ${cwa.es_transversal ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>{cwa.es_transversal ? 'DWP' : 'CWA'}</span>
-                        <span className="text-base leading-tight">{cwa.codigo} <span className="font-normal text-gray-600">- {cwa.nombre}</span></span>
+                    <td className={`p-2 font-bold text-hatch-blue ${stickyClass2}`}>
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-1">
+                            <span className={`text-[8px] px-1 rounded font-semibold ${cwa.es_transversal ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>{cwa.es_transversal ? 'DWP' : 'CWA'}</span>
+                            <span className="text-xs">{cwa.codigo}</span>
+                        </div>
+                        <span className="font-normal text-gray-500 text-[10px] leading-tight">{cwa.nombre}</span>
                       </div>
                     </td>
-                    <td className="p-3 text-center align-top">
-                      <select 
-                        className={`bg-white text-xs font-bold border-2 rounded-lg px-2 py-1 cursor-pointer w-full ${cwa.prioridad === 'CRITICA' ? 'border-red-400 text-red-600' : cwa.prioridad === 'ALTA' ? 'border-orange-400 text-orange-600' : 'border-hatch-gray text-gray-600'}`}
-                        value={cwa.prioridad || 'MEDIA'} 
-                        onChange={e => updateCWAField(cwa.id, 'prioridad', e.target.value)}
-                        onClick={e => e.stopPropagation()}
-                      >
-                        <option value="BAJA">🟢 Baja</option>
-                        <option value="MEDIA">🟡 Media</option>
-                        <option value="ALTA">🟠 Alta</option>
-                        <option value="CRITICA">🔴 Crítica</option>
+                    <td className={`p-1 text-center align-top ${rowBg}`}>
+                      <select className={`text-[10px] border rounded px-1 py-0.5 w-full h-6 ${cwa.prioridad === 'CRITICA' ? 'border-red-300 text-red-600' : 'border-gray-300'}`} value={cwa.prioridad || 'MEDIA'} onChange={e => updateCWAField(cwa.id, 'prioridad', e.target.value)} onClick={e => e.stopPropagation()}>
+                        <option value="BAJA">🟢 Baja</option><option value="MEDIA">🟡 Media</option><option value="ALTA">🟠 Alta</option><option value="CRITICA">🔴 Crítica</option>
                       </select>
                     </td>
-                    <td colSpan={2 + customColumns.length} className="p-3 text-xs text-gray-500 italic align-top">📍 {cwa.plot_plan_nombre}</td>
-                    <td className="p-3 text-right align-top">
-                      <button onClick={() => openCWPModal(cwa)} className="text-xs bg-gradient-orange hover:shadow-lg text-white px-3 py-1.5 rounded-lg transition-all font-medium">+ CWP</button>
+                    <td colSpan={2 + customColumns.length} className={`p-2 text-[10px] text-gray-400 italic align-top ${rowBg}`}>📍 {cwa.plot_plan_nombre}</td>
+                    <td className={`p-1 text-right align-top ${rowBg}`}>
+                      <button onClick={() => openCWPModal(cwa)} className="text-[10px] bg-gray-100 hover:bg-hatch-orange hover:text-white text-gray-600 px-2 py-0.5 rounded border border-gray-300 transition-colors">+ CWP</button>
                     </td>
                   </tr>
 
                   {/* CWP ROW */}
                   {isExp && cwa.cwps.sort((a, b) => (a.secuencia || 0) - (b.secuencia || 0)).map(cwp => {
                     const isCwpExp = expandedCWPs.has(cwp.id);
+                    const cwpBg = 'bg-gray-50/50';
+                    const stickyCwp = `sticky left-0 z-30 ${cwpBg} align-top`;
+                    const stickyCwp2 = `sticky left-8 z-30 ${cwpBg} border-r-2 border-hatch-gray shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] align-top break-words whitespace-normal pl-4`;
+
                     return (
                       <React.Fragment key={cwp.id}>
-                        <tr className="bg-hatch-gray/20 hover:bg-hatch-gray/40 border-t border-hatch-gray transition-colors">
-                          <td className="sticky left-0 bg-inherit z-10 align-top"></td>
-                          <td className="p-3 pl-8 sticky left-12 bg-inherit z-10 border-r-2 border-hatch-gray align-top break-words whitespace-normal">
-                            <div className="flex items-start gap-3">
-                              <button onClick={() => toggle(expandedCWPs, cwp.id, setExpandedCWPs)} className="text-hatch-blue hover:text-hatch-orange text-sm font-bold w-4 transition-colors mt-0.5">{isCwpExp ? '▼' : '▶'}</button>
-                              <div className="flex flex-col">
-                                <span className="text-green-600 font-mono text-xs bg-green-50 px-1 rounded border border-green-200 w-fit mb-1">{cwp.codigo}</span>
-                                <span className="text-hatch-blue font-medium text-sm leading-tight">{cwp.nombre}</span>
+                        <tr className="hover:bg-gray-100 border-t border-gray-100">
+                          <td className={stickyCwp}></td>
+                          <td className={`p-1 ${stickyCwp2}`}>
+                            <div className="flex items-start gap-2">
+                              <button onClick={() => toggle(expandedCWPs, cwp.id, setExpandedCWPs)} className="text-hatch-blue hover:text-hatch-orange font-bold w-3 mt-0.5 text-[10px]">{isCwpExp ? '▼' : '▶'}</button>
+                              <div className="flex flex-col w-full">
+                                <span className="text-green-700 font-mono text-[10px] bg-green-50 px-1 rounded border border-green-100 w-fit mb-0.5">{cwp.codigo}</span>
+                                <span className="text-hatch-blue font-medium text-[11px] leading-tight">{cwp.nombre}</span>
                               </div>
                             </div>
                           </td>
-                          <td className="p-3 text-center text-gray-400 text-xs align-top">-</td>
-                          <td className="p-3 text-center align-top">
-                            <input type="number" className="w-full bg-white border-2 border-hatch-gray rounded text-center text-sm text-hatch-blue focus:border-hatch-orange outline-none" value={cwp.secuencia || 0} onChange={e => updateCWPField(cwp.id, 'secuencia', e.target.value)} />
+                          <td className={`p-1 text-center align-top ${cwpBg} text-[10px] text-gray-300`}>-</td>
+                          <td className={`p-1 text-center align-top ${cwpBg}`}>
+                            <input type="number" className="w-full border border-gray-300 rounded text-center text-[10px] h-6 focus:border-hatch-orange outline-none bg-white" value={cwp.secuencia || 0} onChange={e => updateCWPField(cwp.id, 'secuencia', e.target.value)} />
                           </td>
-                          <td className="p-3 text-center text-xs align-top">
-                            <div className="flex flex-col gap-1">
-                              <input type="date" className="bg-white border-2 border-hatch-gray rounded w-full text-hatch-blue text-[10px] px-1 py-0.5" value={cwp.forecast_inicio?.split('T')[0] || ''} onChange={e => updateCWPField(cwp.id, 'forecast_inicio', e.target.value)} title="Inicio" />
-                              <input type="date" className="bg-white border-2 border-hatch-gray rounded w-full text-hatch-blue text-[10px] px-1 py-0.5" value={cwp.forecast_fin?.split('T')[0] || ''} onChange={e => updateCWPField(cwp.id, 'forecast_fin', e.target.value)} title="Fin" />
+                          <td className={`p-1 text-center align-top ${cwpBg}`}>
+                            <div className="flex gap-1">
+                              <input type="date" className="border border-gray-300 rounded w-full text-[9px] px-0.5 py-0 bg-white h-6" value={cwp.forecast_inicio?.split('T')[0] || ''} onChange={e => updateCWPField(cwp.id, 'forecast_inicio', e.target.value)} />
+                              <input type="date" className="border border-gray-300 rounded w-full text-[9px] px-0.5 py-0 bg-white h-6" value={cwp.forecast_fin?.split('T')[0] || ''} onChange={e => updateCWPField(cwp.id, 'forecast_fin', e.target.value)} />
                             </div>
                           </td>
-                          {customColumns.map(c => (<td key={c.id} className="p-3 border-l-2 border-hatch-gray text-xs align-top break-words whitespace-normal"><span className="bg-hatch-gray text-hatch-blue px-2 py-1 rounded border border-hatch-gray-dark block w-full">{cwp.metadata_json?.[c.nombre] || '-'}</span></td>))}
-                          <td className="p-3 text-right align-top">
-                            <div className="flex justify-end gap-1 items-center flex-wrap">
-                              <button onClick={() => openCWPModal(null, cwp)} className="text-gray-500 hover:text-hatch-orange text-xs p-1 rounded border border-transparent hover:border-hatch-gray">✏️</button>
-                              <button onClick={() => handleDeleteCWP(cwp.id)} className="text-red-400 hover:text-red-600 text-xs p-1 rounded border border-transparent hover:border-red-200">🗑️</button>
-                              <div className="w-full h-1"></div>
-                              <button onClick={() => openPkgModal(cwp, 'EWP')} className="text-[9px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded border border-purple-300">+E</button>
-                              <button onClick={() => openPkgModal(cwp, 'PWP')} className="text-[9px] bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded border border-teal-300">+P</button>
-                              <button onClick={() => openPkgModal(cwp, 'IWP')} className="text-[9px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded border border-orange-300">+I</button>
+                          {customColumns.map(c => (
+                            <td key={c.id} className={`p-1 border-l border-gray-200 align-top ${cwpBg}`}>
+                              <span className="text-[10px] bg-white px-1 py-0.5 rounded border border-gray-200 block w-full min-h-[20px] break-words">
+                                {cwp.metadata_json?.[c.nombre] || ''}
+                              </span>
+                            </td>
+                          ))}
+                          <td className={`p-1 text-right align-top ${cwpBg}`}>
+                            <div className="flex justify-end gap-1 flex-wrap">
+                              <button onClick={() => openCWPModal(null, cwp)} className="text-gray-400 hover:text-hatch-blue text-[10px]">✏️</button>
+                              <button onClick={() => handleDeleteCWP(cwp.id)} className="text-gray-400 hover:text-red-600 text-[10px]">🗑️</button>
+                              <span className="text-gray-300 mx-1">|</span>
+                              <button onClick={() => openPkgModal(cwp, 'EWP')} className="text-[9px] bg-white text-purple-700 border border-purple-200 px-1 rounded hover:bg-purple-50">+E</button>
+                              <button onClick={() => openPkgModal(cwp, 'PWP')} className="text-[9px] bg-white text-teal-700 border border-teal-200 px-1 rounded hover:bg-teal-50">+P</button>
+                              <button onClick={() => openPkgModal(cwp, 'IWP')} className="text-[9px] bg-white text-orange-700 border border-orange-200 px-1 rounded hover:bg-orange-50">+I</button>
                             </div>
                           </td>
                         </tr>
@@ -354,26 +255,33 @@ function AWPTableConsolidada({ plotPlanId, proyecto, filteredCWAId, onDataChange
                         {/* PAQUETES ROW */}
                         {isCwpExp && cwp.paquetes.map(pkg => {
                           const isPkgExp = expandedPaquetes.has(pkg.id);
+                          const pkgBg = 'bg-white';
+                          const stickyPkg = `sticky left-0 z-30 ${pkgBg} align-top`;
+                          const stickyPkg2 = `sticky left-8 z-30 ${pkgBg} border-r-2 border-hatch-gray shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] align-top break-words whitespace-normal pl-8`;
+
                           return (
                             <React.Fragment key={pkg.id}>
-                              <tr className="bg-white hover:bg-hatch-gray/10 text-xs group border-t border-hatch-gray/50 transition-colors">
-                                <td className="sticky left-0 bg-inherit z-10 align-top"></td>
-                                <td className="p-2 pl-16 sticky left-12 bg-inherit z-10 border-r-2 border-hatch-gray align-top break-words whitespace-normal">
-                                  <div className="flex items-start gap-2 text-gray-700">
-                                    <button onClick={() => toggle(expandedPaquetes, pkg.id, setExpandedPaquetes)} className="hover:text-hatch-orange text-xs font-bold w-3 transition-colors mt-0.5">{isPkgExp ? '▼' : '▶'}</button>
-                                    <div className="flex flex-col">
-                                        <span className={`text-[9px] border px-1 py-0.5 rounded font-semibold w-fit mb-1 ${pkg.tipo === 'EWP' ? 'border-purple-300 text-purple-700 bg-purple-50' : pkg.tipo === 'PWP' ? 'border-teal-300 text-teal-700 bg-teal-50' : 'border-orange-300 text-orange-700 bg-orange-50'}`}>{pkg.tipo}</span>
-                                        <span className="font-mono text-[10px] text-gray-600">{pkg.codigo}</span>
+                              <tr className="hover:bg-gray-50 border-t border-gray-100">
+                                <td className={stickyPkg}></td>
+                                <td className={`p-1 ${stickyPkg2}`}>
+                                  <div className="flex items-start gap-1 text-gray-600">
+                                    <button onClick={() => toggle(expandedPaquetes, pkg.id, setExpandedPaquetes)} className="hover:text-hatch-orange text-[10px] font-bold w-3 mt-0.5">{isPkgExp ? '▼' : '▶'}</button>
+                                    <div className="flex flex-col w-full">
+                                        <div className="flex items-center gap-1 mb-0.5">
+                                            <span className={`text-[8px] border px-1 rounded font-bold ${pkg.tipo === 'EWP' ? 'text-purple-700 bg-purple-50' : pkg.tipo === 'PWP' ? 'text-teal-700 bg-teal-50' : 'text-orange-700 bg-orange-50'}`}>{pkg.tipo}</span>
+                                            <span className="font-mono text-[9px] text-gray-500">{pkg.codigo}</span>
+                                        </div>
+                                        <span className="text-[10px] italic text-gray-500 leading-tight">{pkg.nombre}</span>
                                     </div>
                                   </div>
                                 </td>
-                                <td colSpan={3} className="p-2 text-gray-600 italic text-[11px] align-top break-words whitespace-normal">{pkg.nombre}</td>
-                                {customColumns.map(c => <td key={c.id} className="border-l-2 border-hatch-gray/30 align-top"></td>)}
-                                <td className="p-2 text-right align-top opacity-60 group-hover:opacity-100 transition-opacity">
-                                  <div className="flex justify-end gap-1 flex-wrap">
-                                    <button onClick={() => handleDeletePkg(pkg.id)} className="text-red-400 hover:text-red-600 hover:bg-red-50 px-2 py-1 rounded text-xs transition-colors">🗑️</button>
-                                    <button onClick={() => openLinkModal(pkg)} className="text-blue-500 hover:text-blue-700 hover:bg-blue-50 px-2 py-1 rounded text-xs transition-colors font-medium">🔗 Link</button>
-                                    <button onClick={() => addBatch(pkg.id)} className="text-hatch-orange hover:text-hatch-orange-dark hover:bg-orange-50 px-2 py-1 rounded text-xs font-bold transition-colors">+Lote</button>
+                                <td colSpan={3} className={`p-1 ${pkgBg}`}></td>
+                                {customColumns.map(c => <td key={c.id} className={`border-l border-gray-200 ${pkgBg}`}></td>)}
+                                <td className={`p-1 text-right align-top ${pkgBg} opacity-50 hover:opacity-100`}>
+                                  <div className="flex justify-end gap-1">
+                                    <button onClick={() => handleDeletePkg(pkg.id)} className="text-gray-400 hover:text-red-600 text-[10px]">🗑️</button>
+                                    <button onClick={() => openLinkModal(pkg)} className="text-blue-600 hover:underline text-[10px]">Link</button>
+                                    <button onClick={() => addBatch(pkg.id)} className="text-hatch-orange font-bold text-[10px]">+Lote</button>
                                   </div>
                                 </td>
                               </tr>
@@ -381,52 +289,56 @@ function AWPTableConsolidada({ plotPlanId, proyecto, filteredCWAId, onDataChange
                               {/* ITEMS ROW */}
                               {isPkgExp && (
                                 <>
-                                  {pkg.items.map(item => (
-                                    <tr key={item.id} className="bg-hatch-gray/5 text-[11px] hover:bg-hatch-gray/20 transition-colors border-t border-hatch-gray/30">
-                                      <td className="sticky left-0 bg-inherit z-10 align-top"></td>
-                                      <td className="p-2 pl-24 sticky left-12 bg-inherit z-10 border-r-2 border-hatch-gray/50 text-gray-500 align-top break-words whitespace-normal">
-                                        {item.source_item_id ? (
-                                            <div className="flex items-center gap-1 text-blue-600 bg-blue-50 px-1 rounded border border-blue-100">
-                                                <span className="text-xs">🔗</span>
-                                                <span className="font-mono font-bold text-[10px]">ID: {item.source_item_id}</span>
+                                  {pkg.items.map(item => {
+                                    const itemBg = 'bg-gray-50/30';
+                                    const stickyItem = `sticky left-0 z-30 ${itemBg} align-top`;
+                                    const stickyItem2 = `sticky left-8 z-30 ${itemBg} border-r-2 border-hatch-gray shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] align-top break-words whitespace-normal pl-12`;
+
+                                    return (
+                                      <tr key={item.id} className="hover:bg-blue-50/30 border-t border-gray-50">
+                                        <td className={stickyItem}></td>
+                                        <td className={`p-1 ${stickyItem2} text-[10px]`}>
+                                          <div className="flex flex-col">
+                                            <div className="flex justify-between items-start">
+                                                <span className="text-hatch-blue font-medium leading-tight">{item.nombre}</span>
+                                                {item.source_item_id && <span className="text-[8px] text-blue-500 bg-blue-50 px-1 rounded border border-blue-100 ml-1 whitespace-nowrap">🔗 {item.source_item_id}</span>}
                                             </div>
-                                        ) : (
-                                            <span className="text-gray-400 font-mono">ID: {item.id}</span>
-                                        )}
-                                      </td>
-                                      <td colSpan={2} className="p-2 text-hatch-blue pl-4 align-top break-words whitespace-normal leading-tight">
-                                        {item.nombre}
-                                      </td>
-                                      <td className="p-2 text-center align-top">
-                                        <input type="date" className="bg-white border border-hatch-gray rounded w-full text-gray-600 text-[10px] text-center px-1 py-0.5" value={item.forecast_fin?.split('T')[0] || ''} onChange={e => updateItemForecast(item.id, e.target.value)} />
-                                      </td>
-                                      {customColumns.map(c => <td key={c.id} className="border-l-2 border-hatch-gray/30 align-top"></td>)}
-                                      <td className="p-2 text-right align-top">
-                                        <button onClick={() => handleDeleteItem(item.id)} className="text-gray-400 hover:text-red-500 px-2 py-1 rounded hover:bg-red-50 transition-colors">🗑️</button>
-                                      </td>
-                                    </tr>
-                                  ))}
+                                            {!item.source_item_id && <span className="text-[8px] text-gray-300 font-mono">#{item.id}</span>}
+                                          </div>
+                                        </td>
+                                        <td className={`p-1 ${itemBg}`}></td>
+                                        <td className={`p-1 ${itemBg}`}></td>
+                                        <td className={`p-1 text-center align-top ${itemBg}`}>
+                                          <input type="date" className="border border-gray-200 rounded w-full text-gray-500 text-[9px] px-0.5 py-0 h-5 bg-white text-center" value={item.forecast_fin?.split('T')[0] || ''} onChange={e => updateItemForecast(item.id, e.target.value)} />
+                                        </td>
+                                        {customColumns.map(c => <td key={c.id} className={`border-l border-gray-200 ${itemBg}`}></td>)}
+                                        <td className={`p-1 text-right align-top ${itemBg}`}>
+                                          <button onClick={() => handleDeleteItem(item.id)} className="text-gray-300 hover:text-red-500 text-[10px] px-1">×</button>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
                                   
                                   {/* BATCH ITEMS */}
                                   {pendingItems[pkg.id]?.map(t => (
-                                    <tr key={t.id} className="bg-yellow-50 text-xs animate-pulse border-t border-yellow-200">
-                                      <td className="sticky left-0 bg-inherit align-top"></td>
-                                      <td className="p-2 pl-24 text-yellow-700 sticky left-12 border-r-2 border-yellow-200 font-semibold align-top">⚡ Nuevo</td>
-                                      <td colSpan={3} className="p-2 align-top">
-                                        <input autoFocus className="w-full bg-white border-2 border-yellow-400 rounded text-hatch-blue outline-none px-2 py-1" value={t.nombre} onChange={e => changeBatch(pkg.id, t.id, e.target.value)} onKeyDown={e => {if(e.key === 'Enter') saveBatch(pkg)}} placeholder="Nombre del entregable..." />
+                                    <tr key={t.id} className="bg-yellow-50 text-xs">
+                                      <td className="sticky left-0 z-30 bg-yellow-50"></td>
+                                      <td className="p-1 pl-12 sticky left-8 z-30 bg-yellow-50 border-r-2 border-hatch-gray text-[10px] font-bold text-yellow-700">⚡ Nuevo</td>
+                                      <td colSpan={3} className="p-1">
+                                        <input autoFocus className="w-full border border-yellow-300 rounded text-[10px] px-1 py-0.5 bg-white" value={t.nombre} onChange={e => changeBatch(pkg.id, t.id, e.target.value)} onKeyDown={e => {if(e.key === 'Enter') saveBatch(pkg)}} placeholder="Nombre..." />
                                       </td>
-                                      <td colSpan={customColumns.length} className="align-top"></td>
-                                      <td className="p-2 text-right align-top">
-                                        <button onClick={() => setPendingItems({...pendingItems, [pkg.id]: pendingItems[pkg.id].filter(i => i.id !== t.id)})} className="text-red-500 hover:bg-red-50 px-2 py-1 rounded">✕</button>
+                                      <td colSpan={customColumns.length}></td>
+                                      <td className="p-1 text-right">
+                                        <button onClick={() => setPendingItems({...pendingItems, [pkg.id]: pendingItems[pkg.id].filter(i => i.id !== t.id)})} className="text-red-400 hover:text-red-600 px-1">×</button>
                                       </td>
                                     </tr>
                                   ))}
                                   
-                                  {/* SAVE BATCH BTN */}
+                                  {/* SAVE BTN */}
                                   {pendingItems[pkg.id]?.length > 0 && (
-                                    <tr className="bg-yellow-100 border-t-2 border-yellow-400">
-                                      <td colSpan="100%" className="text-center p-2">
-                                        <button onClick={() => saveBatch(pkg)} className="bg-gradient-orange text-white font-bold px-6 py-1 rounded text-xs uppercase shadow-md">💾 Guardar {pendingItems[pkg.id].length} Item(s)</button>
+                                    <tr className="bg-yellow-50 border-b border-yellow-200">
+                                      <td colSpan="100%" className="text-center p-1">
+                                        <button onClick={() => saveBatch(pkg)} className="bg-gradient-orange text-white font-bold px-4 py-0.5 rounded text-[10px] shadow-sm">GUARDAR ({pendingItems[pkg.id].length})</button>
                                       </td>
                                     </tr>
                                   )}
@@ -445,58 +357,46 @@ function AWPTableConsolidada({ plotPlanId, proyecto, filteredCWAId, onDataChange
         </table>
       </div>
 
-      {/* Los Modales (CWP, Paquete, Link, Import) se mantienen igual que la versión anterior */}
-      {/* Se eliminó el Modal de Clasificar Item (editItem) ya que no se usa Tipo de Item */}
+      {/* Modales se mantienen igual, solo asegurate de que estén al final */}
       {modals.cwp && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm">
-          <div className="bg-white w-[500px] p-6 rounded-2xl border-2 border-hatch-gray shadow-2xl">
-            <h3 className="text-hatch-blue font-bold mb-4 text-xl flex items-center gap-2"><span className="text-hatch-orange">{isEditingCWP ? '✏️' : '➕'}</span> {isEditingCWP ? 'Editar' : 'Crear'} CWP</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs text-gray-600 mb-1 font-semibold">Nombre del Paquete</label>
-                <input className="w-full bg-white text-hatch-blue border-2 border-hatch-gray rounded-lg px-3 py-2 focus:border-hatch-orange outline-none" value={formData.nombre} onChange={e => setFormData({...formData, nombre: e.target.value})} />
-              </div>
-              {!isEditingCWP && (
-                <div>
-                  <label className="block text-xs text-gray-600 mb-1 font-semibold">Disciplina</label>
-                  <select className="w-full bg-white text-hatch-blue border-2 border-hatch-gray rounded-lg px-3 py-2 focus:border-hatch-orange outline-none" value={formData.disciplina_id} onChange={e => setFormData({...formData, disciplina_id: e.target.value})}>
-                    <option value="">Seleccionar disciplina...</option>
-                    {proyecto.disciplinas?.map(d => <option key={d.id} value={d.id}>{d.codigo} - {d.nombre}</option>)}
-                  </select>
-                </div>
-              )}
-              {customColumns.length > 0 && (
-                <div className="border-t-2 border-hatch-gray pt-4">
-                  <p className="text-hatch-orange text-xs font-bold mb-3 uppercase tracking-wider">🏷️ Restricciones / Metadatos</p>
-                  {customColumns.map(c => (
-                    <div key={c.id} className="mb-3">
-                      <label className="block text-xs text-gray-600 mb-1 font-semibold">{c.nombre}</label>
-                      {c.tipo_dato === 'SELECCION' ? (
-                        <select className="w-full bg-white text-hatch-blue border-2 border-hatch-gray rounded-lg px-2 py-1.5 text-sm focus:border-hatch-orange outline-none" value={formData.metadata?.[c.nombre] || ''} onChange={e => setFormData({...formData, metadata: {...formData.metadata, [c.nombre]: e.target.value}})}><option value="">- Seleccionar -</option>{c.opciones_json?.map(o => <option key={o} value={o}>{o}</option>)}</select>
-                      ) : (
-                        <input className="w-full bg-white text-hatch-blue border-2 border-hatch-gray rounded-lg px-2 py-1.5 text-sm focus:border-hatch-orange outline-none" value={formData.metadata?.[c.nombre] || ''} onChange={e => setFormData({...formData, metadata: {...formData.metadata, [c.nombre]: e.target.value}})} />
-                      )}
+            <div className="bg-white w-[400px] p-4 rounded shadow-lg border border-gray-300">
+                <h3 className="font-bold text-hatch-blue mb-3">Gestión CWP</h3>
+                <input className="w-full border p-2 rounded text-sm mb-2" placeholder="Nombre" value={formData.nombre} onChange={e => setFormData({...formData, nombre: e.target.value})} />
+                {!isEditingCWP && (
+                    <select className="w-full border p-2 rounded text-sm mb-2" value={formData.disciplina_id} onChange={e => setFormData({...formData, disciplina_id: e.target.value})}>
+                        <option value="">Disciplina...</option>
+                        {proyecto.disciplinas?.map(d => <option key={d.id} value={d.id}>{d.codigo}</option>)}
+                    </select>
+                )}
+                {customColumns.length > 0 && (
+                    <div className="border-t pt-2 mt-2">
+                        <p className="text-xs font-bold text-gray-500 mb-1">Metadatos</p>
+                        {customColumns.map(c => (
+                            <div key={c.id} className="mb-1">
+                                <label className="text-[10px] block text-gray-600">{c.nombre}</label>
+                                <input className="w-full border p-1 rounded text-xs" value={formData.metadata?.[c.nombre] || ''} onChange={e => setFormData({...formData, metadata: {...formData.metadata, [c.nombre]: e.target.value}})} />
+                            </div>
+                        ))}
                     </div>
-                  ))}
+                )}
+                <div className="flex justify-end gap-2 mt-3">
+                    <button onClick={() => setModals({...modals, cwp: false})} className="text-xs text-gray-500">Cancelar</button>
+                    <button onClick={handleSaveCWP} className="text-xs bg-hatch-orange text-white px-3 py-1 rounded">Guardar</button>
                 </div>
-              )}
             </div>
-            <div className="flex justify-end gap-3 mt-6 pt-4 border-t-2 border-hatch-gray">
-              <button onClick={() => setModals({...modals, cwp: false})} className="text-gray-600 hover:text-hatch-blue px-4 py-2 font-medium">Cancelar</button>
-              <button onClick={handleSaveCWP} className="bg-gradient-orange text-white px-6 py-2 rounded-lg font-bold">{isEditingCWP ? 'Guardar' : 'Crear'}</button>
-            </div>
-          </div>
         </div>
       )}
-
+      
+      {/* (Resto de modales Link, Pkg, Import: Mismos que antes pero con estilos compactos si lo deseas, o déjalos igual) */}
       {modals.pkg && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm">
-          <div className="bg-white p-6 rounded-2xl w-96 border-2 border-hatch-gray shadow-2xl">
-            <h3 className="text-hatch-blue font-bold mb-4 text-xl flex items-center gap-2"><span className="text-hatch-orange">➕</span> Nuevo {formData.tipo}</h3>
-            <input className="w-full mb-4 bg-white text-hatch-blue border-2 border-hatch-gray rounded-lg px-3 py-2 focus:border-hatch-orange outline-none" placeholder="Nombre" value={formData.nombre} onChange={e => setFormData({...formData, nombre: e.target.value})} />
-            <div className="flex justify-end gap-3">
-              <button onClick={() => setModals({...modals, pkg: false})} className="text-gray-600 px-4 py-2">Cancelar</button>
-              <button onClick={handleSavePkg} className="bg-gradient-orange text-white px-6 py-2 rounded-lg font-bold">Crear</button>
+          <div className="bg-white p-4 rounded w-80 shadow-lg">
+            <h3 className="font-bold text-sm mb-2">Nuevo {formData.tipo}</h3>
+            <input className="w-full border p-1.5 rounded text-sm mb-3" placeholder="Nombre" value={formData.nombre} onChange={e => setFormData({...formData, nombre: e.target.value})} />
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setModals({...modals, pkg: false})} className="text-xs text-gray-500">Cancelar</button>
+              <button onClick={handleSavePkg} className="text-xs bg-hatch-orange text-white px-3 py-1 rounded">Crear</button>
             </div>
           </div>
         </div>
@@ -504,23 +404,22 @@ function AWPTableConsolidada({ plotPlanId, proyecto, filteredCWAId, onDataChange
 
       {modals.link && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm">
-          <div className="bg-white w-[650px] p-6 rounded-2xl border-2 border-hatch-gray h-[85vh] flex flex-col shadow-2xl">
-            <h3 className="text-xl font-bold text-hatch-blue mb-2">🔗 Vincular Entregables</h3>
-            <div className="flex gap-2 mb-3">
-              <button onClick={() => setLinkFilter("ALL")} className={`px-4 py-2 rounded-lg text-sm font-bold ${linkFilter === "ALL" ? 'bg-gradient-orange text-white' : 'bg-hatch-gray text-hatch-blue'}`}>Todo</button>
-              <button onClick={() => setLinkFilter("TRANSVERSAL")} className={`px-4 py-2 rounded-lg text-sm font-bold ${linkFilter === "TRANSVERSAL" ? 'bg-gradient-orange text-white' : 'bg-hatch-gray text-hatch-blue'}`}>Transversales</button>
+          <div className="bg-white w-[600px] h-[80vh] p-4 rounded flex flex-col shadow-lg">
+            <h3 className="font-bold text-sm mb-2">Vincular Items</h3>
+            <div className="flex gap-2 mb-2 text-xs">
+                <button onClick={() => setLinkFilter("ALL")} className={`px-2 py-1 rounded ${linkFilter==="ALL" ? 'bg-blue-100 text-blue-700' : 'bg-gray-100'}`}>Todos</button>
+                <button onClick={() => setLinkFilter("TRANSVERSAL")} className={`px-2 py-1 rounded ${linkFilter==="TRANSVERSAL" ? 'bg-blue-100 text-blue-700' : 'bg-gray-100'}`}>Transversales</button>
             </div>
-            <div className="flex-1 overflow-y-auto bg-hatch-gray/20 p-3 rounded-lg border-2 border-hatch-gray">
-              {transversalItems.filter(i => linkFilter === "ALL" || i.es_transversal).map(item => (
-                <div key={item.id} className={`flex items-center p-3 mb-2 rounded-lg cursor-pointer border-2 ${selectedLinkItems.has(item.id) ? 'border-hatch-orange bg-orange-50' : 'border-hatch-gray bg-white'}`} onClick={() => toggle(selectedLinkItems, item.id, setSelectedLinkItems)}>
-                  <div className={`w-5 h-5 border-2 rounded mr-3 flex items-center justify-center ${selectedLinkItems.has(item.id) ? 'bg-hatch-orange border-hatch-orange' : 'border-hatch-gray-dark'}`}>{selectedLinkItems.has(item.id) && <span className="text-white font-bold text-sm">✓</span>}</div>
-                  <div><p className="text-hatch-blue text-sm font-medium">{item.nombre}</p><p className="text-gray-500 text-xs">ID:{item.id} | {item.cwa} ➝ {item.paquete}</p></div>
-                </div>
-              ))}
+            <div className="flex-1 overflow-y-auto border p-2 rounded bg-gray-50">
+                {transversalItems.filter(i => linkFilter === "ALL" || i.es_transversal).map(item => (
+                    <div key={item.id} onClick={() => toggle(selectedLinkItems, item.id, setSelectedLinkItems)} className={`text-xs p-2 mb-1 rounded border cursor-pointer ${selectedLinkItems.has(item.id) ? 'bg-blue-50 border-blue-300' : 'bg-white'}`}>
+                        {selectedLinkItems.has(item.id) && "✅ "} {item.nombre} <span className="text-gray-400">({item.cwa})</span>
+                    </div>
+                ))}
             </div>
-            <div className="mt-4 flex justify-end gap-3 pt-4 border-t-2 border-hatch-gray">
-              <button onClick={() => setModals({...modals, link: false})} className="text-gray-600 px-4 py-2">Cancelar</button>
-              <button onClick={handleLinkItems} className="bg-gradient-orange text-white px-6 py-2 rounded-lg font-bold">Vincular ({selectedLinkItems.size})</button>
+            <div className="flex justify-end gap-2 mt-2">
+                <button onClick={() => setModals({...modals, link: false})} className="text-xs text-gray-500">Cancelar</button>
+                <button onClick={handleLinkItems} className="text-xs bg-hatch-orange text-white px-3 py-1 rounded">Vincular</button>
             </div>
           </div>
         </div>
@@ -528,23 +427,19 @@ function AWPTableConsolidada({ plotPlanId, proyecto, filteredCWAId, onDataChange
 
       {modals.import && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm">
-          <div className="bg-white p-6 rounded-2xl w-[450px] border-2 border-hatch-gray shadow-2xl">
-            <h3 className="text-hatch-blue font-bold mb-2 text-xl">📤 Importar Excel/CSV</h3>
-            <form onSubmit={handleImport}>
-              <label className="block mb-4 cursor-pointer">
-                <div className="w-full border-2 border-dashed border-hatch-gray rounded-lg p-8 text-center hover:border-hatch-orange bg-hatch-gray/20">
-                  {importFile ? <div className="flex flex-col items-center gap-2"><span className="text-4xl">📄</span><span className="text-hatch-blue font-medium text-sm">{importFile.name}</span></div> : <div className="flex flex-col items-center gap-2"><span className="text-4xl text-gray-400">📁</span><span className="text-gray-600 text-sm">Seleccionar archivo</span></div>}
+            <div className="bg-white p-6 rounded w-96 shadow-lg">
+                <h3 className="font-bold text-sm mb-2">Importar CSV</h3>
+                <input type="file" className="text-xs mb-4" onChange={e => setImportFile(e.target.files[0])} />
+                <div className="flex justify-end gap-2">
+                    <button onClick={() => setModals({...modals, import: false})} className="text-xs text-gray-500">Cancelar</button>
+                    <button onClick={handleImport} disabled={!importFile || importing} className="text-xs bg-hatch-orange text-white px-3 py-1 rounded">
+                        {importing ? '...' : 'Subir'}
+                    </button>
                 </div>
-                <input type="file" accept=".csv,.xlsx" onChange={e => setImportFile(e.target.files[0])} className="hidden" />
-              </label>
-              <div className="flex justify-end gap-3">
-                <button type="button" onClick={() => setModals({...modals, import: false})} className="text-gray-600 px-4 py-2">Cancelar</button>
-                <button type="submit" disabled={importing || !importFile} className="bg-gradient-orange hover:shadow-lg disabled:opacity-50 text-white px-6 py-2 rounded-lg font-bold">{importing ? 'Procesando...' : 'Importar'}</button>
-              </div>
-            </form>
-          </div>
+            </div>
         </div>
       )}
+
     </div>
   );
 }
