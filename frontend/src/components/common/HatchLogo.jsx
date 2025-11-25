@@ -1,35 +1,45 @@
-// frontend/src/components/common/HatchLogo.jsx
-import React from 'react';
+import React, { useState } from 'react';
 
 function HatchLogo({ className = "h-8", variant = "full" }) {
-  // Variante completa (con texto)
-  if (variant === "full") {
+  // Estado para controlar si la imagen cargó bien o mal
+  const [imgError, setImgError] = useState(false);
+  
+  // Ruta esperada en la carpeta public
+  const logoSrc = "/hatch_logo.png"; 
+
+  // --- FALLBACK: SI EL PNG FALLA, MUESTRA ESTO (Logo Vectorial) ---
+  if (imgError) {
     return (
       <div className={`flex items-center gap-2 ${className}`}>
-        <svg viewBox="0 0 40 40" className="h-full" fill="none" xmlns="http://www.w3.org/2000/svg">
-          {/* Símbolo H estilizado */}
-          <rect width="40" height="40" rx="6" fill="#FF6B35"/>
-          <path d="M10 10 L10 30 M10 20 L30 20 M30 10 L30 30" 
-                stroke="white" 
-                strokeWidth="4" 
-                strokeLinecap="round"/>
+        {/* Icono SVG que imita el logo real (Cuadrado Naranja con H) */}
+        <svg viewBox="0 0 100 100" className="h-full w-auto aspect-square" fill="none" xmlns="http://www.w3.org/2000/svg">
+           <rect width="100" height="100" rx="15" fill="#FF6B35"/> {/* Hatch Orange */}
+           <path d="M28 25V75M72 25V75M28 50H72" stroke="white" strokeWidth="12" strokeLinecap="round"/>
         </svg>
-        <span className="font-bold text-2xl tracking-tight text-hatch-blue">
-          HATCH
-        </span>
+        
+        {/* Texto (Solo si variant es full) */}
+        {variant === 'full' && (
+          <span className="font-extrabold text-2xl tracking-tighter text-hatch-blue ml-1 font-sans">
+            HATCH
+          </span>
+        )}
       </div>
     );
   }
-  
-  // Variante solo ícono
+
+  // --- INTENTO PRINCIPAL: CARGAR TU PNG ---
   return (
-    <svg viewBox="0 0 40 40" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect width="40" height="40" rx="6" fill="#FF6B35"/>
-      <path d="M10 10 L10 30 M10 20 L30 20 M30 10 L30 30" 
-            stroke="white" 
-            strokeWidth="4" 
-            strokeLinecap="round"/>
-    </svg>
+    <div className={`flex items-center ${className}`}>
+      <img 
+        src={logoSrc} 
+        alt="HATCH Logo" 
+        className="h-full w-auto object-contain"
+        onError={() => {
+          console.warn("⚠️ No se encontró hatch_logo.png en /public. Usando logo SVG de respaldo.");
+          setImgError(true);
+        }}
+      />
+    </div>
   );
 }
 

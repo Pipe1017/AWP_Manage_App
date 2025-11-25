@@ -65,11 +65,15 @@ function ProyectosLanding({ proyectos, onSelectProyecto, onAddProyecto, error })
       {/* --- HEADER --- */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <HatchLogo className="h-10" variant="full" />
-            <div className="h-8 w-px bg-gray-300 mx-2"></div>
+          <div className="flex items-center gap-6">
+            {/* ✅ CAMBIO AQUÍ: Logo más grande (h-16) */}
+            <HatchLogo className="h-16" variant="full" />
+            
+            <div className="h-12 w-px bg-gray-300"></div>
+            
             <div>
-              <h1 className="text-xl font-bold text-hatch-blue tracking-tight">AWP Manager</h1>
+              {/* ✅ CAMBIO AQUÍ: Título más grande para balancear */}
+              <h1 className="text-2xl font-bold text-hatch-blue tracking-tight">AWP Manager</h1>
               <p className="text-xs text-gray-500 uppercase tracking-wider font-semibold">Construction Workspace</p>
             </div>
           </div>
@@ -78,7 +82,7 @@ function ProyectosLanding({ proyectos, onSelectProyecto, onAddProyecto, error })
               <p className="text-xs text-gray-400 font-semibold uppercase">Proyectos Activos</p>
               <p className="text-2xl font-bold text-hatch-orange leading-none">{proyectos.length}</p>
             </div>
-            <div className="h-10 w-10 rounded-full bg-gradient-hatch flex items-center justify-center text-white font-bold shadow-lg">
+            <div className="h-12 w-12 rounded-full bg-gradient-hatch flex items-center justify-center text-white font-bold shadow-lg text-lg">
               U
             </div>
           </div>
