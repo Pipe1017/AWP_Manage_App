@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Stage, Layer, Group, Image, Rect, Circle, Line } from 'react-konva'; 
 import client from '../../../api/axios';
+import { jsPDF } from 'jspdf';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 const SERVER_URL = API_BASE.replace('/api/v1', '');
@@ -13,6 +14,7 @@ const HATCH_COLORS = {
   earth: [ '#95A5A6', '#7F8C8D', '#34495E', '#2C3E50', '#BDC3C7' ],   // Grises/Metálicos
   warn: [ '#F1C40F', '#1ABC9C', '#E84393', '#2C2C54', '#474787' ]     // Amarillos/Teal/Rosas
 };
+
 const allColors = [...HATCH_COLORS.primary, ...HATCH_COLORS.secondary, ...HATCH_COLORS.dark, ...HATCH_COLORS.earth, ...HATCH_COLORS.warn];
 
 const useImageLoader = (src) => {
@@ -30,7 +32,8 @@ const useImageLoader = (src) => {
   return { image, error };
 };
 
-function Toolbar({ activeTool, setActiveTool, color, setColor, onZoom, onReset, onClearAll, onDeleteSelected, hasSelection, onUndo, canUndo }) { 
+// --- BARRA DE HERRAMIENTAS (CON EXPORTAR AGREGADO) ---
+function Toolbar({ activeTool, setActiveTool, color, setColor, onZoom, onReset, onClearAll, onDeleteSelected, hasSelection, onUndo, canUndo, onExportPNG, onExportPDF }) { 
   const [showColorPicker, setShowColorPicker] = useState(false);
   
   const tools = [
@@ -44,7 +47,7 @@ function Toolbar({ activeTool, setActiveTool, color, setColor, onZoom, onReset, 
   return (
     <div className="p-2 border-b border-gray-600 flex flex-wrap justify-between items-center gap-2" style={{ backgroundColor: '#333333' }}>
       
-      {/* HERRAMIENTAS */}
+      {/* HERRAMIENTAS DE DIBUJO */}
       <div className="flex items-center gap-1 bg-black/20 p-1 rounded-lg border border-gray-600">
         {tools.map(tool => (
           <button
@@ -97,6 +100,18 @@ function Toolbar({ activeTool, setActiveTool, color, setColor, onZoom, onReset, 
 
         <div className="h-6 w-px bg-gray-500"></div>
 
+        {/* ✅ NUEVO: Botones de Exportación */}
+        <div className="flex bg-gray-700 rounded border border-gray-600">
+            <button onClick={onExportPNG} className="px-3 py-1.5 hover:bg-gray-600 text-gray-200 text-xs font-bold border-r border-gray-600 flex gap-1 items-center" title="Imagen PNG">
+               <span>📷</span> PNG
+            </button>
+            <button onClick={onExportPDF} className="px-3 py-1.5 hover:bg-gray-600 text-hatch-orange text-xs font-bold flex gap-1 items-center" title="Documento PDF">
+               <span>📄</span> PDF
+            </button>
+        </div>
+
+        <div className="h-6 w-px bg-gray-500"></div>
+
         {/* Zoom */}
         <div className="flex items-center gap-1">
             <button onClick={() => onZoom(1.2)} className="p-2 bg-gray-600 text-gray-300 hover:text-white hover:bg-gray-500 rounded" title="Acercar">➕</button>
@@ -104,48 +119,23 @@ function Toolbar({ activeTool, setActiveTool, color, setColor, onZoom, onReset, 
             <button onClick={onReset} className="p-2 bg-gray-600 text-gray-300 hover:text-white hover:bg-gray-500 rounded" title="Resetear Vista">⟲</button>
         </div>
 
-        <div className="h-6 w-px bg-gray-500"></div>
-
-        {/* Edición */}
-        <div className="flex items-center gap-1">
-            <button 
-                onClick={onUndo} 
-                disabled={!canUndo}
-                className={`p-2 rounded transition-colors ${canUndo ? 'text-white hover:bg-gray-600' : 'text-gray-600 cursor-not-allowed'}`} 
-                title="Deshacer (Ctrl+Z)"
-            >
-                ↶
-            </button>
-            
-            {/* Botón Borrar Selección */}
-            <button 
-                onClick={onDeleteSelected} 
-                disabled={!hasSelection}
-                className={`p-2 rounded transition-colors flex items-center gap-1 ${hasSelection ? 'bg-red-600 text-white hover:bg-red-500 shadow-sm' : 'text-gray-600 cursor-not-allowed'}`} 
-                title="Borrar Área Seleccionada (Supr)"
-            >
-                <span>🗑️</span>
-                <span className="text-xs font-bold hidden lg:inline">Borrar</span>
-            </button>
-
-            {/* Botón Borrar Todo */}
-            <button 
-                onClick={onClearAll} 
-                className="p-2 text-red-400 hover:text-red-200 hover:bg-red-900/30 rounded border border-transparent hover:border-red-900/50" 
-                title="Limpiar Todo el Plano"
-            >
-                ☠️
-            </button>
+        <div className="flex items-center gap-1 ml-2">
+            {onUndo && <button onClick={onUndo} className={`p-2 rounded ${canUndo ? 'text-white hover:bg-gray-600' : 'text-gray-600 cursor-not-allowed'}`} title="Deshacer">↶</button>}
+            {onDeleteSelected && <button onClick={onDeleteSelected} disabled={!hasSelection} className={`p-2 rounded ${hasSelection ? 'text-red-400 hover:bg-gray-700' : 'text-gray-600 cursor-not-allowed'}`} title="Borrar">🗑️</button>}
+            {onClearAll && <button onClick={onClearAll} className="p-2 text-red-400 hover:text-red-200 hover:bg-red-900/30 rounded" title="Limpiar Todo">☠️</button>}
         </div>
       </div>
     </div>
   );
 }
 
+// === COMPONENTE PRINCIPAL ===
 function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShapeClick }) {
   const { image, error } = useImageLoader(plotPlan?.image_url);
   const containerRef = useRef(null);
+  const stageRef = useRef(null); // Referencia para exportar
   
+  // Estados
   const [containerSize, setContainerSize] = useState({ width: 800, height: 600 });
   const [activeTool, setActiveTool] = useState('pan');
   const [currentColor, setCurrentColor] = useState(HATCH_COLORS.primary[0]);
@@ -182,6 +172,7 @@ function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShape
     return () => window.removeEventListener('resize', updateSize);
   }, []);
 
+  // Cargar formas
   useEffect(() => {
     if (!plotPlan?.cwas) { setShapes([]); return; }
     const loadedShapes = [];
@@ -218,12 +209,10 @@ function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShape
   // Hotkeys (Undo / Delete)
   useEffect(() => {
     const handleKeyDown = (e) => {
-        // Ctrl+Z
         if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
             e.preventDefault();
             handleUndo();
         }
-        // Delete / Backspace
         if ((e.key === 'Delete' || e.key === 'Backspace') && selectedShapeKey) {
             e.preventDefault();
             handleDeleteSelected();
@@ -231,23 +220,18 @@ function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShape
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedShapeKey, shapes, history]); // Dependencias importantes para que funcione
+  }, [selectedShapeKey, shapes, history]);
 
   // --- ACCIONES DE EDICIÓN ---
 
   const handleZoom = (scaleFactor) => setStageState(s => ({ ...s, scale: s.scale * scaleFactor }));
   const handleResetZoom = () => setStageState({ scale: 1, x: 0, y: 0 });
 
-  // ✅ UNDO REAL: Restaurar estado anterior
   const handleUndo = () => {
     if(history.length > 0) { 
         const previousShapes = history[history.length-1];
         setShapes(previousShapes); 
         setHistory(prev => prev.slice(0, -1));
-        // Nota: El Undo visual no revierte la DB automáticamente en este esquema simple, 
-        // pero permite corregir errores antes de cambiar de plano.
-        // Para revertir DB se requeriría un endpoint específico de rollback o volver a guardar el estado anterior.
-        // Por ahora, asumo que el usuario quiere deshacer la última acción visual.
     }
   };
 
@@ -255,7 +239,6 @@ function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShape
     setHistory(prev => [...prev, shapes]);
   };
 
-  // ✅ BORRAR SELECCIONADO (API + LOCAL)
   const handleDeleteSelected = async () => {
     if (!selectedShapeKey) return;
     const shape = shapes.find(s => s.key === selectedShapeKey);
@@ -264,9 +247,8 @@ function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShape
     if (!confirm(`¿Eliminar el dibujo del área ${shape.codigo}?`)) return;
 
     try {
-        saveToHistory(); // Guardar antes de borrar
+        saveToHistory();
 
-        // Enviar geometría vacía al backend para "borrarla"
         const formData = new FormData();
         formData.append('shape_type', ''); 
         formData.append('shape_data', '{}');
@@ -276,11 +258,9 @@ function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShape
             formData
         );
         
-        // Actualizar local
         setShapes(prev => prev.filter(s => s.key !== selectedShapeKey));
         setSelectedShapeKey(null);
         
-        // Notificar padre (para que aparezca la X roja)
         if (onShapeSaved) onShapeSaved(shape.cwaId, null);
 
     } catch (err) {
@@ -288,7 +268,6 @@ function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShape
     }
   };
 
-  // ✅ BORRAR TODO (API LOOP + LOCAL)
   const handleClearAll = async () => {
     if (shapes.length === 0) return;
     if(!confirm('⚠️ ¿ESTÁS SEGURO? Esto borrará TODOS los dibujos de este plano.')) return;
@@ -296,7 +275,6 @@ function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShape
     saveToHistory();
     
     try {
-        // Borrar uno por uno en el backend (idealmente habría un endpoint bulk, pero esto funciona)
         for (const shape of shapes) {
             const formData = new FormData();
             formData.append('shape_type', ''); 
@@ -309,11 +287,34 @@ function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShape
 
         setShapes([]);
         setSelectedShapeKey(null);
-        // Notificar recarga completa
         if (onShapeSaved) onShapeSaved(null, null); 
 
     } catch (err) {
         alert("Error limpiando: " + err.message);
+    }
+  };
+
+  // --- EXPORTACIÓN ---
+  const handleExportImage = () => {
+    if (stageRef.current) {
+        const uri = stageRef.current.toDataURL({ pixelRatio: 2 });
+        const link = document.createElement('a');
+        link.download = `PlotPlan_${plotPlan.nombre}.png`;
+        link.href = uri;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+  };
+
+  const handleExportPDF = () => {
+    if (stageRef.current) {
+        const uri = stageRef.current.toDataURL({ pixelRatio: 2 });
+        const pdf = new jsPDF('l', 'px', [imageDim.width, imageDim.height]);
+        const width = pdf.internal.pageSize.getWidth();
+        const height = pdf.internal.pageSize.getHeight();
+        pdf.addImage(uri, 'PNG', 0, 0, width, height);
+        pdf.save(`PlotPlan_${plotPlan.nombre}.pdf`);
     }
   };
 
@@ -327,6 +328,7 @@ function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShape
     return { x: relativeX, y: relativeY };
   };
 
+  // --- EVENTOS MOUSE ---
   const handleMouseDown = (e) => {
     if (activeTool === 'pan' || !image || e.evt.button !== 0) {
       if (activeTool === 'pan' && !e.target.findAncestor('Shape')) setSelectedShapeKey(null);
@@ -356,6 +358,7 @@ function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShape
       const newPoints = [...polygonPoints, newX, newY];
       setPolygonPoints(newPoints);
 
+      // Cerrar polígono
       if (newPoints.length > 4) {
         const startX = newPoints[0];
         const startY = newPoints[1];
@@ -422,9 +425,10 @@ function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShape
     else if (finalShape.type === 'circle') shapeData = { x: finalShape.x, y: finalShape.y, radius: finalShape.radius, color: finalShape.color };
 
     try {
-      saveToHistory(); // ✅ GUARDAR ESTADO ANTES DE CAMBIAR
+      saveToHistory(); 
 
       const formData = new FormData();
+      // Unificar tipo a 'polygon' para evitar problemas si es ortho
       const typeToSend = (finalShape.type === 'ortho' || finalShape.type === 'polygon') ? 'polygon' : finalShape.type;
       
       formData.append('shape_type', typeToSend);
@@ -481,10 +485,12 @@ function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShape
         onZoom={handleZoom} 
         onReset={handleResetZoom} 
         onClearAll={handleClearAll} 
-        onDeleteSelected={handleDeleteSelected}
-        hasSelection={!!selectedShapeKey}
-        onUndo={handleUndo}
-        canUndo={history.length > 0}
+        onDeleteSelected={handleDeleteSelected} 
+        hasSelection={!!selectedShapeKey} 
+        onUndo={handleUndo} 
+        canUndo={history.length > 0} 
+        onExportPNG={handleExportImage}
+        onExportPDF={handleExportPDF}
       />
       
       <div ref={containerRef} className="w-full relative flex-1 overflow-hidden cursor-crosshair" style={{ backgroundColor: '#262626' }}>
@@ -502,34 +508,12 @@ function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShape
         )}
 
         {image && (
-          <Stage 
-            width={containerSize.width} 
-            height={containerSize.height}
-            draggable={activeTool === 'pan'}
-            scaleX={stageState.scale} 
-            scaleY={stageState.scale}
-            x={stageState.x} 
-            y={stageState.y}
-            onDragEnd={(e) => setStageState(prev => ({ ...prev, x: e.target.x(), y: e.target.y() }))}
-            onMouseDown={handleMouseDown} 
-            onMouseMove={handleStageMouseMove} 
-            onMouseUp={handleMouseUp}
-            style={{ cursor: activeTool === 'pan' ? 'grab' : 'crosshair' }}
-          >
+          <Stage ref={stageRef} width={containerSize.width} height={containerSize.height} draggable={activeTool === 'pan'} scaleX={stageState.scale} scaleY={stageState.scale} x={stageState.x} y={stageState.y} onDragEnd={(e) => setStageState(prev => ({ ...prev, x: e.target.x(), y: e.target.y() }))} onMouseDown={handleMouseDown} onMouseMove={handleStageMouseMove} onMouseUp={handleMouseUp} style={{ cursor: activeTool === 'pan' ? 'grab' : 'crosshair' }}>
             <Layer>
-              <Group
-                x={groupX}
-                y={groupY}
-                scaleX={scaleRatio}
-                scaleY={scaleRatio}
-              >
-                <Image 
-                  image={image} 
-                  x={0} y={0}
-                  width={image.width} height={image.height}
-                  listening={false} 
-                />
+              <Group x={groupX} y={groupY} scaleX={scaleRatio} scaleY={scaleRatio}>
+                <Image image={image} x={0} y={0} width={image.width} height={image.height} listening={false} />
                 
+                {/* FORMAS */}
                 {shapes.map(shape => {
                   const isSel = shape.key === selectedShapeKey;
                   const props = {
@@ -547,6 +531,7 @@ function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShape
                   return null;
                 })}
 
+                {/* DIBUJOS TEMPORALES */}
                 {newShape && activeTool === 'rect' && <Rect {...newShape} fill={`${newShape.color}40`} stroke={newShape.color} strokeWidth={dynamicStroke} />}
                 {newShape && activeTool === 'circle' && <Circle {...newShape} fill={`${newShape.color}40`} stroke={newShape.color} strokeWidth={dynamicStroke} />}
                 
