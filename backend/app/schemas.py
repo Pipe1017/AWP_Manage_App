@@ -1,5 +1,3 @@
-# backend/app/schemas.py
-
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from datetime import date
@@ -35,14 +33,15 @@ class CWACreate(BaseModel):
     es_transversal: Optional[bool] = False
     shape_type: Optional[str] = None
     shape_data: Optional[Dict[str, Any]] = None
-    prioridad: Optional[str] = "MEDIA"
+    # ✅ CAMBIO: Prioridad numérica para ordenamiento (1, 2, 3...)
+    prioridad: Optional[int] = 99
 
 class CWAUpdate(BaseModel):
     nombre: Optional[str] = None
     descripcion: Optional[str] = None
     codigo: Optional[str] = None
     es_transversal: Optional[bool] = None
-    prioridad: Optional[str] = None
+    prioridad: Optional[int] = None
 
 # --- CWP (CONSTRUCTION WORK PACKAGE) ---
 class CWPCreate(BaseModel):
@@ -54,17 +53,14 @@ class CWPCreate(BaseModel):
     fecha_inicio_prevista: Optional[date] = None
     fecha_fin_prevista: Optional[date] = None
     secuencia: Optional[int] = 0
-    forecast_inicio: Optional[date] = None
-    forecast_fin: Optional[date] = None
+    # ❌ ELIMINADO: Forecasts se mueven a Paquete
     metadata_json: Optional[Dict[str, Any]] = None
-    # Nota: Prioridad eliminada de aquí (es del Área)
 
 class CWPUpdate(BaseModel):
     nombre: Optional[str] = None
     descripcion: Optional[str] = None
     secuencia: Optional[int] = None
-    forecast_inicio: Optional[date] = None
-    forecast_fin: Optional[date] = None
+    # ❌ ELIMINADO: Forecasts
     metadata_json: Optional[Dict[str, Any]] = None
 
 class CWPResponse(BaseModel):
@@ -75,8 +71,6 @@ class CWPResponse(BaseModel):
     porcentaje_completitud: float
     estado: str
     secuencia: Optional[int]
-    forecast_inicio: Optional[date]
-    forecast_fin: Optional[date]
     metadata_json: Optional[Dict[str, Any]] = None
     
     class Config:
@@ -91,7 +85,7 @@ class CWAResponse(BaseModel):
     plot_plan_id: int
     shape_type: Optional[str]
     shape_data: Optional[Dict[str, Any]]
-    prioridad: Optional[str]
+    prioridad: Optional[int] # ✅ Numérico
     cwps: List[CWPResponse] = []
     
     class Config:
@@ -188,6 +182,9 @@ class PaqueteCreate(BaseModel):
     responsable: str
     fecha_inicio_prevista: Optional[date] = None
     fecha_fin_prevista: Optional[date] = None
+    # ✅ NUEVO: Forecasts aquí (EWP, IWP, PWP)
+    forecast_inicio: Optional[date] = None
+    forecast_fin: Optional[date] = None
     metadata_json: Optional[dict] = None
 
 class PaqueteUpdate(BaseModel):
@@ -196,6 +193,9 @@ class PaqueteUpdate(BaseModel):
     responsable: Optional[str] = None
     fecha_inicio_prevista: Optional[date] = None
     fecha_fin_prevista: Optional[date] = None
+    # ✅ NUEVO: Forecasts aquí
+    forecast_inicio: Optional[date] = None
+    forecast_fin: Optional[date] = None
     estado: Optional[str] = None
     porcentaje_completitud: Optional[float] = None
     metadata_json: Optional[dict] = None
@@ -210,6 +210,9 @@ class PaqueteResponse(BaseModel):
     cwp_id: int
     porcentaje_completitud: float
     estado: str
+    # ✅ NUEVO: Forecasts en la respuesta
+    forecast_inicio: Optional[date] = None
+    forecast_fin: Optional[date] = None
     class Config:
         from_attributes = True
 
@@ -220,7 +223,7 @@ class ItemCreate(BaseModel):
     es_entregable_cliente: Optional[bool] = False
     requiere_aprobacion: Optional[bool] = True
     metadata_json: Optional[dict] = None
-    forecast_fin: Optional[date] = None
+    # ❌ ELIMINADO: forecast_fin (Ya no se usa en items)
 
 class ItemUpdate(BaseModel):
     nombre: Optional[str] = None
@@ -232,7 +235,7 @@ class ItemUpdate(BaseModel):
     es_entregable_cliente: Optional[bool] = None
     requiere_aprobacion: Optional[bool] = None
     metadata_json: Optional[dict] = None
-    forecast_fin: Optional[date] = None
+    # ❌ ELIMINADO: forecast_fin
 
 class ItemResponse(BaseModel):
     id: int
@@ -247,7 +250,6 @@ class ItemResponse(BaseModel):
     es_entregable_cliente: bool
     requiere_aprobacion: bool
     source_item_id: Optional[int]
-    forecast_fin: Optional[date]
     
     class Config:
         from_attributes = True
@@ -267,7 +269,6 @@ class ItemImportRow(BaseModel):
     descripcion: Optional[str] = None
     es_entregable_cliente: Optional[bool] = False
     requiere_aprobacion: Optional[bool] = True
-    forecast_fin: Optional[date] = None
 
 # Actualizar referencias circulares (si las hubiera)
 PlotPlanResponse.update_forward_refs()

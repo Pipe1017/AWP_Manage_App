@@ -1,5 +1,3 @@
-# backend/app/crud_nuevo.py
-
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
 from . import models, schemas
@@ -20,7 +18,7 @@ def create_cwp_auto(db: Session, cwp: schemas.CWPCreate):
     if not db_area or not db_disciplina:
         raise ValueError("Área o Disciplina no encontrada")
     
-    # Generar consecutivo (0001, 0002...)
+    # Generar consecutivo (0001, 0002...) dentro del mismo CWA y Disciplina
     contador = db.query(func.count(models.CWP.id)).filter(
         models.CWP.cwa_id == cwp.area_id,
         models.CWP.disciplina_id == cwp.disciplina_id
@@ -38,10 +36,8 @@ def create_cwp_auto(db: Session, cwp: schemas.CWPCreate):
         duracion_dias=cwp.duracion_dias,
         fecha_inicio_prevista=cwp.fecha_inicio_prevista,
         fecha_fin_prevista=cwp.fecha_fin_prevista,
-        # Campos nuevos
         secuencia=cwp.secuencia,
-        forecast_inicio=cwp.forecast_inicio,
-        forecast_fin=cwp.forecast_fin,
+        # ❌ CORREGIDO: No asignamos forecasts aquí porque se movieron a Paquete
         metadata_json=cwp.metadata_json
     )
     
@@ -62,8 +58,8 @@ def update_cwp(db: Session, cwp_id: int, cwp_update: schemas.CWPUpdate):
     if cwp_update.nombre is not None: db_cwp.nombre = cwp_update.nombre
     if cwp_update.descripcion is not None: db_cwp.descripcion = cwp_update.descripcion
     if cwp_update.secuencia is not None: db_cwp.secuencia = cwp_update.secuencia
-    if cwp_update.forecast_inicio is not None: db_cwp.forecast_inicio = cwp_update.forecast_inicio
-    if cwp_update.forecast_fin is not None: db_cwp.forecast_fin = cwp_update.forecast_fin
+    
+    # ❌ CORREGIDO: No actualizamos forecasts aquí
     
     # Fusión de metadatos JSON
     if cwp_update.metadata_json is not None:
@@ -109,6 +105,9 @@ def create_paquete_auto(db: Session, paquete: schemas.PaqueteCreate, cwp_id: int
         tipo=paquete.tipo,
         responsable=paquete.responsable,
         cwp_id=cwp_id,
+        # ✅ Forecasts ahora se guardan aquí
+        forecast_inicio=paquete.forecast_inicio,
+        forecast_fin=paquete.forecast_fin,
         metadata_json=paquete.metadata_json
     )
     
@@ -137,7 +136,7 @@ def create_item_simple(db: Session, item: schemas.ItemCreate, paquete_id: int):
         descripcion=item.descripcion,
         tipo_entregable_id=item.tipo_entregable_id,
         paquete_id=paquete_id,
-        forecast_fin=item.forecast_fin,
+        # forecast_fin eliminado de Item
         metadata_json=item.metadata_json
     )
     
@@ -186,7 +185,6 @@ def link_items_from_source(db: Session, target_paquete_id: int, source_item_ids:
 def smart_import_awp(db: Session, project_id: int, df_data):
     stats = {"cwp_creados": 0, "paquetes_creados": 0, "items_creados": 0, "items_actualizados": 0, "errores": []}
     
-    # Caches
     cache_cwa = {c.codigo.upper(): c.id for c in db.query(models.CWA).join(models.PlotPlan).filter(models.PlotPlan.proyecto_id == project_id).all()}
     disciplinas = db.query(models.Disciplina).filter(models.Disciplina.proyecto_id == project_id).all()
     disciplina_default = disciplinas[0].id if disciplinas else None
@@ -202,7 +200,6 @@ def smart_import_awp(db: Session, project_id: int, df_data):
                     if db_item:
                         if pd.notna(row.get('Nombre_Item')): db_item.nombre = str(row.get('Nombre_Item'))
                         if pd.notna(row.get('Descripcion')): db_item.descripcion = str(row.get('Descripcion'))
-                        # TODO: Actualizar fechas si vienen en el excel
                         stats["items_actualizados"] += 1
                         continue
                 except: pass
@@ -237,20 +234,22 @@ def smart_import_awp(db: Session, project_id: int, df_data):
                     nombre=f"Paquete {pkg_code}", codigo=pkg_code, tipo=pkg_type,
                     responsable="Importado", cwp_id=db_cwp.id
                 )
+                # Si el excel tiene fechas, asignarlas aquí
+                if pd.notna(row.get('Forecast_Inicio')): db_pkg.forecast_inicio = pd.to_datetime(row.get('Forecast_Inicio')).date()
+                if pd.notna(row.get('Forecast_Fin')): db_pkg.forecast_fin = pd.to_datetime(row.get('Forecast_Fin')).date()
+                
                 db.add(db_pkg); db.flush(); stats["paquetes_creados"] += 1
 
             # Crear Item
             item_name = str(row.get('Nombre_Item', '')).strip()
             if not item_name or item_name == 'nan': continue
             
-            # Buscar Tipo
             tipo_code = str(row.get('Tipo_Item_Codigo', '')).strip().upper()
             tipo_id = None
             if tipo_code and tipo_code != 'NAN':
                 t = db.query(models.TipoEntregable).filter(models.TipoEntregable.codigo == tipo_code).first()
                 if t: tipo_id = t.id
 
-            # Insertar si no existe
             if not db.query(models.Item).filter(models.Item.paquete_id == db_pkg.id, models.Item.nombre == item_name).first():
                 new_item = models.Item(
                     nombre=item_name, descripcion=str(row.get('Descripcion', '')),
@@ -266,70 +265,10 @@ def smart_import_awp(db: Session, project_id: int, df_data):
     return stats
 
 # ============================================================================
-# VISTA GLOBAL (ARBOL COMPLETO)
+# VISTA GLOBAL (ARBOL COMPLETO) - HELPER
 # ============================================================================
 
-def obtener_jerarquia_global(db: Session, project_id: int):
-    """
-    Devuelve todo el árbol del proyecto: CWA -> CWP -> Paquete -> Item
-    """
-    jerarquia = {"proyecto_id": project_id, "cwas": []}
-    
-    # Obtener todos los CWAs del proyecto
-    cwas = db.query(models.CWA).join(models.PlotPlan).filter(models.PlotPlan.proyecto_id == project_id).order_by(models.CWA.codigo).all()
-    
-    for cwa in cwas:
-        cwa_data = {
-            "id": cwa.id, "nombre": cwa.nombre, "codigo": cwa.codigo,
-            "plot_plan_nombre": cwa.plot_plan.nombre,
-            "prioridad": cwa.prioridad, # ✅ Prioridad está aquí (Área)
-            "es_transversal": cwa.es_transversal,
-            "cwps": []
-        }
-        
-        cwps = db.query(models.CWP).filter(models.CWP.cwa_id == cwa.id).order_by(models.CWP.secuencia).all()
-        
-        for cwp in cwps:
-            cwp_data = {
-                "id": cwp.id, "nombre": cwp.nombre, "codigo": cwp.codigo,
-                "secuencia": cwp.secuencia,
-                "forecast_inicio": str(cwp.forecast_inicio) if cwp.forecast_inicio else None,
-                "forecast_fin": str(cwp.forecast_fin) if cwp.forecast_fin else None,
-                "porcentaje_completitud": cwp.porcentaje_completitud,
-                "metadata_json": cwp.metadata_json,
-                "disciplina_id": cwp.disciplina_id,
-                "paquetes": []
-            }
-            
-            pkgs = db.query(models.Paquete).filter(models.Paquete.cwp_id == cwp.id).all()
-            for p in pkgs:
-                p_data = { "id": p.id, "codigo": p.codigo, "nombre": p.nombre, "tipo": p.tipo, "items": [] }
-                
-                items = db.query(models.Item).filter(models.Item.paquete_id == p.id).all()
-                for i in items:
-                    tipo = None
-                    if i.tipo_entregable_id:
-                        tipo = db.query(models.TipoEntregable).filter(models.TipoEntregable.id == i.tipo_entregable_id).first()
-                    
-                    # Info de Origen
-                    org = None
-                    if i.source_item_id:
-                        src = db.query(models.Item).filter(models.Item.id == i.source_item_id).first()
-                        if src: org = f"{src.paquete.cwp.cwa.nombre} / {src.paquete.codigo}"
-                    
-                    p_data["items"].append({
-                        "id": i.id, "nombre": i.nombre, "archivo_url": i.archivo_url,
-                        "tipo_entregable_codigo": tipo.codigo if tipo else None,
-                        "forecast_fin": str(i.forecast_fin) if i.forecast_fin else None,
-                        "source_item_id": i.source_item_id, "origen_info": org
-                    })
-                cwp_data["paquetes"].append(p_data)
-            cwa_data["cwps"].append(cwp_data)
-        jerarquia["cwas"].append(cwa_data)
-    
-    return jerarquia
-
-# Helpers
+# Los helpers de lectura se importan desde aquí en el router
 def get_tipos_entregables_disponibles(db, cid):
     c = db.query(models.CWP).filter(models.CWP.id == cid).first()
     if not c: return []
@@ -339,4 +278,3 @@ def get_paquete(db, pid): return db.query(models.Paquete).filter(models.Paquete.
 def get_paquetes_por_cwp(db, cid): return db.query(models.Paquete).filter(models.Paquete.cwp_id == cid).all()
 def get_item(db, iid): return db.query(models.Item).filter(models.Item.id == iid).first()
 def get_items_por_paquete(db, pid): return db.query(models.Item).filter(models.Item.paquete_id == pid).all()
-def import_items_masivo(db, items): pass

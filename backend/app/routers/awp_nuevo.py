@@ -7,7 +7,7 @@ from ..database import get_db
 from ..crud_nuevo import (
     create_cwp_auto, update_cwp, delete_cwp,
     create_paquete_auto, create_item_simple,
-    smart_import_awp, link_items_from_source, obtener_jerarquia_global,
+    smart_import_awp, link_items_from_source,
     get_tipos_entregables_disponibles, get_paquete, get_paquetes_por_cwp, get_item, get_items_por_paquete
 )
 import pandas as pd
@@ -15,13 +15,13 @@ import io
 
 router = APIRouter(prefix="/awp-nuevo", tags=["AWP Nuevo"])
 
-# --- CWA (Update Prioridad) ---
+# ... (Endpoints de CWA, CWP, Paquete, Item, Links se mantienen igual que antes) ...
+
 @router.put("/cwa/{cwa_id}", response_model=schemas.CWAResponse)
 def update_cwa_endpoint(cwa_id: int, cwa_update: schemas.CWAUpdate, db: Session = Depends(get_db)):
     try: return crud.update_cwa(db, cwa_id, cwa_update)
     except ValueError as e: raise HTTPException(status_code=404, detail=str(e))
 
-# --- CWP ---
 @router.post("/cwp", response_model=schemas.CWPResponse)
 def create_cwp(cwp: schemas.CWPCreate, db: Session = Depends(get_db)):
     try: return create_cwp_auto(db, cwp)
@@ -42,7 +42,6 @@ def get_tipos_disponibles(cwp_id: int, db: Session = Depends(get_db)):
     tipos = get_tipos_entregables_disponibles(db, cwp_id)
     return [{"id": t.id, "nombre": t.nombre, "codigo": t.codigo} for t in tipos]
 
-# --- PAQUETE ---
 @router.post("/cwp/{cwp_id}/paquete", response_model=schemas.PaqueteResponse)
 def create_paquete(cwp_id: int, paquete: schemas.PaqueteCreate, db: Session = Depends(get_db)):
     try: return create_paquete_auto(db, paquete, cwp_id)
@@ -70,7 +69,6 @@ def delete_paquete_endpoint(paquete_id: int, db: Session = Depends(get_db)):
     if not p: raise HTTPException(404)
     db.delete(p); db.commit(); return {"msg": "Deleted"}
 
-# --- ITEM ---
 @router.post("/paquete/{paquete_id}/item", response_model=schemas.ItemResponse)
 def create_item(paquete_id: int, item: schemas.ItemCreate, db: Session = Depends(get_db)):
     try: return create_item_simple(db, item, paquete_id)
@@ -98,7 +96,6 @@ def delete_item_endpoint(item_id: int, db: Session = Depends(get_db)):
     if not i: raise HTTPException(404)
     db.delete(i); db.commit(); return {"msg": "Deleted"}
 
-# --- LINKS ---
 @router.post("/paquete/{paquete_id}/vincular-items")
 def vincular_items(paquete_id: int, req: schemas.ItemLinkRequest, db: Session = Depends(get_db)):
     try: return {"mensaje": f"Vinculados {link_items_from_source(db, paquete_id, req.source_item_ids)}"}
@@ -110,17 +107,77 @@ def get_available_items(proyecto_id: int, filter_type: str = "ALL", db: Session 
     if filter_type == "TRANSVERSAL": query = query.filter(models.CWA.es_transversal == True)
     return [{"id": i.id, "nombre": i.nombre, "paquete": i.paquete.codigo, "cwa": i.paquete.cwp.cwa.nombre, "es_transversal": i.paquete.cwp.cwa.es_transversal} for i in query.all()]
 
+# --- JERARQUÍA GLOBAL OPTIMIZADA ---
 @router.get("/proyectos/{proyecto_id}/jerarquia-global")
 def get_jerarquia_global(proyecto_id: int, db: Session = Depends(get_db)):
-    return obtener_jerarquia_global(db, proyecto_id)
+    # ✅ Estructura completa con Prioridad Numérica y Fechas en Paquete
+    jerarquia = {"proyecto_id": proyecto_id, "cwas": []}
+    
+    # Ordenar CWA por prioridad (Integer) y luego código
+    cwas = db.query(models.CWA).join(models.PlotPlan).filter(models.PlotPlan.proyecto_id == proyecto_id).order_by(models.CWA.prioridad, models.CWA.codigo).all()
+    
+    for cwa in cwas:
+        cwa_data = {
+            "id": cwa.id, "nombre": cwa.nombre, "codigo": cwa.codigo,
+            "plot_plan_nombre": cwa.plot_plan.nombre,
+            "prioridad": cwa.prioridad, # Integer
+            "es_transversal": cwa.es_transversal,
+            "cwps": []
+        }
+        
+        cwps = db.query(models.CWP).filter(models.CWP.cwa_id == cwa.id).order_by(models.CWP.secuencia).all()
+        
+        for cwp in cwps:
+            cwp_data = {
+                "id": cwp.id, "nombre": cwp.nombre, "codigo": cwp.codigo,
+                "secuencia": cwp.secuencia,
+                "porcentaje_completitud": cwp.porcentaje_completitud,
+                "metadata_json": cwp.metadata_json,
+                "disciplina_id": cwp.disciplina_id,
+                "paquetes": []
+            }
+            
+            pkgs = db.query(models.Paquete).filter(models.Paquete.cwp_id == cwp.id).all()
+            for p in pkgs:
+                p_data = { 
+                    "id": p.id, 
+                    "codigo": p.codigo, 
+                    "nombre": p.nombre, 
+                    "tipo": p.tipo,
+                    # ✅ Fechas en Paquete
+                    "forecast_inicio": str(p.forecast_inicio) if p.forecast_inicio else None,
+                    "forecast_fin": str(p.forecast_fin) if p.forecast_fin else None,
+                    "items": [] 
+                }
+                
+                items = db.query(models.Item).filter(models.Item.paquete_id == p.id).all()
+                for i in items:
+                    tipo = None
+                    if i.tipo_entregable_id:
+                        tipo = db.query(models.TipoEntregable).filter(models.TipoEntregable.id == i.tipo_entregable_id).first()
+                    
+                    org = None
+                    if i.source_item_id:
+                        src = db.query(models.Item).filter(models.Item.id == i.source_item_id).first()
+                        if src: org = f"{src.paquete.cwp.cwa.nombre} / {src.paquete.codigo}"
+                    
+                    p_data["items"].append({
+                        "id": i.id, "nombre": i.nombre, "archivo_url": i.archivo_url,
+                        "tipo_entregable_codigo": tipo.codigo if tipo else None,
+                        "source_item_id": i.source_item_id, "origen_info": org
+                    })
+                cwp_data["paquetes"].append(p_data)
+            cwa_data["cwps"].append(cwp_data)
+        jerarquia["cwas"].append(cwa_data)
+    
+    return jerarquia
 
-# --- IMPORT/EXPORT MEJORADO ---
+# --- IMPORT/EXPORT ACTUALIZADO ---
 @router.get("/exportar-csv/{proyecto_id}")
 def exportar_csv_proyecto(proyecto_id: int, db: Session = Depends(get_db)):
     proyecto = crud.get_proyecto(db, proyecto_id)
     if not proyecto: raise HTTPException(404)
     
-    # 1. Obtener columnas personalizadas (Restricciones)
     meta_cols = db.query(models.CWPColumnaMetadata).filter(models.CWPColumnaMetadata.proyecto_id == proyecto_id).all()
     meta_names = [col.nombre for col in meta_cols]
 
@@ -128,10 +185,9 @@ def exportar_csv_proyecto(proyecto_id: int, db: Session = Depends(get_db)):
     
     for pp in proyecto.plot_plans:
         for cwa in pp.cwas:
-            # Base data para CWA
             cwa_data = {
                 "CWA": cwa.codigo,
-                "Prioridad_Area": cwa.prioridad
+                "Prioridad_Area": cwa.prioridad # Numérica
             }
             
             if not cwa.cwps:
@@ -139,16 +195,12 @@ def exportar_csv_proyecto(proyecto_id: int, db: Session = Depends(get_db)):
                 continue
 
             for cwp in cwa.cwps:
-                # Base data para CWP
                 cwp_data = {
                     **cwa_data,
                     "CWP": cwp.codigo,
                     "Secuencia_CWP": cwp.secuencia,
-                    "Forecast_Inicio_CWP": str(cwp.forecast_inicio) if cwp.forecast_inicio else "",
-                    "Forecast_Fin_CWP": str(cwp.forecast_fin) if cwp.forecast_fin else "",
                 }
                 
-                # Agregar columnas dinámicas (Restricciones)
                 for meta_name in meta_names:
                     cwp_data[meta_name] = cwp.metadata_json.get(meta_name, "") if cwp.metadata_json else ""
 
@@ -160,7 +212,10 @@ def exportar_csv_proyecto(proyecto_id: int, db: Session = Depends(get_db)):
                     pkg_data = {
                         **cwp_data,
                         "Tipo_Paquete": pkg.tipo,
-                        "Codigo_Paquete": pkg.codigo
+                        "Codigo_Paquete": pkg.codigo,
+                        # ✅ Fechas en Paquete
+                        "Forecast_Inicio": str(pkg.forecast_inicio) if pkg.forecast_inicio else "",
+                        "Forecast_Fin": str(pkg.forecast_fin) if pkg.forecast_fin else ""
                     }
 
                     if not pkg.items:
@@ -168,28 +223,24 @@ def exportar_csv_proyecto(proyecto_id: int, db: Session = Depends(get_db)):
                         continue
 
                     for item in pkg.items:
-                        # Row completo con Item
+                        # Row completo con Item (Sin fechas de item)
                         row = {
                             **pkg_data,
-                            "ID_Item": item.source_item_id if item.source_item_id else item.id, # Usar Source ID si es vínculo
-                            "Nombre_Item": item.nombre,
-                            "Forecast_Fin_Item": str(item.forecast_fin) if item.forecast_fin else ""
+                            "ID_Item": item.source_item_id if item.source_item_id else item.id,
+                            "Nombre_Item": item.nombre
                         }
                         data_rows.append(row)
 
     df = pd.DataFrame(data_rows)
     
-    # Ordenar columnas para que las fijas salgan primero
-    fixed_cols = ["CWA", "Prioridad_Area", "CWP", "Secuencia_CWP", "Forecast_Inicio_CWP", "Forecast_Fin_CWP"]
-    fixed_cols += meta_names # Restricciones del usuario
-    fixed_cols += ["Tipo_Paquete", "Codigo_Paquete", "ID_Item", "Nombre_Item", "Forecast_Fin_Item"]
+    fixed_cols = ["CWA", "Prioridad_Area", "CWP", "Secuencia_CWP"]
+    fixed_cols += meta_names
+    fixed_cols += ["Tipo_Paquete", "Codigo_Paquete", "Forecast_Inicio", "Forecast_Fin", "ID_Item", "Nombre_Item"]
     
-    # Asegurar que todas las columnas existan en el DF (por si hay filas vacías)
     for col in fixed_cols:
         if col not in df.columns:
             df[col] = ""
             
-    # Reordenar
     df = df[fixed_cols]
 
     stream = io.StringIO(); df.to_csv(stream, index=False)

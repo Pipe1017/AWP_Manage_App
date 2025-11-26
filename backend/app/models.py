@@ -63,11 +63,12 @@ class CWA(Base):
     __tablename__ = "cwa"
     id = Column(Integer, primary_key=True, index=True)
     nombre = Column(String, nullable=False)
-    # ⚠️ CORRECCIÓN IMPORTANTE: Quitamos unique=True global
     codigo = Column(String(20), index=True) 
     descripcion = Column(Text, nullable=True)
     es_transversal = Column(Boolean, default=False)
-    prioridad = Column(String(20), default="MEDIA") 
+    
+    # ✅ CAMBIO 1: Prioridad ahora es Entero (para ordenar 1, 2, 3...)
+    prioridad = Column(Integer, default=99) 
     
     plot_plan_id = Column(Integer, ForeignKey("plot_plans.id"))
     plot_plan = relationship("PlotPlan", back_populates="cwas")
@@ -75,7 +76,6 @@ class CWA(Base):
     shape_type = Column(String(15), nullable=True)
     shape_data = Column(JSON, nullable=True)
 
-    # ✅ SOLUCIÓN: El código debe ser único SOLO dentro del mismo Plot Plan
     __table_args__ = (
         UniqueConstraint('codigo', 'plot_plan_id', name='_cwa_codigo_plot_uc'),
     )
@@ -84,7 +84,7 @@ class CWP(Base):
     __tablename__ = "cwp"
     id = Column(Integer, primary_key=True, index=True)
     nombre = Column(String, nullable=False)
-    codigo = Column(String(50), index=True) # Quitamos unique global por seguridad
+    codigo = Column(String(50), index=True)
     descripcion = Column(Text, nullable=True)
     cwa_id = Column(Integer, ForeignKey("cwa.id"))
     disciplina_id = Column(Integer, ForeignKey("disciplinas.id"))
@@ -96,8 +96,8 @@ class CWP(Base):
     duracion_dias = Column(Integer, nullable=True)
     fecha_inicio_prevista = Column(Date, nullable=True)
     fecha_fin_prevista = Column(Date, nullable=True)
-    forecast_inicio = Column(Date, nullable=True)
-    forecast_fin = Column(Date, nullable=True)
+    
+    # ❌ ELIMINADO: Forecasts ya no están aquí
     
     porcentaje_completitud = Column(Float, default=0.0)
     estado = Column(String(20), default="NO_INICIADO")
@@ -105,7 +105,6 @@ class CWP(Base):
     restricciones_json = Column(JSON, nullable=True)
     metadata_json = Column(JSON, nullable=True)
 
-    # Un CWP debe ser único dentro de un CWA y Disciplina (opcional, pero buena práctica)
     __table_args__ = (
         UniqueConstraint('codigo', 'cwa_id', name='_cwp_codigo_cwa_uc'),
     )
@@ -121,6 +120,11 @@ class Paquete(Base):
     cwp_id = Column(Integer, ForeignKey("cwp.id"))
     cwp = relationship("CWP", back_populates="paquetes")
     items = relationship("Item", back_populates="paquete", cascade="all, delete-orphan")
+    
+    # ✅ NUEVO: Forecasts ahora viven aquí (EWP, IWP, PWP)
+    forecast_inicio = Column(Date, nullable=True)
+    forecast_fin = Column(Date, nullable=True)
+    
     fecha_inicio_prevista = Column(Date, nullable=True)
     fecha_fin_prevista = Column(Date, nullable=True)
     porcentaje_completitud = Column(Float, default=0.0)
@@ -140,7 +144,9 @@ class Item(Base):
     paquete = relationship("Paquete", back_populates="items")
     source_item_id = Column(Integer, ForeignKey("items.id"), nullable=True)
     source_item = relationship("Item", remote_side=[id], backref="linked_items")
-    forecast_fin = Column(Date, nullable=True)
+    
+    # ❌ ELIMINADO: forecast_fin ya no está aquí
+    
     version = Column(Integer, default=1)
     estado = Column(String(20), default="NO_INICIADO")
     porcentaje_completitud = Column(Float, default=0.0)

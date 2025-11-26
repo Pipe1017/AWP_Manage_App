@@ -1,5 +1,3 @@
-// frontend/src/components/modules/awp/AWPTableConsolidada.jsx
-
 import React, { useState, useEffect } from 'react';
 import client from '../../../api/axios';
 
@@ -70,13 +68,9 @@ function AWPTableConsolidada({ plotPlanId, proyecto, filteredCWAId, onDataChange
       const res = await client.get(url);
       setJerarquia(res.data);
       
-      // ✅ CAMBIO: Lógica de expansión por defecto
       if (!jerarquia && res.data.cwas) {
-        // Solo expandimos CWAs (Nivel 1)
         const allCwaIds = new Set(res.data.cwas.map(c => c.id));
         setExpandedCWAs(allCwaIds);
-        
-        // Los niveles inferiores inician cerrados (vacíos)
         setExpandedCWPs(new Set());
         setExpandedPaquetes(new Set());
       }
@@ -89,13 +83,19 @@ function AWPTableConsolidada({ plotPlanId, proyecto, filteredCWAId, onDataChange
   };
 
   // ============================================================================
-  // 6. LÓGICA DE FILTRADO
+  // 6. LÓGICA DE FILTRADO Y ORDENAMIENTO
   // ============================================================================
   const cwasToRender = jerarquia?.cwas?.filter(cwa => {
     const matchText = !filters.codigo || cwa.codigo.toLowerCase().includes(filters.codigo.toLowerCase());
     const matchSelection = !filteredCWAId || cwa.id === filteredCWAId;
     return matchText && matchSelection;
-  }).sort((a, b) => a.codigo.localeCompare(b.codigo));
+  }).sort((a, b) => {
+    const pA = a.prioridad !== null ? a.prioridad : 9999;
+    const pB = b.prioridad !== null ? b.prioridad : 9999;
+    
+    if (pA !== pB) return pA - pB;
+    return a.codigo.localeCompare(b.codigo);
+  });
 
   useEffect(() => {
     if (filteredCWAId && jerarquia) {
@@ -126,17 +126,15 @@ function AWPTableConsolidada({ plotPlanId, proyecto, filteredCWAId, onDataChange
     try { await client.put(`/awp-nuevo/cwp/${id}`, { [field]: value }); loadData(); } catch(e) { console.error(e); }
   };
 
-  // ✅ NUEVO: Helper para actualizar metadatos directamente desde la tabla
   const updateCWPMetadata = async (id, key, value) => {
     try { 
-        // Enviamos solo el fragmento JSON que cambió, el backend hace el merge
         await client.put(`/awp-nuevo/cwp/${id}`, { metadata_json: { [key]: value } }); 
         loadData(); 
     } catch(e) { console.error(e); }
   };
 
-  const updateItemForecast = async (id, date) => {
-    try { await client.put(`/awp-nuevo/item/${id}`, { forecast_fin: date }); loadData(); } catch(e) { console.error(e); }
+  const updatePaqueteField = async (id, field, value) => {
+    try { await client.put(`/awp-nuevo/paquete/${id}`, { [field]: value }); loadData(); } catch(e) { console.error(e); }
   };
 
   // ============================================================================
@@ -179,6 +177,7 @@ function AWPTableConsolidada({ plotPlanId, proyecto, filteredCWAId, onDataChange
     if(confirm("¿Borrar Paquete y sus items?")) { await client.delete(`/awp-nuevo/paquete/${id}`); loadData(); } 
   };
 
+  // Batch Items
   const addBatch = (pkgId) => {
     const count = parseInt(prompt("Cantidad de items:", "5")) || 0; 
     if(count <= 0) return;
@@ -193,13 +192,25 @@ function AWPTableConsolidada({ plotPlanId, proyecto, filteredCWAId, onDataChange
     setPendingItems({...pendingItems, [pkgId]: list}); 
   };
 
+  const handlePasteBatch = (e, pkgId) => {
+    e.preventDefault();
+    const pasteData = e.clipboardData.getData('text');
+    if (!pasteData) return;
+    const lines = pasteData.split(/\r\n|\n|\r/).filter(line => line.trim() !== '');
+    if (lines.length === 0) return;
+    const newRows = lines.map((line, i) => ({ id: `paste_${Date.now()}_${i}`, nombre: line.trim() }));
+    const current = pendingItems[pkgId] || [];
+    setPendingItems({...pendingItems, [pkgId]: [...current, ...newRows]});
+    setExpandedPaquetes(prev => new Set(prev).add(pkgId));
+  };
+
   const saveBatch = async (pkg) => {
     const toSave = pendingItems[pkg.id]?.filter(i => i.nombre.trim()) || [];
     if(!toSave.length) return;
     try {
       await Promise.all(toSave.map(i => client.post(`/awp-nuevo/paquete/${pkg.id}/item`, { nombre: i.nombre })));
       const newP = {...pendingItems}; delete newP[pkg.id]; setPendingItems(newP); loadData();
-    } catch(e) { alert("Error guardando lote de items"); }
+    } catch(e) { alert("Error guardando lote"); }
   };
 
   const handleDeleteItem = async (id) => { 
@@ -229,14 +240,11 @@ function AWPTableConsolidada({ plotPlanId, proyecto, filteredCWAId, onDataChange
     } catch(e) { alert("Error: " + (e.response?.data?.detail || e.message)); } finally { setImporting(false); } 
   };
 
-  // ============================================================================
-  // 9. RENDER
-  // ============================================================================
   if (loading && !jerarquia) {
     return (
       <div className="p-10 text-center">
-        <div className="w-12 h-12 border-4 border-hatch-orange border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-        <p className="text-hatch-blue font-semibold">Cargando estructura AWP...</p>
+        <div className="w-8 h-8 border-2 border-hatch-orange border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+        <p className="text-gray-500 text-xs font-medium">Cargando datos...</p>
       </div>
     );
   }
@@ -244,7 +252,7 @@ function AWPTableConsolidada({ plotPlanId, proyecto, filteredCWAId, onDataChange
   return (
     <div className="flex flex-col h-full gap-2 bg-white">
       
-      {/* HEADER COMPACTO */}
+      {/* HEADER */}
       <div className="flex justify-between items-center px-4 py-2 bg-white rounded border border-hatch-gray shadow-sm shrink-0">
         <div className="flex items-center gap-4">
           <h3 className="text-hatch-blue font-bold text-sm">📊 Control AWP</h3>
@@ -261,7 +269,7 @@ function AWPTableConsolidada({ plotPlanId, proyecto, filteredCWAId, onDataChange
       <div className="flex-1 overflow-auto border border-hatch-gray rounded bg-white shadow-sm relative">
         <table className="text-left border-collapse relative w-full min-w-max">
           
-          {/* HEADER FIXED (STICKY) */}
+          {/* HEADER FIXED (STICKY) - Agregado border-r para continuidad visual */}
           <thead className="text-[10px] uppercase font-bold text-hatch-blue bg-hatch-gray">
             <tr className="h-8">
               <th className="p-1 w-8 min-w-[32px] sticky left-0 top-0 z-50 bg-hatch-gray border-b border-r border-hatch-gray-dark text-center"></th>
@@ -271,11 +279,12 @@ function AWPTableConsolidada({ plotPlanId, proyecto, filteredCWAId, onDataChange
                   <input className="bg-white border border-gray-300 rounded px-1 py-0.5 text-hatch-blue font-normal text-[10px] w-full focus:border-hatch-orange outline-none h-5" placeholder="Filtro..." onChange={e => setFilters({...filters, codigo: e.target.value})} />
                 </div>
               </th>
-              <th className="p-1 w-24 min-w-[96px] text-center border-b border-hatch-gray-dark bg-hatch-gray sticky top-0 z-40">Prioridad<br/><span className="text-[8px] font-normal text-gray-600">(Área)</span></th>
-              <th className="p-1 w-12 min-w-[48px] text-center border-b border-hatch-gray-dark bg-hatch-gray sticky top-0 z-40">Seq</th>
-              <th className="p-1 w-40 min-w-[160px] text-center border-b border-hatch-gray-dark bg-hatch-gray sticky top-0 z-40">Forecasts<br/><span className="text-[8px] font-normal text-gray-600">(Inicio ➜ Fin)</span></th>
+              {/* ✅ FIXED: Bordes derechos agregados en el header para alinear con el body */}
+              <th className="p-1 w-24 min-w-[96px] text-center border-b border-r border-hatch-gray-dark bg-hatch-gray sticky top-0 z-40">Prioridad<br/><span className="text-[8px] font-normal text-gray-600">(Numérica)</span></th>
+              <th className="p-1 w-12 min-w-[48px] text-center border-b border-r border-hatch-gray-dark bg-hatch-gray sticky top-0 z-40">Seq</th>
+              <th className="p-1 w-40 min-w-[160px] text-center border-b border-r border-hatch-gray-dark bg-hatch-gray sticky top-0 z-40">Forecasts<br/><span className="text-[8px] font-normal text-gray-600">(Paquete)</span></th>
               {customColumns.map(c => (
-                <th key={c.id} className="p-1 border-l border-b border-hatch-gray-dark text-hatch-orange whitespace-normal w-32 min-w-[128px] break-words bg-hatch-gray align-top sticky top-0 z-40">
+                <th key={c.id} className="p-1 border-r border-b border-hatch-gray-dark text-hatch-orange whitespace-normal w-32 min-w-[128px] break-words bg-hatch-gray align-top sticky top-0 z-40">
                   {c.nombre}
                 </th>
               ))}
@@ -283,7 +292,6 @@ function AWPTableConsolidada({ plotPlanId, proyecto, filteredCWAId, onDataChange
             </tr>
           </thead>
 
-          {/* BODY COMPACTO */}
           <tbody className="text-xs text-hatch-blue divide-y divide-gray-200">
             {cwasToRender?.map(cwa => {
               const isExp = expandedCWAs.has(cwa.id);
@@ -307,12 +315,16 @@ function AWPTableConsolidada({ plotPlanId, proyecto, filteredCWAId, onDataChange
                         <span className="font-normal text-gray-500 text-[10px] leading-tight">{cwa.nombre}</span>
                       </div>
                     </td>
-                    <td className={`p-1 text-center align-top ${rowBg}`}>
-                      <select className={`text-[10px] border rounded px-1 py-0.5 w-full h-6 ${cwa.prioridad === 'CRITICA' ? 'border-red-300 text-red-600' : 'border-gray-300'}`} value={cwa.prioridad || 'MEDIA'} onChange={e => updateCWAField(cwa.id, 'prioridad', e.target.value)} onClick={e => e.stopPropagation()}>
-                        <option value="BAJA">🟢 Baja</option><option value="MEDIA">🟡 Media</option><option value="ALTA">🟠 Alta</option><option value="CRITICA">🔴 Crítica</option>
-                      </select>
+                    <td className={`p-1 text-center align-top ${rowBg} border-r border-gray-100`}>
+                        <input 
+                            type="number"
+                            className="w-full border border-gray-300 rounded text-center text-[10px] h-7 focus:border-hatch-orange outline-none bg-white"
+                            value={cwa.prioridad || 99}
+                            onChange={e => updateCWAField(cwa.id, 'prioridad', e.target.value)}
+                            onClick={e => e.stopPropagation()}
+                        />
                     </td>
-                    <td colSpan={2 + customColumns.length} className={`p-2 text-[10px] text-gray-400 italic align-top ${rowBg}`}>📍 {cwa.plot_plan_nombre}</td>
+                    <td colSpan={2 + customColumns.length} className={`p-2 text-[10px] text-gray-400 italic align-top ${rowBg} border-r border-gray-100`}>📍 {cwa.plot_plan_nombre}</td>
                     <td className={`p-1 text-right align-top ${rowBg}`}>
                       <button onClick={() => openCWPModal(cwa)} className="text-[10px] bg-gray-100 hover:bg-hatch-orange hover:text-white text-gray-600 px-2 py-0.5 rounded border border-gray-300 transition-colors">+ CWP</button>
                     </td>
@@ -338,36 +350,20 @@ function AWPTableConsolidada({ plotPlanId, proyecto, filteredCWAId, onDataChange
                               </div>
                             </div>
                           </td>
-                          <td className={`p-1 text-center align-top ${cwpBg} text-[10px] text-gray-300`}>-</td>
-                          <td className={`p-1 text-center align-top ${cwpBg}`}>
+                          <td className={`p-1 text-center align-top ${cwpBg} text-[10px] text-gray-300 border-r border-gray-100`}>-</td>
+                          <td className={`p-1 text-center align-top ${cwpBg} border-r border-gray-100`}>
                             <input type="number" className="w-full border border-gray-300 rounded text-center text-[10px] h-6 focus:border-hatch-orange outline-none bg-white" value={cwp.secuencia || 0} onChange={e => updateCWPField(cwp.id, 'secuencia', e.target.value)} />
                           </td>
-                          <td className={`p-1 text-center align-top ${cwpBg}`}>
-                            <div className="flex gap-1">
-                              <input type="date" className="border border-gray-300 rounded w-full text-[9px] px-0.5 py-0 bg-white h-6" value={cwp.forecast_inicio?.split('T')[0] || ''} onChange={e => updateCWPField(cwp.id, 'forecast_inicio', e.target.value)} />
-                              <input type="date" className="border border-gray-300 rounded w-full text-[9px] px-0.5 py-0 bg-white h-6" value={cwp.forecast_fin?.split('T')[0] || ''} onChange={e => updateCWPField(cwp.id, 'forecast_fin', e.target.value)} />
-                            </div>
-                          </td>
-                          {/* ✅ RENDERIZADO INTELIGENTE DE METADATOS */}
+                          <td className={`p-1 text-center align-top ${cwpBg} text-gray-300 text-[9px] border-r border-gray-100`}>-</td>
+                          
                           {customColumns.map(c => (
-                            <td key={c.id} className={`p-1 border-l border-gray-200 align-top ${cwpBg}`}>
+                            <td key={c.id} className={`p-1 border-r border-gray-200 align-top ${cwpBg}`}>
                               {c.tipo_dato === 'SELECCION' ? (
-                                <select
-                                    className="w-full border border-gray-300 rounded text-[10px] h-6 bg-white focus:border-hatch-orange outline-none"
-                                    value={cwp.metadata_json?.[c.nombre] || ''}
-                                    onChange={e => updateCWPMetadata(cwp.id, c.nombre, e.target.value)}
-                                >
-                                    <option value="">-</option>
-                                    {c.opciones_json?.map(opt => (
-                                        <option key={opt} value={opt}>{opt}</option>
-                                    ))}
+                                <select className="w-full border border-gray-300 rounded text-[10px] h-6 bg-white focus:border-hatch-orange outline-none" value={cwp.metadata_json?.[c.nombre] || ''} onChange={e => updateCWPMetadata(cwp.id, c.nombre, e.target.value)}>
+                                    <option value="">-</option>{c.opciones_json?.map(opt => (<option key={opt} value={opt}>{opt}</option>))}
                                 </select>
                               ) : (
-                                <input
-                                    className="w-full border border-gray-300 rounded text-[10px] h-6 bg-white px-1 focus:border-hatch-orange outline-none"
-                                    value={cwp.metadata_json?.[c.nombre] || ''}
-                                    onChange={e => updateCWPMetadata(cwp.id, c.nombre, e.target.value)}
-                                />
+                                <input className="w-full border border-gray-300 rounded text-[10px] h-6 bg-white px-1 focus:border-hatch-orange outline-none" value={cwp.metadata_json?.[c.nombre] || ''} onChange={e => updateCWPMetadata(cwp.id, c.nombre, e.target.value)} />
                               )}
                             </td>
                           ))}
@@ -406,8 +402,18 @@ function AWPTableConsolidada({ plotPlanId, proyecto, filteredCWAId, onDataChange
                                     </div>
                                   </div>
                                 </td>
-                                <td colSpan={3} className={`p-1 ${pkgBg}`}></td>
-                                {customColumns.map(c => <td key={c.id} className={`border-l border-gray-200 ${pkgBg}`}></td>)}
+                                <td className={`p-1 ${pkgBg} border-r border-gray-100`}></td>
+                                <td className={`p-1 ${pkgBg} border-r border-gray-100`}></td>
+                                
+                                {/* ✅ FECHAS EN PAQUETE */}
+                                <td className={`p-1 text-center align-top ${pkgBg} border-r border-gray-100`}>
+                                    <div className="flex gap-1 items-center">
+                                        <input type="date" className="border border-gray-300 rounded w-full text-[9px] px-0.5 py-0 bg-white h-6" value={pkg.forecast_inicio?.split('T')[0] || ''} onChange={e => updatePaqueteField(pkg.id, 'forecast_inicio', e.target.value)} />
+                                        <input type="date" className="border border-gray-300 rounded w-full text-[9px] px-0.5 py-0 bg-white h-6" value={pkg.forecast_fin?.split('T')[0] || ''} onChange={e => updatePaqueteField(pkg.id, 'forecast_fin', e.target.value)} />
+                                    </div>
+                                </td>
+
+                                {customColumns.map(c => <td key={c.id} className={`p-1 border-r border-gray-100 ${pkgBg}`}></td>)}
                                 <td className={`p-1 text-right align-top ${pkgBg} opacity-50 hover:opacity-100`}>
                                   <div className="flex justify-end gap-1">
                                     <button onClick={() => handleDeletePkg(pkg.id)} className="text-gray-400 hover:text-red-600 text-[10px]">🗑️</button>
@@ -437,12 +443,9 @@ function AWPTableConsolidada({ plotPlanId, proyecto, filteredCWAId, onDataChange
                                             {!item.source_item_id && <span className="text-[8px] text-gray-300 font-mono">#{item.id}</span>}
                                           </div>
                                         </td>
-                                        <td className={`p-1 ${itemBg}`}></td>
-                                        <td className={`p-1 ${itemBg}`}></td>
-                                        <td className={`p-1 text-center align-top ${itemBg}`}>
-                                          <input type="date" className="border border-gray-200 rounded w-full text-gray-500 text-[9px] px-0.5 py-0 h-5 bg-white text-center" value={item.forecast_fin?.split('T')[0] || ''} onChange={e => updateItemForecast(item.id, e.target.value)} />
-                                        </td>
-                                        {customColumns.map(c => <td key={c.id} className={`border-l border-gray-200 ${itemBg}`}></td>)}
+                                        {/* ✅ FIXED: colSpan={3} para las 3 columnas de datos (Prio, Seq, Forecast) */}
+                                        <td colSpan={3} className={`p-1 ${itemBg} border-r border-gray-100`}></td>
+                                        {customColumns.map(c => <td key={c.id} className={`border-r border-gray-100 ${itemBg}`}></td>)}
                                         <td className={`p-1 text-right align-top ${itemBg}`}>
                                           <button onClick={() => handleDeleteItem(item.id)} className="text-gray-300 hover:text-red-500 text-[10px] px-1">×</button>
                                         </td>
@@ -452,11 +455,19 @@ function AWPTableConsolidada({ plotPlanId, proyecto, filteredCWAId, onDataChange
                                   
                                   {/* BATCH ITEMS */}
                                   {pendingItems[pkg.id]?.map(t => (
-                                    <tr key={t.id} className="bg-yellow-50 text-xs">
+                                    <tr key={t.id} className="bg-yellow-50 text-xs animate-pulse">
                                       <td className="sticky left-0 z-30 bg-yellow-50"></td>
                                       <td className="p-1 pl-12 sticky left-8 z-30 bg-yellow-50 border-r-2 border-hatch-gray text-[10px] font-bold text-yellow-700">⚡ Nuevo</td>
+                                      {/* ✅ FIXED: colSpan={3} */}
                                       <td colSpan={3} className="p-1">
-                                        <input autoFocus className="w-full border border-yellow-300 rounded text-[10px] px-1 py-0.5 bg-white" value={t.nombre} onChange={e => changeBatch(pkg.id, t.id, e.target.value)} onKeyDown={e => {if(e.key === 'Enter') saveBatch(pkg)}} placeholder="Nombre..." />
+                                        <input 
+                                            autoFocus 
+                                            className="w-full border border-yellow-300 rounded text-[10px] px-1 py-0.5 bg-white" 
+                                            value={t.nombre} 
+                                            onChange={e => changeBatch(pkg.id, t.id, e.target.value)} 
+                                            onPaste={(e) => handlePasteBatch(e, pkg.id)} 
+                                            placeholder="Nombre..." 
+                                        />
                                       </td>
                                       <td colSpan={customColumns.length}></td>
                                       <td className="p-1 text-right">
@@ -488,7 +499,7 @@ function AWPTableConsolidada({ plotPlanId, proyecto, filteredCWAId, onDataChange
         </table>
       </div>
 
-      {/* Modales se mantienen igual, solo asegurate de que estén al final */}
+      {/* Modales (Se mantienen igual) */}
       {modals.cwp && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm">
             <div className="bg-white w-[400px] p-4 rounded shadow-lg border border-gray-300">
@@ -506,14 +517,7 @@ function AWPTableConsolidada({ plotPlanId, proyecto, filteredCWAId, onDataChange
                         {customColumns.map(c => (
                             <div key={c.id} className="mb-1">
                                 <label className="text-[10px] block text-gray-600">{c.nombre}</label>
-                                {c.tipo_dato === 'SELECCION' ? (
-                                    <select className="w-full border p-1 rounded text-xs" value={formData.metadata?.[c.nombre] || ''} onChange={e => setFormData({...formData, metadata: {...formData.metadata, [c.nombre]: e.target.value}})}>
-                                        <option value="">-</option>
-                                        {c.opciones_json?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                    </select>
-                                ) : (
-                                    <input className="w-full border p-1 rounded text-xs" value={formData.metadata?.[c.nombre] || ''} onChange={e => setFormData({...formData, metadata: {...formData.metadata, [c.nombre]: e.target.value}})} />
-                                )}
+                                <input className="w-full border p-1 rounded text-xs" value={formData.metadata?.[c.nombre] || ''} onChange={e => setFormData({...formData, metadata: {...formData.metadata, [c.nombre]: e.target.value}})} />
                             </div>
                         ))}
                     </div>
@@ -526,7 +530,6 @@ function AWPTableConsolidada({ plotPlanId, proyecto, filteredCWAId, onDataChange
         </div>
       )}
       
-      {/* (Resto de modales Link, Pkg, Import: Mismos que antes pero con estilos compactos si lo deseas, o déjalos igual) */}
       {modals.pkg && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm">
           <div className="bg-white p-4 rounded w-80 shadow-lg">
