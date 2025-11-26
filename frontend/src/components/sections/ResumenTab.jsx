@@ -7,7 +7,7 @@ import PlotPlan from '../modules/plotplan/PlotPlan';
 import AWPTableConsolidada from '../modules/awp/AWPTableConsolidada';
 import UploadPlotPlanForm from '../modules/upload/UploadPlotPlanForm';
 
-// --- COMPONENTE: SELECTOR DE CWA CON BUSCADOR ---
+// --- COMPONENTE: SELECTOR DE CWA CON BUSCADOR Y TEXT WRAP ---
 function CWASelector({ cwas, selectedCWA, onSelect }) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -35,14 +35,13 @@ function CWASelector({ cwas, selectedCWA, onSelect }) {
       {/* Botón Principal (Trigger) */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`w-full px-3 py-1.5 text-xs font-medium text-left bg-white border-2 rounded-lg flex items-center justify-between transition-all min-h-[32px] ${
+        className={`w-full px-3 py-2 text-xs font-medium bg-white border-2 rounded-lg flex items-center justify-between transition-all min-h-[40px] h-auto ${
           selectedCWA 
             ? 'border-green-400 text-green-800 bg-green-50' 
             : 'border-hatch-gray text-gray-600 hover:border-hatch-orange'
         }`}
       >
-        {/* ✅ CAMBIO: wrap y break-words para ver todo el texto */}
-        <span className="whitespace-normal break-words leading-tight flex-1 mr-2">
+        <span className="whitespace-normal break-words text-left flex-1 mr-2 leading-tight">
           {selectedCWA 
             ? `${selectedCWA.codigo} - ${selectedCWA.nombre}` 
             : "-- Seleccionar Área --"}
@@ -50,16 +49,16 @@ function CWASelector({ cwas, selectedCWA, onSelect }) {
         <span className="text-gray-400 flex-shrink-0">▼</span>
       </button>
 
-      {/* Dropdown Flotante */}
+      {/* Dropdown Flotante - Z-INDEX ALTO PARA EVITAR CORTE */}
       {isOpen && (
-        <div className="absolute top-full left-0 mt-1 w-80 bg-white border-2 border-hatch-gray rounded-lg shadow-xl z-50 overflow-hidden flex flex-col max-h-96">
+        <div className="absolute top-full left-0 mt-1 w-80 bg-white border-2 border-hatch-gray rounded-lg shadow-xl z-[100] overflow-hidden flex flex-col max-h-96">
           
           {/* Buscador Interno */}
           <div className="p-2 border-b border-gray-100 bg-gray-50">
             <input
               type="text"
               placeholder="🔍 Buscar área..."
-              className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:border-hatch-orange"
+              className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:border-hatch-orange"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               autoFocus
@@ -87,13 +86,11 @@ function CWASelector({ cwas, selectedCWA, onSelect }) {
                       <span className={`font-mono font-bold text-[10px] ${selectedCWA?.id === cwa.id ? 'text-hatch-blue' : 'text-gray-500'}`}>
                         {cwa.codigo}
                       </span>
-                      {/* ✅ CAMBIO: Texto completo (wrap) */}
                       <span className={`whitespace-normal break-words leading-tight ${selectedCWA?.id === cwa.id ? 'font-bold text-hatch-blue' : ''}`}>
                         {cwa.nombre}
                       </span>
                     </div>
                     
-                    {/* Indicador de Estado */}
                     <div className="flex items-center self-center flex-shrink-0" title={hasGeo ? "Geometría dibujada" : "Sin dibujo"}>
                       {hasGeo ? (
                         <span className="text-green-500 text-xs">✅</span>
@@ -123,14 +120,13 @@ function ResumenTab({ proyecto, onProyectoUpdate }) {
   const [filteredCWAId, setFilteredCWAId] = useState(null);
   const [isLoadingPlotPlan, setIsLoadingPlotPlan] = useState(false);
 
-  // Inicializar con el primer plot plan si existe
+  // Inicializar
   useEffect(() => {
     if (proyecto.plot_plans && proyecto.plot_plans.length > 0 && !selectedPlotPlanId) {
       setSelectedPlotPlanId(proyecto.plot_plans[0].id);
     }
   }, [proyecto.plot_plans]);
 
-  // Función para recargar todo el proyecto
   const recargarProyecto = async () => {
     try {
       const response = await client.get(`/proyectos/${proyecto.id}`);
@@ -164,7 +160,7 @@ function ResumenTab({ proyecto, onProyectoUpdate }) {
         });
         
         setSelectedCWA(null);
-        setFilteredCWAId(null); // Reset filtro al cambiar plano
+        setFilteredCWAId(null); 
         setIsLoadingPlotPlan(false);
         
       } catch (err) {
@@ -201,16 +197,15 @@ function ResumenTab({ proyecto, onProyectoUpdate }) {
     setSelectedPlotPlanId(newId);
   };
 
-  // ✅ LÓGICA UNIFICADA: Desde Dropdown -> PlotPlan -> Tabla
   const handleCWASelectFromDropdown = (cwa) => {
-    setSelectedCWA(cwa);        // 1. Pone el CWA listo para dibujar (si no tiene geo)
-    setFilteredCWAId(cwa.id);   // 2. Filtra la tabla de abajo
-    // 3. (Implícito) Al pasar filteredCWAId al PlotPlan, este lo iluminará
+    console.log("🔽 Seleccionado desde dropdown:", cwa.nombre);
+    setSelectedCWA(cwa);        
+    setFilteredCWAId(cwa.id);   
   };
 
-  // ✅ LÓGICA INVERSA: Desde Clic en Mapa -> Dropdown y Tabla
   const handleShapeClick = (cwaId) => {
-    setFilteredCWAId(cwaId);
+    console.log("📍 Click en figura CWA ID:", cwaId);
+    setFilteredCWAId(cwaId);    
     const cwa = currentPlotPlan?.cwas?.find(c => c.id === cwaId);
     if (cwa) setSelectedCWA(cwa);
   };
@@ -237,9 +232,18 @@ function ResumenTab({ proyecto, onProyectoUpdate }) {
 
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
         
-        {/* Visualizador */}
-        <div className="bg-white border-2 border-hatch-gray rounded-lg overflow-hidden shadow-sm">
-          <div className="p-4 border-b-2 border-hatch-gray bg-gray-50 flex flex-wrap items-center justify-between gap-4">
+        {/* ✅ MOVIDO ARRIBA: Sección de Subida */}
+        <div className="bg-white border-2 border-dashed border-gray-300 rounded-lg p-4">
+            <UploadPlotPlanForm proyecto={proyecto} onUploadSuccess={handlePlotPlanUploaded} />
+        </div>
+
+        {/* 1. VISUALIZADOR DE PLANOS */}
+        {/* ⚠️ CORRECCIÓN DE MARGEN: Quitamos overflow-hidden del contenedor padre para que el dropdown pueda salir */}
+        <div className="bg-white border-2 border-hatch-gray rounded-lg shadow-sm relative z-10">
+          
+          {/* Header del Card */}
+          {/* ✅ CAMBIO: justify-start en lugar de justify-between y gap-8 para mover "Asignar Área" a la izquierda */}
+          <div className="p-4 border-b-2 border-hatch-gray bg-gray-50 flex flex-wrap items-center justify-start gap-8 rounded-t-lg">
             <div className="flex items-center gap-2">
                 <h3 className="text-sm font-bold text-hatch-blue uppercase mr-2">📐 Plot Plan Interactivo</h3>
                 {proyecto.plot_plans && proyecto.plot_plans.length > 0 ? (
@@ -250,26 +254,28 @@ function ResumenTab({ proyecto, onProyectoUpdate }) {
                 {isLoadingPlotPlan && <span className="text-xs text-gray-400 animate-pulse">Cargando...</span>}
             </div>
 
-            <div className="flex items-center gap-3 bg-white px-3 py-1 rounded-lg border border-gray-200 shadow-sm">
+            {/* Selector CWA - z-index alto */}
+            <div className="flex items-center gap-3 bg-white px-3 py-1 rounded-lg border border-gray-200 shadow-sm relative z-20">
                 <span className="text-xs font-bold text-gray-500">Asignar Área:</span>
                 {currentPlotPlan && currentPlotPlan.cwas && currentPlotPlan.cwas.length > 0 ? (
                     <CWASelector 
                       cwas={currentPlotPlan.cwas} 
                       selectedCWA={selectedCWA}
-                      onSelect={handleCWASelectFromDropdown} // Usamos el nuevo handler unificado
+                      onSelect={handleCWASelectFromDropdown}
                     />
                 ) : <span className="text-xs text-gray-400 italic px-2">No hay CWAs creados</span>}
                 {selectedCWA && <span className="text-green-500 text-xs font-bold">✓ Listo</span>}
             </div>
           </div>
           
-          <div className="p-4 bg-gray-900">
+          {/* Mapa */}
+          <div className="p-4 bg-gray-900 rounded-b-lg">
             {currentPlotPlan ? (
                 <PlotPlan
                   key={`plotplan-${selectedPlotPlanId}`}
                   plotPlan={currentPlotPlan}
                   cwaToAssociate={selectedCWA}
-                  activeCWAId={filteredCWAId} // ✅ NUEVO PROP: Para iluminar desde el listado
+                  activeCWAId={filteredCWAId} 
                   onShapeSaved={handleShapeSaved}
                   onShapeClick={handleShapeClick}
                 />
@@ -279,17 +285,14 @@ function ResumenTab({ proyecto, onProyectoUpdate }) {
           </div>
         </div>
 
-        <div className="bg-white border-2 border-dashed border-gray-300 rounded-lg p-4">
-            <UploadPlotPlanForm proyecto={proyecto} onUploadSuccess={handlePlotPlanUploaded} />
-        </div>
-
-        {/* Tabla */}
-        <div className="bg-white border-2 border-hatch-gray rounded-lg overflow-hidden shadow-sm">
+        {/* 2. TABLA FILTRABLE */}
+        <div className="bg-white border-2 border-hatch-gray rounded-lg overflow-hidden shadow-sm z-0">
           <div className="p-3 border-b-2 border-hatch-gray bg-gray-50 flex items-center justify-between">
             <h3 className="text-sm font-bold text-hatch-blue uppercase">📋 Tabla de Control</h3>
             {filteredCWAId && (
               <button onClick={handleClearFilter} className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded border border-yellow-300 text-xs flex items-center gap-2 hover:bg-yellow-200 transition-colors">
-                <span>🔍 Filtro: {selectedCWA?.codigo}</span><span className="font-bold">✕</span>
+                <span>🔍 Filtro Activo: <strong>{selectedCWA?.codigo || "ID "+filteredCWAId}</strong></span>
+                <span className="font-bold ml-1">✕</span>
               </button>
             )}
           </div>

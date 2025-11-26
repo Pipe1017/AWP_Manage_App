@@ -5,18 +5,19 @@ import client from '../../../api/axios';
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 const SERVER_URL = API_BASE.replace('/api/v1', '');
 
+// 🎨 PALETA DE COLORES EXTENDIDA
 const HATCH_COLORS = {
-  primary: [ '#E67E22', '#2E86C1', '#27AE60', '#C0392B' ],
-  secondary: [ '#F39C12', '#8E44AD', '#16A085', '#D35400' ],
-  earth: [ '#95A5A6', '#7F8C8D', '#BDC3C7', '#34495E' ]
+  primary: [ '#E67E22', '#2E86C1', '#27AE60', '#C0392B', '#8E44AD' ], // Naranja, Azul, Verde, Rojo, Morado
+  secondary: [ '#F39C12', '#3498DB', '#2ECC71', '#E74C3C', '#9B59B6' ], // Variaciones brillantes
+  dark: [ '#D35400', '#21618C', '#1E8449', '#922B21', '#6C3483' ],    // Variaciones oscuras
+  earth: [ '#95A5A6', '#7F8C8D', '#34495E', '#2C3E50', '#BDC3C7' ],   // Grises/Metálicos
+  warn: [ '#F1C40F', '#1ABC9C', '#E84393', '#2C2C54', '#474787' ]     // Amarillos/Teal/Rosas
 };
-const allColors = [...HATCH_COLORS.primary, ...HATCH_COLORS.secondary, ...HATCH_COLORS.earth];
+const allColors = [...HATCH_COLORS.primary, ...HATCH_COLORS.secondary, ...HATCH_COLORS.dark, ...HATCH_COLORS.earth, ...HATCH_COLORS.warn];
 
-// Hook para cargar imagen
 const useImageLoader = (src) => {
   const [image, setImage] = useState(null);
   const [error, setError] = useState(null);
-  
   useEffect(() => {
     if (!src) { setImage(null); return; }
     const img = new window.Image();
@@ -26,11 +27,10 @@ const useImageLoader = (src) => {
     img.onload = () => { setImage(img); setError(null); };
     img.onerror = (err) => { console.error("❌ Error imagen:", fullSrc); setError(err); };
   }, [src]);
-  
   return { image, error };
 };
 
-function Toolbar({ activeTool, setActiveTool, color, setColor, onZoom, onReset, onClear, onUndo }) { 
+function Toolbar({ activeTool, setActiveTool, color, setColor, onZoom, onReset, onClearAll, onDeleteSelected, hasSelection, onUndo, canUndo }) { 
   const [showColorPicker, setShowColorPicker] = useState(false);
   
   const tools = [
@@ -43,6 +43,8 @@ function Toolbar({ activeTool, setActiveTool, color, setColor, onZoom, onReset, 
 
   return (
     <div className="p-2 border-b border-gray-600 flex flex-wrap justify-between items-center gap-2" style={{ backgroundColor: '#333333' }}>
+      
+      {/* HERRAMIENTAS */}
       <div className="flex items-center gap-1 bg-black/20 p-1 rounded-lg border border-gray-600">
         {tools.map(tool => (
           <button
@@ -61,27 +63,31 @@ function Toolbar({ activeTool, setActiveTool, color, setColor, onZoom, onReset, 
         ))}
       </div>
 
+      {/* ACCIONES */}
       <div className="flex items-center gap-3">
+        
+        {/* Color Picker */}
         <div className="relative">
           <button 
             onClick={() => setShowColorPicker(!showColorPicker)} 
             className="flex items-center gap-2 px-3 py-1.5 bg-gray-600 hover:bg-gray-500 rounded border border-gray-500 transition-colors"
-            title="Cambiar Color"
+            title="Color de relleno"
           >
             <div className="w-5 h-5 rounded-full border-2 border-white shadow-sm" style={{ backgroundColor: color }} />
-            <span className="text-xs text-gray-200">Color</span>
+            <span className="text-xs text-gray-200 hidden sm:inline">Color</span>
             <span className="text-gray-400 text-[10px]">▼</span>
           </button>
           
           {showColorPicker && (
-            <div className="absolute right-0 top-full mt-2 p-3 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 w-48 animate-in fade-in zoom-in duration-200">
-              <div className="grid grid-cols-4 gap-2">
+            <div className="absolute right-0 top-full mt-2 p-3 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 w-64 animate-in fade-in zoom-in duration-200">
+              <div className="grid grid-cols-5 gap-2">
                 {allColors.map((c, idx) => (
                   <button 
                     key={idx} 
                     onClick={() => { setColor(c); setShowColorPicker(false); }} 
                     className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-110 ${color === c ? 'border-gray-900 scale-110 shadow-md' : 'border-transparent'}`} 
                     style={{ backgroundColor: c }} 
+                    title={c}
                   />
                 ))}
               </div>
@@ -91,15 +97,45 @@ function Toolbar({ activeTool, setActiveTool, color, setColor, onZoom, onReset, 
 
         <div className="h-6 w-px bg-gray-500"></div>
 
+        {/* Zoom */}
         <div className="flex items-center gap-1">
             <button onClick={() => onZoom(1.2)} className="p-2 bg-gray-600 text-gray-300 hover:text-white hover:bg-gray-500 rounded" title="Acercar">➕</button>
             <button onClick={() => onZoom(0.8)} className="p-2 bg-gray-600 text-gray-300 hover:text-white hover:bg-gray-500 rounded" title="Alejar">➖</button>
             <button onClick={onReset} className="p-2 bg-gray-600 text-gray-300 hover:text-white hover:bg-gray-500 rounded" title="Resetear Vista">⟲</button>
         </div>
 
-        <div className="flex items-center gap-1 ml-2">
-            {onUndo && <button onClick={onUndo} className="p-2 text-gray-400 hover:text-white hover:bg-gray-600 rounded" title="Deshacer">↶</button>}
-            {onClear && <button onClick={onClear} className="p-2 text-red-400 hover:text-red-200 hover:bg-red-900/30 rounded" title="Limpiar Todo">🗑️</button>}
+        <div className="h-6 w-px bg-gray-500"></div>
+
+        {/* Edición */}
+        <div className="flex items-center gap-1">
+            <button 
+                onClick={onUndo} 
+                disabled={!canUndo}
+                className={`p-2 rounded transition-colors ${canUndo ? 'text-white hover:bg-gray-600' : 'text-gray-600 cursor-not-allowed'}`} 
+                title="Deshacer (Ctrl+Z)"
+            >
+                ↶
+            </button>
+            
+            {/* Botón Borrar Selección */}
+            <button 
+                onClick={onDeleteSelected} 
+                disabled={!hasSelection}
+                className={`p-2 rounded transition-colors flex items-center gap-1 ${hasSelection ? 'bg-red-600 text-white hover:bg-red-500 shadow-sm' : 'text-gray-600 cursor-not-allowed'}`} 
+                title="Borrar Área Seleccionada (Supr)"
+            >
+                <span>🗑️</span>
+                <span className="text-xs font-bold hidden lg:inline">Borrar</span>
+            </button>
+
+            {/* Botón Borrar Todo */}
+            <button 
+                onClick={onClearAll} 
+                className="p-2 text-red-400 hover:text-red-200 hover:bg-red-900/30 rounded border border-transparent hover:border-red-900/50" 
+                title="Limpiar Todo el Plano"
+            >
+                ☠️
+            </button>
         </div>
       </div>
     </div>
@@ -114,8 +150,13 @@ function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShape
   const [activeTool, setActiveTool] = useState('pan');
   const [currentColor, setCurrentColor] = useState(HATCH_COLORS.primary[0]);
   const [isDrawing, setIsDrawing] = useState(false);
+  
+  // Estado principal de formas
   const [shapes, setShapes] = useState([]);
+  
+  // Historial para Undo
   const [history, setHistory] = useState([]); 
+  
   const [newShape, setNewShape] = useState(null);
   const [polygonPoints, setPolygonPoints] = useState([]);
   const [isDrawingPolygon, setIsDrawingPolygon] = useState(false);
@@ -141,7 +182,6 @@ function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShape
     return () => window.removeEventListener('resize', updateSize);
   }, []);
 
-  // Cargar formas
   useEffect(() => {
     if (!plotPlan?.cwas) { setShapes([]); return; }
     const loadedShapes = [];
@@ -161,7 +201,7 @@ function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShape
     setShapes(loadedShapes);
   }, [plotPlan?.id, plotPlan?.cwas]);
 
-  // ✅ EFECTO NUEVO: Sincronizar selección externa (dropdown/tabla)
+  // Sincronización selección externa
   useEffect(() => {
     if (activeCWAId) {
         const shapeToSelect = shapes.find(s => s.cwaId === activeCWAId);
@@ -175,11 +215,107 @@ function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShape
     }
   }, [activeCWAId, shapes]);
 
-  // Helpers
+  // Hotkeys (Undo / Delete)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+        // Ctrl+Z
+        if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+            e.preventDefault();
+            handleUndo();
+        }
+        // Delete / Backspace
+        if ((e.key === 'Delete' || e.key === 'Backspace') && selectedShapeKey) {
+            e.preventDefault();
+            handleDeleteSelected();
+        }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedShapeKey, shapes, history]); // Dependencias importantes para que funcione
+
+  // --- ACCIONES DE EDICIÓN ---
+
   const handleZoom = (scaleFactor) => setStageState(s => ({ ...s, scale: s.scale * scaleFactor }));
   const handleResetZoom = () => setStageState({ scale: 1, x: 0, y: 0 });
-  const handleClear = () => { if(confirm('¿Limpiar?')) { setHistory([...history, shapes]); setShapes([]); }};
-  const handleUndo = () => { if(history.length > 0) { setShapes(history[history.length-1]); setHistory(history.slice(0,-1)); }};
+
+  // ✅ UNDO REAL: Restaurar estado anterior
+  const handleUndo = () => {
+    if(history.length > 0) { 
+        const previousShapes = history[history.length-1];
+        setShapes(previousShapes); 
+        setHistory(prev => prev.slice(0, -1));
+        // Nota: El Undo visual no revierte la DB automáticamente en este esquema simple, 
+        // pero permite corregir errores antes de cambiar de plano.
+        // Para revertir DB se requeriría un endpoint específico de rollback o volver a guardar el estado anterior.
+        // Por ahora, asumo que el usuario quiere deshacer la última acción visual.
+    }
+  };
+
+  const saveToHistory = () => {
+    setHistory(prev => [...prev, shapes]);
+  };
+
+  // ✅ BORRAR SELECCIONADO (API + LOCAL)
+  const handleDeleteSelected = async () => {
+    if (!selectedShapeKey) return;
+    const shape = shapes.find(s => s.key === selectedShapeKey);
+    if (!shape) return;
+
+    if (!confirm(`¿Eliminar el dibujo del área ${shape.codigo}?`)) return;
+
+    try {
+        saveToHistory(); // Guardar antes de borrar
+
+        // Enviar geometría vacía al backend para "borrarla"
+        const formData = new FormData();
+        formData.append('shape_type', ''); 
+        formData.append('shape_data', '{}');
+
+        await client.put(
+            `/proyectos/${plotPlan.proyecto_id}/plot_plans/${plotPlan.id}/cwa/${shape.cwaId}/geometry`,
+            formData
+        );
+        
+        // Actualizar local
+        setShapes(prev => prev.filter(s => s.key !== selectedShapeKey));
+        setSelectedShapeKey(null);
+        
+        // Notificar padre (para que aparezca la X roja)
+        if (onShapeSaved) onShapeSaved(shape.cwaId, null);
+
+    } catch (err) {
+        alert("Error al eliminar: " + err.message);
+    }
+  };
+
+  // ✅ BORRAR TODO (API LOOP + LOCAL)
+  const handleClearAll = async () => {
+    if (shapes.length === 0) return;
+    if(!confirm('⚠️ ¿ESTÁS SEGURO? Esto borrará TODOS los dibujos de este plano.')) return;
+    
+    saveToHistory();
+    
+    try {
+        // Borrar uno por uno en el backend (idealmente habría un endpoint bulk, pero esto funciona)
+        for (const shape of shapes) {
+            const formData = new FormData();
+            formData.append('shape_type', ''); 
+            formData.append('shape_data', '{}');
+            await client.put(
+                `/proyectos/${plotPlan.proyecto_id}/plot_plans/${plotPlan.id}/cwa/${shape.cwaId}/geometry`,
+                formData
+            );
+        }
+
+        setShapes([]);
+        setSelectedShapeKey(null);
+        // Notificar recarga completa
+        if (onShapeSaved) onShapeSaved(null, null); 
+
+    } catch (err) {
+        alert("Error limpiando: " + err.message);
+    }
+  };
 
   const getRelativePointerPosition = (node) => {
     const stage = node.getStage();
@@ -191,7 +327,6 @@ function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShape
     return { x: relativeX, y: relativeY };
   };
 
-  // Eventos Mouse
   const handleMouseDown = (e) => {
     if (activeTool === 'pan' || !image || e.evt.button !== 0) {
       if (activeTool === 'pan' && !e.target.findAncestor('Shape')) setSelectedShapeKey(null);
@@ -238,13 +373,11 @@ function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShape
 
   const handleMouseMove = (e) => {
     if (!image) return;
-    
     const pos = getRelativePointerPosition(e.target);
 
     if (isDrawingPolygon) {
         let guideX = pos.x;
         let guideY = pos.y;
-
         if (activeTool === 'ortho' && polygonPoints.length >= 2) {
             const lastX = polygonPoints[polygonPoints.length - 2];
             const lastY = polygonPoints[polygonPoints.length - 1];
@@ -266,7 +399,6 @@ function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShape
 
   const handleMouseUp = () => {
     if (!image || activeTool === 'pan') return;
-    
     if (activeTool === 'rect' || activeTool === 'circle') {
         setIsDrawing(false);
         if (newShape && (Math.abs(newShape.width) > 5 || newShape.radius > 5)) {
@@ -290,6 +422,8 @@ function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShape
     else if (finalShape.type === 'circle') shapeData = { x: finalShape.x, y: finalShape.y, radius: finalShape.radius, color: finalShape.color };
 
     try {
+      saveToHistory(); // ✅ GUARDAR ESTADO ANTES DE CAMBIAR
+
       const formData = new FormData();
       const typeToSend = (finalShape.type === 'ortho' || finalShape.type === 'polygon') ? 'polygon' : finalShape.type;
       
@@ -303,7 +437,7 @@ function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShape
       
       if (onShapeSaved) onShapeSaved(cwaToAssociate.id, null);
       
-      const newShapeVisual = { ...finalShape, type: typeToSend, key: Date.now(), ...shapeData, codigo: cwaToAssociate.codigo, nombre: cwaToAssociate.nombre };
+      const newShapeVisual = { ...finalShape, type: typeToSend, key: Date.now(), ...shapeData, codigo: cwaToAssociate.codigo, nombre: cwaToAssociate.nombre, cwaId: cwaToAssociate.id };
       setShapes(prev => [...prev, newShapeVisual]);
 
     } catch (error) {
@@ -339,11 +473,24 @@ function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShape
 
   return (
     <div className="bg-white border-r-2 border-hatch-gray rounded-lg border border-gray-700 overflow-hidden flex flex-col h-full min-h-[600px]">
-      <Toolbar activeTool={activeTool} setActiveTool={setActiveTool} color={currentColor} setColor={setCurrentColor} onZoom={handleZoom} onReset={handleResetZoom} onClear={handleClear} onUndo={handleUndo} />
+      <Toolbar 
+        activeTool={activeTool} 
+        setActiveTool={setActiveTool} 
+        color={currentColor} 
+        setColor={setCurrentColor} 
+        onZoom={handleZoom} 
+        onReset={handleResetZoom} 
+        onClearAll={handleClearAll} 
+        onDeleteSelected={handleDeleteSelected}
+        hasSelection={!!selectedShapeKey}
+        onUndo={handleUndo}
+        canUndo={history.length > 0}
+      />
       
       <div ref={containerRef} className="w-full relative flex-1 overflow-hidden cursor-crosshair" style={{ backgroundColor: '#262626' }}>
         {!image && <div className="flex items-center justify-center h-full text-white">⏳ Cargando plano...</div>}
         
+        {/* Tooltip */}
         {tooltip.visible && (
             <div 
                 className="absolute z-50 bg-black/90 text-white px-3 py-2 rounded-lg shadow-xl border border-gray-600 pointer-events-none transform -translate-x-1/2 -translate-y-full"
@@ -388,7 +535,7 @@ function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShape
                   const props = {
                     fill: `${shape.color}60`, 
                     stroke: isSel ? '#00FFFF' : shape.color, 
-                    strokeWidth: isSel ? (dynamicStroke * 2) : dynamicStroke, // 🔥 STROKE FINO
+                    strokeWidth: isSel ? (dynamicStroke * 2) : dynamicStroke, 
                     onClick: () => { setSelectedShapeKey(shape.key); if(onShapeClick) onShapeClick(shape.cwaId); },
                     onMouseEnter: (e) => handleShapeMouseEnter(e, shape),
                     onMouseLeave: handleShapeMouseLeave,
