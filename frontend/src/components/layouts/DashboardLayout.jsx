@@ -1,5 +1,3 @@
-// frontend/src/components/layouts/DashboardLayout.jsx
-
 import React, { useState, useEffect } from 'react';
 import DashboardHeader from '../common/DashboardHeader';
 import DashboardSidebar from '../common/DashboardSidebar';
@@ -19,27 +17,23 @@ function ProyectoDashboardLayout({
   onBack,
   onProyectoUpdate
 }) {
-  // 1. Estado local para manejar actualizaciones inmediatas
   const [proyecto, setProyecto] = useState(proyectoInicial);
+  const [globalCWAFilter, setGlobalCWAFilter] = useState(null);
 
-  // 2. Sincronizar si el padre manda un proyecto nuevo
   useEffect(() => {
     setProyecto(proyectoInicial);
   }, [proyectoInicial]);
 
-  // 3. Handler local para actualizar estado y propagar al padre
   const handleProyectoUpdate = (nuevoProyecto) => {
-    console.log("🔄 DashboardLayout: Actualizando proyecto...", nuevoProyecto);
     setProyecto(nuevoProyecto);
-    
     if (onProyectoUpdate) {
       onProyectoUpdate(nuevoProyecto);
     }
   };
 
   return (
+    // ✅ CAMBIO: min-h-screen permite que la página crezca y el scroll sea global
     <div className="bg-gray-900 text-hatch-blue min-h-screen flex flex-col">
-      {/* Header */}
       <DashboardHeader
         proyecto={proyecto}
         onBack={onBack}
@@ -47,24 +41,27 @@ function ProyectoDashboardLayout({
         setSidebarExpanded={setSidebarExpanded}
       />
 
-      {/* Contenedor Principal con Sidebar y Contenido */}
-      <div className="flex-1 flex overflow-hidden">
+      {/* ✅ CAMBIO: flex-1 sin overflow-hidden, permitiendo scroll natural */}
+      <div className="flex flex-1 items-stretch">
         
-        {/* Sidebar */}
+        {/* Sidebar (Crecerá con el contenido pero scrolleará con la página) */}
         <DashboardSidebar
           proyecto={proyecto}
           selectedSection={selectedSection}
           setSelectedSection={setSelectedSection}
           isExpanded={sidebarExpanded}
+          activeCWAId={globalCWAFilter}
         />
 
-        {/* Área de Contenido Variable */}
-        <div className="flex-1 overflow-auto bg-gray-900">
+        {/* Contenido Principal */}
+        <div className="flex-1 bg-gray-900 p-0 min-w-0">
           
           {selectedSection === 'resumen' && (
             <ResumenTab
               proyecto={proyecto}
               onProyectoUpdate={handleProyectoUpdate}
+              globalFilterCWA={globalCWAFilter}
+              setGlobalFilterCWA={setGlobalCWAFilter}
             />
           )}
 

@@ -1,3 +1,4 @@
+// ... (IMPORTS Y CONSTANTES IGUALES) ...
 import React, { useState, useEffect, useRef } from 'react';
 import { Stage, Layer, Group, Image, Rect, Circle, Line } from 'react-konva'; 
 import client from '../../../api/axios';
@@ -6,15 +7,13 @@ import { jsPDF } from 'jspdf';
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 const SERVER_URL = API_BASE.replace('/api/v1', '');
 
-// 🎨 PALETA DE COLORES EXTENDIDA
 const HATCH_COLORS = {
-  primary: [ '#E67E22', '#2E86C1', '#27AE60', '#C0392B', '#8E44AD' ], // Naranja, Azul, Verde, Rojo, Morado
-  secondary: [ '#F39C12', '#3498DB', '#2ECC71', '#E74C3C', '#9B59B6' ], // Variaciones brillantes
-  dark: [ '#D35400', '#21618C', '#1E8449', '#922B21', '#6C3483' ],    // Variaciones oscuras
-  earth: [ '#95A5A6', '#7F8C8D', '#34495E', '#2C3E50', '#BDC3C7' ],   // Grises/Metálicos
-  warn: [ '#F1C40F', '#1ABC9C', '#E84393', '#2C2C54', '#474787' ]     // Amarillos/Teal/Rosas
+  primary: [ '#E67E22', '#2E86C1', '#27AE60', '#C0392B', '#8E44AD' ],
+  secondary: [ '#F39C12', '#3498DB', '#2ECC71', '#E74C3C', '#9B59B6' ],
+  dark: [ '#D35400', '#21618C', '#1E8449', '#922B21', '#6C3483' ],
+  earth: [ '#95A5A6', '#7F8C8D', '#34495E', '#2C3E50', '#BDC3C7' ],
+  warn: [ '#F1C40F', '#1ABC9C', '#E84393', '#2C2C54', '#474787' ]
 };
-
 const allColors = [...HATCH_COLORS.primary, ...HATCH_COLORS.secondary, ...HATCH_COLORS.dark, ...HATCH_COLORS.earth, ...HATCH_COLORS.warn];
 
 const useImageLoader = (src) => {
@@ -32,7 +31,6 @@ const useImageLoader = (src) => {
   return { image, error };
 };
 
-// --- BARRA DE HERRAMIENTAS (CON EXPORTAR AGREGADO) ---
 function Toolbar({ activeTool, setActiveTool, color, setColor, onZoom, onReset, onClearAll, onDeleteSelected, hasSelection, onUndo, canUndo, onExportPNG, onExportPDF }) { 
   const [showColorPicker, setShowColorPicker] = useState(false);
   
@@ -46,8 +44,6 @@ function Toolbar({ activeTool, setActiveTool, color, setColor, onZoom, onReset, 
 
   return (
     <div className="p-2 border-b border-gray-600 flex flex-wrap justify-between items-center gap-2" style={{ backgroundColor: '#333333' }}>
-      
-      {/* HERRAMIENTAS DE DIBUJO */}
       <div className="flex items-center gap-1 bg-black/20 p-1 rounded-lg border border-gray-600">
         {tools.map(tool => (
           <button
@@ -66,33 +62,16 @@ function Toolbar({ activeTool, setActiveTool, color, setColor, onZoom, onReset, 
         ))}
       </div>
 
-      {/* ACCIONES */}
       <div className="flex items-center gap-3">
-        
-        {/* Color Picker */}
         <div className="relative">
-          <button 
-            onClick={() => setShowColorPicker(!showColorPicker)} 
-            className="flex items-center gap-2 px-3 py-1.5 bg-gray-600 hover:bg-gray-500 rounded border border-gray-500 transition-colors"
-            title="Color de relleno"
-          >
+          <button onClick={() => setShowColorPicker(!showColorPicker)} className="flex items-center gap-2 px-3 py-1.5 bg-gray-600 hover:bg-gray-500 rounded border border-gray-500 transition-colors" title="Color">
             <div className="w-5 h-5 rounded-full border-2 border-white shadow-sm" style={{ backgroundColor: color }} />
-            <span className="text-xs text-gray-200 hidden sm:inline">Color</span>
             <span className="text-gray-400 text-[10px]">▼</span>
           </button>
-          
           {showColorPicker && (
             <div className="absolute right-0 top-full mt-2 p-3 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 w-64 animate-in fade-in zoom-in duration-200">
               <div className="grid grid-cols-5 gap-2">
-                {allColors.map((c, idx) => (
-                  <button 
-                    key={idx} 
-                    onClick={() => { setColor(c); setShowColorPicker(false); }} 
-                    className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-110 ${color === c ? 'border-gray-900 scale-110 shadow-md' : 'border-transparent'}`} 
-                    style={{ backgroundColor: c }} 
-                    title={c}
-                  />
-                ))}
+                {allColors.map((c, idx) => (<button key={idx} onClick={() => { setColor(c); setShowColorPicker(false); }} className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-110 ${color === c ? 'border-gray-900 scale-110 shadow-md' : 'border-transparent'}`} style={{ backgroundColor: c }} />))}
               </div>
             </div>
           )}
@@ -100,7 +79,6 @@ function Toolbar({ activeTool, setActiveTool, color, setColor, onZoom, onReset, 
 
         <div className="h-6 w-px bg-gray-500"></div>
 
-        {/* ✅ NUEVO: Botones de Exportación */}
         <div className="flex bg-gray-700 rounded border border-gray-600">
             <button onClick={onExportPNG} className="px-3 py-1.5 hover:bg-gray-600 text-gray-200 text-xs font-bold border-r border-gray-600 flex gap-1 items-center" title="Imagen PNG">
                <span>📷</span> PNG
@@ -112,11 +90,10 @@ function Toolbar({ activeTool, setActiveTool, color, setColor, onZoom, onReset, 
 
         <div className="h-6 w-px bg-gray-500"></div>
 
-        {/* Zoom */}
         <div className="flex items-center gap-1">
             <button onClick={() => onZoom(1.2)} className="p-2 bg-gray-600 text-gray-300 hover:text-white hover:bg-gray-500 rounded" title="Acercar">➕</button>
             <button onClick={() => onZoom(0.8)} className="p-2 bg-gray-600 text-gray-300 hover:text-white hover:bg-gray-500 rounded" title="Alejar">➖</button>
-            <button onClick={onReset} className="p-2 bg-gray-600 text-gray-300 hover:text-white hover:bg-gray-500 rounded" title="Resetear Vista">⟲</button>
+            <button onClick={onReset} className="p-2 bg-gray-600 text-gray-300 hover:text-white hover:bg-gray-500 rounded" title="Resetear">⟲</button>
         </div>
 
         <div className="flex items-center gap-1 ml-2">
@@ -129,22 +106,17 @@ function Toolbar({ activeTool, setActiveTool, color, setColor, onZoom, onReset, 
   );
 }
 
-// === COMPONENTE PRINCIPAL ===
 function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShapeClick }) {
   const { image, error } = useImageLoader(plotPlan?.image_url);
   const containerRef = useRef(null);
-  const stageRef = useRef(null); // Referencia para exportar
+  const stageRef = useRef(null);
   
-  // Estados
   const [containerSize, setContainerSize] = useState({ width: 800, height: 600 });
   const [activeTool, setActiveTool] = useState('pan');
   const [currentColor, setCurrentColor] = useState(HATCH_COLORS.primary[0]);
   const [isDrawing, setIsDrawing] = useState(false);
   
-  // Estado principal de formas
   const [shapes, setShapes] = useState([]);
-  
-  // Historial para Undo
   const [history, setHistory] = useState([]); 
   
   const [newShape, setNewShape] = useState(null);
@@ -172,7 +144,6 @@ function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShape
     return () => window.removeEventListener('resize', updateSize);
   }, []);
 
-  // Cargar formas
   useEffect(() => {
     if (!plotPlan?.cwas) { setShapes([]); return; }
     const loadedShapes = [];
@@ -192,109 +163,21 @@ function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShape
     setShapes(loadedShapes);
   }, [plotPlan?.id, plotPlan?.cwas]);
 
-  // Sincronización selección externa
   useEffect(() => {
     if (activeCWAId) {
         const shapeToSelect = shapes.find(s => s.cwaId === activeCWAId);
-        if (shapeToSelect) {
-            setSelectedShapeKey(shapeToSelect.key);
-        } else {
-            setSelectedShapeKey(null);
-        }
+        setSelectedShapeKey(shapeToSelect ? shapeToSelect.key : null);
     } else {
         setSelectedShapeKey(null);
     }
   }, [activeCWAId, shapes]);
 
-  // Hotkeys (Undo / Delete)
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-        if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
-            e.preventDefault();
-            handleUndo();
-        }
-        if ((e.key === 'Delete' || e.key === 'Backspace') && selectedShapeKey) {
-            e.preventDefault();
-            handleDeleteSelected();
-        }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedShapeKey, shapes, history]);
-
-  // --- ACCIONES DE EDICIÓN ---
-
+  // Handlers
   const handleZoom = (scaleFactor) => setStageState(s => ({ ...s, scale: s.scale * scaleFactor }));
   const handleResetZoom = () => setStageState({ scale: 1, x: 0, y: 0 });
+  const handleClear = () => { if(confirm('¿Limpiar todas las áreas locales?')) { setHistory([...history, shapes]); setShapes([]); }};
+  const handleUndo = () => { if(history.length > 0) { setShapes(history[history.length-1]); setHistory(history.slice(0,-1)); }};
 
-  const handleUndo = () => {
-    if(history.length > 0) { 
-        const previousShapes = history[history.length-1];
-        setShapes(previousShapes); 
-        setHistory(prev => prev.slice(0, -1));
-    }
-  };
-
-  const saveToHistory = () => {
-    setHistory(prev => [...prev, shapes]);
-  };
-
-  const handleDeleteSelected = async () => {
-    if (!selectedShapeKey) return;
-    const shape = shapes.find(s => s.key === selectedShapeKey);
-    if (!shape) return;
-
-    if (!confirm(`¿Eliminar el dibujo del área ${shape.codigo}?`)) return;
-
-    try {
-        saveToHistory();
-
-        const formData = new FormData();
-        formData.append('shape_type', ''); 
-        formData.append('shape_data', '{}');
-
-        await client.put(
-            `/proyectos/${plotPlan.proyecto_id}/plot_plans/${plotPlan.id}/cwa/${shape.cwaId}/geometry`,
-            formData
-        );
-        
-        setShapes(prev => prev.filter(s => s.key !== selectedShapeKey));
-        setSelectedShapeKey(null);
-        
-        if (onShapeSaved) onShapeSaved(shape.cwaId, null);
-
-    } catch (err) {
-        alert("Error al eliminar: " + err.message);
-    }
-  };
-
-  const handleClearAll = async () => {
-    if (shapes.length === 0) return;
-    if(!confirm('⚠️ ¿ESTÁS SEGURO? Esto borrará TODOS los dibujos de este plano.')) return;
-    
-    saveToHistory();
-    
-    try {
-        for (const shape of shapes) {
-            const formData = new FormData();
-            formData.append('shape_type', ''); 
-            formData.append('shape_data', '{}');
-            await client.put(
-                `/proyectos/${plotPlan.proyecto_id}/plot_plans/${plotPlan.id}/cwa/${shape.cwaId}/geometry`,
-                formData
-            );
-        }
-
-        setShapes([]);
-        setSelectedShapeKey(null);
-        if (onShapeSaved) onShapeSaved(null, null); 
-
-    } catch (err) {
-        alert("Error limpiando: " + err.message);
-    }
-  };
-
-  // --- EXPORTACIÓN ---
   const handleExportImage = () => {
     if (stageRef.current) {
         const uri = stageRef.current.toDataURL({ pixelRatio: 2 });
@@ -328,13 +211,14 @@ function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShape
     return { x: relativeX, y: relativeY };
   };
 
-  // --- EVENTOS MOUSE ---
   const handleMouseDown = (e) => {
+    // ✅ PREVENIR COMPORTAMIENTO DE SCROLL POR DEFAULT
+    if (e.evt) e.evt.preventDefault();
+
     if (activeTool === 'pan' || !image || e.evt.button !== 0) {
       if (activeTool === 'pan' && !e.target.findAncestor('Shape')) setSelectedShapeKey(null);
       return;
     }
-    
     setSelectedShapeKey(null);
     const pos = getRelativePointerPosition(e.target);
     
@@ -346,27 +230,19 @@ function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShape
     
     if (activeTool === 'polygon' || activeTool === 'ortho') {
       setIsDrawingPolygon(true);
-      let newX = pos.x;
-      let newY = pos.y;
-
+      let newX = pos.x; let newY = pos.y;
       if (activeTool === 'ortho' && polygonPoints.length >= 2) {
         const lastX = polygonPoints[polygonPoints.length - 2];
         const lastY = polygonPoints[polygonPoints.length - 1];
         if (Math.abs(newX - lastX) > Math.abs(newY - lastY)) newY = lastY; else newX = lastX;
       }
-
       const newPoints = [...polygonPoints, newX, newY];
       setPolygonPoints(newPoints);
-
-      // Cerrar polígono
       if (newPoints.length > 4) {
-        const startX = newPoints[0];
-        const startY = newPoints[1];
+        const startX = newPoints[0]; const startY = newPoints[1];
         const tolerance = 10 / (scaleRatio * stageState.scale);
-        
         if (Math.hypot(startX - newX, startY - newY) < tolerance) {
-          setIsDrawingPolygon(false);
-          setCursorPos(null);
+          setIsDrawingPolygon(false); setCursorPos(null);
           handleSaveShape({ type: 'polygon', color: currentColor, points: newPoints.slice(0, -2) });
           setPolygonPoints([]);
         }
@@ -375,12 +251,13 @@ function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShape
   };
 
   const handleMouseMove = (e) => {
+    // ✅ PREVENIR COMPORTAMIENTO DE SCROLL POR DEFAULT
+    if (e.evt) e.evt.preventDefault();
+
     if (!image) return;
     const pos = getRelativePointerPosition(e.target);
-
     if (isDrawingPolygon) {
-        let guideX = pos.x;
-        let guideY = pos.y;
+        let guideX = pos.x; let guideY = pos.y;
         if (activeTool === 'ortho' && polygonPoints.length >= 2) {
             const lastX = polygonPoints[polygonPoints.length - 2];
             const lastY = polygonPoints[polygonPoints.length - 1];
@@ -388,15 +265,9 @@ function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShape
         }
         setCursorPos({ x: guideX, y: guideY });
     }
-    
     if (isDrawing && activeTool !== 'pan') {
-        if (activeTool === 'rect') {
-            setNewShape({ ...newShape, width: pos.x - startPoint.current.x, height: pos.y - startPoint.current.y });
-        }
-        if (activeTool === 'circle') {
-            const radius = Math.hypot(pos.x - startPoint.current.x, pos.y - startPoint.current.y);
-            setNewShape({ ...newShape, radius });
-        }
+        if (activeTool === 'rect') setNewShape({ ...newShape, width: pos.x - startPoint.current.x, height: pos.y - startPoint.current.y });
+        if (activeTool === 'circle') setNewShape({ ...newShape, radius: Math.hypot(pos.x - startPoint.current.x, pos.y - startPoint.current.y) });
     }
   };
 
@@ -404,70 +275,70 @@ function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShape
     if (!image || activeTool === 'pan') return;
     if (activeTool === 'rect' || activeTool === 'circle') {
         setIsDrawing(false);
-        if (newShape && (Math.abs(newShape.width) > 5 || newShape.radius > 5)) {
-            handleSaveShape(newShape);
-            setNewShape(null);
-        }
+        if (newShape && (Math.abs(newShape.width) > 5 || newShape.radius > 5)) { handleSaveShape(newShape); setNewShape(null); }
     }
   };
 
   const handleSaveShape = async (finalShape) => {
-    if (!cwaToAssociate) { 
-        alert("⚠️ Selecciona un CWA arriba para asignar esta área."); 
-        setPolygonPoints([]);
-        setIsDrawingPolygon(false);
-        return; 
-    }
-
+    if (!cwaToAssociate) { alert("⚠️ Selecciona un CWA arriba para asignar esta área."); setPolygonPoints([]); setIsDrawingPolygon(false); return; }
     let shapeData = {};
     if (finalShape.type === 'polygon') shapeData = { points: finalShape.points, color: finalShape.color };
     else if (finalShape.type === 'rect') shapeData = { x: finalShape.x, y: finalShape.y, width: finalShape.width, height: finalShape.height, color: finalShape.color };
     else if (finalShape.type === 'circle') shapeData = { x: finalShape.x, y: finalShape.y, radius: finalShape.radius, color: finalShape.color };
-
     try {
       saveToHistory(); 
-
       const formData = new FormData();
-      // Unificar tipo a 'polygon' para evitar problemas si es ortho
       const typeToSend = (finalShape.type === 'ortho' || finalShape.type === 'polygon') ? 'polygon' : finalShape.type;
-      
-      formData.append('shape_type', typeToSend);
-      formData.append('shape_data', JSON.stringify(shapeData));
-
-      await client.put(
-        `/proyectos/${plotPlan.proyecto_id}/plot_plans/${plotPlan.id}/cwa/${cwaToAssociate.id}/geometry`,
-        formData
-      );
-      
+      formData.append('shape_type', typeToSend); formData.append('shape_data', JSON.stringify(shapeData));
+      await client.put(`/proyectos/${plotPlan.proyecto_id}/plot_plans/${plotPlan.id}/cwa/${cwaToAssociate.id}/geometry`, formData);
       if (onShapeSaved) onShapeSaved(cwaToAssociate.id, null);
-      
       const newShapeVisual = { ...finalShape, type: typeToSend, key: Date.now(), ...shapeData, codigo: cwaToAssociate.codigo, nombre: cwaToAssociate.nombre, cwaId: cwaToAssociate.id };
       setShapes(prev => [...prev, newShapeVisual]);
-
-    } catch (error) {
-      alert(`Error al guardar geometría: ${error.message}`);
-    }
+    } catch (error) { alert(`Error al guardar geometría: ${error.message}`); }
   };
 
+  const handleDeleteSelected = async () => {
+    if (!selectedShapeKey) return;
+    const shape = shapes.find(s => s.key === selectedShapeKey);
+    if (!shape) return;
+    if (!confirm(`¿Eliminar el dibujo del área ${shape.codigo}?`)) return;
+    try {
+        saveToHistory();
+        const formData = new FormData();
+        formData.append('shape_type', ''); formData.append('shape_data', '{}');
+        await client.put(`/proyectos/${plotPlan.proyecto_id}/plot_plans/${plotPlan.id}/cwa/${shape.cwaId}/geometry`, formData);
+        setShapes(prev => prev.filter(s => s.key !== selectedShapeKey));
+        setSelectedShapeKey(null);
+        if (onShapeSaved) onShapeSaved(shape.cwaId, null);
+    } catch (err) { alert("Error al eliminar: " + err.message); }
+  };
+
+  const handleClearAll = async () => { 
+      if (shapes.length === 0) return;
+      if(!confirm('⚠️ ¿ESTÁS SEGURO? Esto borrará TODOS los dibujos de este plano.')) return;
+      saveToHistory();
+      try {
+        for (const shape of shapes) {
+            const formData = new FormData();
+            formData.append('shape_type', ''); formData.append('shape_data', '{}');
+            await client.put(`/proyectos/${plotPlan.proyecto_id}/plot_plans/${plotPlan.id}/cwa/${shape.cwaId}/geometry`, formData);
+        }
+        setShapes([]); setSelectedShapeKey(null);
+        if (onShapeSaved) onShapeSaved(null, null); 
+      } catch (err) { alert("Error limpiando: " + err.message); }
+  };
+  
   const handleShapeMouseEnter = (e, shape) => {
     const stage = e.target.getStage();
     const pointerPos = stage.getPointerPosition();
-    setTooltip({
-        visible: true,
-        x: pointerPos.x, 
-        y: pointerPos.y - 10, 
-        content: { codigo: shape.codigo, nombre: shape.nombre }
-    });
+    setTooltip({ visible: true, x: pointerPos.x, y: pointerPos.y - 10, content: { codigo: shape.codigo, nombre: shape.nombre } });
   };
 
-  const handleShapeMouseLeave = () => {
-    setTooltip({ ...tooltip, visible: false });
-  };
+  const handleShapeMouseLeave = () => setTooltip({ ...tooltip, visible: false });
 
   const handleStageMouseMove = (e) => {
     if(tooltip.visible) {
-        const stage = e.target.getStage();
-        const pointerPos = stage.getPointerPosition();
+        const stage = e.target.getStage(); const pointerPos = stage.getPointerPosition();
         setTooltip(prev => ({ ...prev, x: pointerPos.x, y: pointerPos.y - 10 }));
     }
     handleMouseMove(e);
@@ -498,10 +369,7 @@ function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShape
         
         {/* Tooltip */}
         {tooltip.visible && (
-            <div 
-                className="absolute z-50 bg-black/90 text-white px-3 py-2 rounded-lg shadow-xl border border-gray-600 pointer-events-none transform -translate-x-1/2 -translate-y-full"
-                style={{ top: tooltip.y, left: tooltip.x }}
-            >
+            <div className="absolute z-50 bg-black/90 text-white px-3 py-2 rounded-lg shadow-xl border border-gray-600 pointer-events-none transform -translate-x-1/2 -translate-y-full" style={{ top: tooltip.y, left: tooltip.x }}>
                 <p className="text-xs font-bold text-hatch-orange">{tooltip.content.codigo}</p>
                 <p className="text-sm font-medium whitespace-nowrap">{tooltip.content.nombre}</p>
             </div>
@@ -516,13 +384,18 @@ function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShape
                 {/* FORMAS */}
                 {shapes.map(shape => {
                   const isSel = shape.key === selectedShapeKey;
-                  const props = {
+                  const props = { 
                     fill: `${shape.color}60`, 
                     stroke: isSel ? '#00FFFF' : shape.color, 
                     strokeWidth: isSel ? (dynamicStroke * 2) : dynamicStroke, 
-                    onClick: () => { setSelectedShapeKey(shape.key); if(onShapeClick) onShapeClick(shape.cwaId); },
-                    onMouseEnter: (e) => handleShapeMouseEnter(e, shape),
-                    onMouseLeave: handleShapeMouseLeave,
+                    // ✅ Eventos Click Corregidos
+                    onClick: (e) => { 
+                        if(e.evt) e.evt.preventDefault(); // Evita scroll
+                        setSelectedShapeKey(shape.key); 
+                        if(onShapeClick) onShapeClick(shape.cwaId); 
+                    }, 
+                    onMouseEnter: (e) => handleShapeMouseEnter(e, shape), 
+                    onMouseLeave: handleShapeMouseLeave 
                   };
                   
                   if(shape.type==='rect') return <Rect key={shape.key} {...props} x={shape.x} y={shape.y} width={shape.width} height={shape.height} />;
@@ -534,30 +407,7 @@ function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShape
                 {/* DIBUJOS TEMPORALES */}
                 {newShape && activeTool === 'rect' && <Rect {...newShape} fill={`${newShape.color}40`} stroke={newShape.color} strokeWidth={dynamicStroke} />}
                 {newShape && activeTool === 'circle' && <Circle {...newShape} fill={`${newShape.color}40`} stroke={newShape.color} strokeWidth={dynamicStroke} />}
-                
-                {isDrawingPolygon && polygonPoints.length > 0 && (
-                    <>
-                        <Line points={polygonPoints} stroke={currentColor} strokeWidth={dynamicStroke} />
-                        {cursorPos && (
-                            <Line 
-                                points={[
-                                    polygonPoints[polygonPoints.length - 2], 
-                                    polygonPoints[polygonPoints.length - 1], 
-                                    cursorPos.x, 
-                                    cursorPos.y
-                                ]} 
-                                stroke={currentColor} 
-                                strokeWidth={dynamicStroke} 
-                                dash={[dynamicStroke * 2, dynamicStroke * 2]} 
-                                opacity={0.7}
-                            />
-                        )}
-                        {polygonPoints.map((_, i) => {
-                            if(i % 2 !== 0) return null; 
-                            return <Circle key={i} x={polygonPoints[i]} y={polygonPoints[i+1]} radius={dynamicStroke * 1.5} fill="white" stroke={currentColor} strokeWidth={1} />
-                        })}
-                    </>
-                )}
+                {isDrawingPolygon && polygonPoints.length > 0 && (<><Line points={polygonPoints} stroke={currentColor} strokeWidth={dynamicStroke} />{cursorPos && <Line points={[polygonPoints[polygonPoints.length - 2], polygonPoints[polygonPoints.length - 1], cursorPos.x, cursorPos.y]} stroke={currentColor} strokeWidth={dynamicStroke} dash={[dynamicStroke * 2, dynamicStroke * 2]} opacity={0.7} />}{polygonPoints.map((_, i) => { if(i % 2 !== 0) return null; return <Circle key={i} x={polygonPoints[i]} y={polygonPoints[i+1]} radius={dynamicStroke * 1.5} fill="white" stroke={currentColor} strokeWidth={1} /> })}</>)}
               </Group>
             </Layer>
           </Stage>

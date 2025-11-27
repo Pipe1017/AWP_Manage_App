@@ -2,30 +2,16 @@ from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from datetime import date
 
-# ============================================================================
-# 1. BASES SIMPLES
-# ============================================================================
-
 class DisciplinaBase(BaseModel):
     nombre: str
     codigo: str
     descripcion: Optional[str] = None
-
-class DisciplinaCreate(DisciplinaBase):
-    pass
-
+class DisciplinaCreate(DisciplinaBase): pass
 class DisciplinaResponse(DisciplinaBase):
     id: int
     proyecto_id: int
-    
-    class Config:
-        from_attributes = True
+    class Config: from_attributes = True
 
-# ============================================================================
-# 2. ESTRUCTURA AWP (CWA, CWP)
-# ============================================================================
-
-# --- CWA (ÁREA) ---
 class CWACreate(BaseModel):
     nombre: str
     codigo: str
@@ -33,8 +19,8 @@ class CWACreate(BaseModel):
     es_transversal: Optional[bool] = False
     shape_type: Optional[str] = None
     shape_data: Optional[Dict[str, Any]] = None
-    # ✅ CAMBIO: Prioridad numérica para ordenamiento (1, 2, 3...)
-    prioridad: Optional[int] = 99
+    # ✅ Default 0 para Prioridad
+    prioridad: Optional[int] = 0
 
 class CWAUpdate(BaseModel):
     nombre: Optional[str] = None
@@ -43,7 +29,6 @@ class CWAUpdate(BaseModel):
     es_transversal: Optional[bool] = None
     prioridad: Optional[int] = None
 
-# --- CWP (CONSTRUCTION WORK PACKAGE) ---
 class CWPCreate(BaseModel):
     nombre: str
     descripcion: Optional[str] = None
@@ -53,14 +38,12 @@ class CWPCreate(BaseModel):
     fecha_inicio_prevista: Optional[date] = None
     fecha_fin_prevista: Optional[date] = None
     secuencia: Optional[int] = 0
-    # ❌ ELIMINADO: Forecasts se mueven a Paquete
     metadata_json: Optional[Dict[str, Any]] = None
 
 class CWPUpdate(BaseModel):
     nombre: Optional[str] = None
     descripcion: Optional[str] = None
     secuencia: Optional[int] = None
-    # ❌ ELIMINADO: Forecasts
     metadata_json: Optional[Dict[str, Any]] = None
 
 class CWPResponse(BaseModel):
@@ -72,9 +55,7 @@ class CWPResponse(BaseModel):
     estado: str
     secuencia: Optional[int]
     metadata_json: Optional[Dict[str, Any]] = None
-    
-    class Config:
-        from_attributes = True
+    class Config: from_attributes = True
 
 class CWAResponse(BaseModel):
     id: int
@@ -85,21 +66,14 @@ class CWAResponse(BaseModel):
     plot_plan_id: int
     shape_type: Optional[str]
     shape_data: Optional[Dict[str, Any]]
-    prioridad: Optional[int] # ✅ Numérico
+    prioridad: Optional[int]
     cwps: List[CWPResponse] = []
-    
-    class Config:
-        from_attributes = True
-
-# ============================================================================
-# 3. PLOT PLAN
-# ============================================================================
+    class Config: from_attributes = True
 
 class PlotPlanCreate(BaseModel):
     nombre: str
     descripcion: Optional[str] = None
     image_url: Optional[str] = None
-
 class PlotPlanResponse(BaseModel):
     id: int
     nombre: str
@@ -107,13 +81,7 @@ class PlotPlanResponse(BaseModel):
     image_url: Optional[str]
     proyecto_id: int
     cwas: List[CWAResponse] = []
-    
-    class Config:
-        from_attributes = True
-
-# ============================================================================
-# 4. TIPOS & METADATA
-# ============================================================================
+    class Config: from_attributes = True
 
 class TipoEntregableCreate(BaseModel):
     nombre: str
@@ -122,7 +90,6 @@ class TipoEntregableCreate(BaseModel):
     descripcion: Optional[str] = None
     disciplina_id: Optional[int] = None
     es_generico: Optional[bool] = False
-
 class TipoEntregableResponse(BaseModel):
     id: int
     nombre: str
@@ -131,49 +98,29 @@ class TipoEntregableResponse(BaseModel):
     descripcion: Optional[str]
     disciplina_id: Optional[int]
     es_generico: bool
-    
-    class Config:
-        from_attributes = True
-
+    class Config: from_attributes = True
 class ColumnaCreate(BaseModel):
     nombre: str
     tipo_dato: str 
     opciones: Optional[List[str]] = [] 
-
 class ColumnaResponse(BaseModel):
     id: int
     nombre: str
     tipo_dato: str
     proyecto_id: int
     opciones_json: Optional[List[str]] = [] 
-    
-    class Config:
-        from_attributes = True
-
-# ============================================================================
-# 5. PROYECTO
-# ============================================================================
-
+    class Config: from_attributes = True
 class ProyectoBase(BaseModel):
     nombre: str
     descripcion: Optional[str] = None
     fecha_inicio: Optional[date] = None
     fecha_fin: Optional[date] = None
-
-class ProyectoCreate(ProyectoBase):
-    pass
-
+class ProyectoCreate(ProyectoBase): pass
 class ProyectoResponse(ProyectoBase):
     id: int
     disciplinas: List[DisciplinaResponse] = []
     plot_plans: List[PlotPlanResponse] = []
-    
-    class Config:
-        from_attributes = True
-
-# ============================================================================
-# 6. PAQUETE & ITEM
-# ============================================================================
+    class Config: from_attributes = True
 
 class PaqueteCreate(BaseModel):
     nombre: str
@@ -182,24 +129,20 @@ class PaqueteCreate(BaseModel):
     responsable: str
     fecha_inicio_prevista: Optional[date] = None
     fecha_fin_prevista: Optional[date] = None
-    # ✅ NUEVO: Forecasts aquí (EWP, IWP, PWP)
     forecast_inicio: Optional[date] = None
     forecast_fin: Optional[date] = None
     metadata_json: Optional[dict] = None
-
 class PaqueteUpdate(BaseModel):
     nombre: Optional[str] = None
     descripcion: Optional[str] = None
     responsable: Optional[str] = None
     fecha_inicio_prevista: Optional[date] = None
     fecha_fin_prevista: Optional[date] = None
-    # ✅ NUEVO: Forecasts aquí
     forecast_inicio: Optional[date] = None
     forecast_fin: Optional[date] = None
     estado: Optional[str] = None
     porcentaje_completitud: Optional[float] = None
     metadata_json: Optional[dict] = None
-
 class PaqueteResponse(BaseModel):
     id: int
     codigo: str
@@ -210,11 +153,9 @@ class PaqueteResponse(BaseModel):
     cwp_id: int
     porcentaje_completitud: float
     estado: str
-    # ✅ NUEVO: Forecasts en la respuesta
     forecast_inicio: Optional[date] = None
     forecast_fin: Optional[date] = None
-    class Config:
-        from_attributes = True
+    class Config: from_attributes = True
 
 class ItemCreate(BaseModel):
     nombre: str
@@ -223,8 +164,6 @@ class ItemCreate(BaseModel):
     es_entregable_cliente: Optional[bool] = False
     requiere_aprobacion: Optional[bool] = True
     metadata_json: Optional[dict] = None
-    # ❌ ELIMINADO: forecast_fin (Ya no se usa en items)
-
 class ItemUpdate(BaseModel):
     nombre: Optional[str] = None
     descripcion: Optional[str] = None
@@ -235,8 +174,6 @@ class ItemUpdate(BaseModel):
     es_entregable_cliente: Optional[bool] = None
     requiere_aprobacion: Optional[bool] = None
     metadata_json: Optional[dict] = None
-    # ❌ ELIMINADO: forecast_fin
-
 class ItemResponse(BaseModel):
     id: int
     nombre: str
@@ -250,17 +187,9 @@ class ItemResponse(BaseModel):
     es_entregable_cliente: bool
     requiere_aprobacion: bool
     source_item_id: Optional[int]
-    
-    class Config:
-        from_attributes = True
+    class Config: from_attributes = True
 
-# ============================================================================
-# 7. VINCULOS & IMPORT
-# ============================================================================
-
-class ItemLinkRequest(BaseModel):
-    source_item_ids: List[int]
-
+class ItemLinkRequest(BaseModel): source_item_ids: List[int]
 class ItemImportRow(BaseModel):
     id_item: Optional[int] = None
     nombre_item: str
@@ -270,5 +199,4 @@ class ItemImportRow(BaseModel):
     es_entregable_cliente: Optional[bool] = False
     requiere_aprobacion: Optional[bool] = True
 
-# Actualizar referencias circulares (si las hubiera)
 PlotPlanResponse.update_forward_refs()

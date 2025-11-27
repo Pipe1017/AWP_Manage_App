@@ -1,67 +1,80 @@
 // frontend/src/components/common/DashboardSidebar.jsx
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import client from '../../api/axios';
 
-function DashboardSidebar({ proyecto, selectedSection, setSelectedSection, isExpanded }) {
+function DashboardSidebar({ proyecto, selectedSection, setSelectedSection, isExpanded, activeCWAId }) {
   
-  // Estado local para las estadísticas
   const [stats, setStats] = useState({ 
     cwas: 0, 
     cwps: 0, 
     ewps: 0, 
     pwps: 0, 
     iwps: 0,
-    items: 0 // Total de entregables
+    items: 0,
+    loading: false // Estado de carga visual
   });
 
-  // 🔄 EFECTO: Cargar la jerarquía completa para contar con precisión
-  useEffect(() => {
-    const fetchStats = async () => {
-      if (!proyecto?.id) return;
+  // ✅ LÓGICA REUTILIZABLE PARA CARGAR DATOS
+  const fetchStats = useCallback(async () => {
+    if (!proyecto?.id) return;
+    
+    setStats(prev => ({ ...prev, loading: true })); // Activar spinner simple
 
-      try {
-        const res = await client.get(`/awp-nuevo/proyectos/${proyecto.id}/jerarquia-global`);
-        const data = res.data;
+    try {
+      const res = await client.get(`/awp-nuevo/proyectos/${proyecto.id}/jerarquia-global`);
+      const data = res.data;
 
-        let counts = { cwas: 0, cwps: 0, ewps: 0, pwps: 0, iwps: 0, items: 0 };
+      let counts = { cwas: 0, cwps: 0, ewps: 0, pwps: 0, iwps: 0, items: 0, loading: false };
 
-        if (data.cwas) {
-          counts.cwas = data.cwas.length;
-          data.cwas.forEach(cwa => {
-            if (cwa.cwps) {
-              counts.cwps += cwa.cwps.length;
-              cwa.cwps.forEach(cwp => {
-                if (cwp.paquetes) {
-                  cwp.paquetes.forEach(pkg => {
-                    // Contar tipo de paquete
-                    const tipo = pkg.tipo?.toUpperCase();
-                    if (tipo === 'EWP') counts.ewps++;
-                    else if (tipo === 'PWP') counts.pwps++;
-                    else if (tipo === 'IWP') counts.iwps++;
+      if (data.cwas) {
+        // Filtrar si hay un área activa seleccionada en el mapa
+        const cwasToCount = activeCWAId 
+          ? data.cwas.filter(c => c.id === activeCWAId)
+          : data.cwas;
 
-                    // Contar items dentro del paquete
-                    if (pkg.items) {
-                        counts.items += pkg.items.length;
-                    }
-                  });
-                }
-              });
+        counts.cwas = cwasToCount.length;
+        
+        cwasToCount.forEach(cwa => {
+          if (cwa.cwps) {
+            
+            // Solo contar CWPs si el área NO es transversal (DWP)
+            if (!cwa.es_transversal) {
+                counts.cwps += cwa.cwps.length;
             }
-          });
-        }
-        setStats(counts);
-      } catch (error) {
-        console.error("Error cargando estadísticas:", error);
+
+            cwa.cwps.forEach(cwp => {
+              if (cwp.paquetes) {
+                cwp.paquetes.forEach(pkg => {
+                  const tipo = pkg.tipo?.toUpperCase();
+                  
+                  if (tipo === 'EWP') counts.ewps++;
+                  else if (tipo === 'PWP') counts.pwps++;
+                  else if (tipo === 'IWP') counts.iwps++;
+
+                  if (pkg.items) {
+                      counts.items += pkg.items.length;
+                  }
+                });
+              }
+            });
+          }
+        });
       }
-    };
+      setStats(counts);
+    } catch (error) {
+      console.error("Error cargando estadísticas:", error);
+      setStats(prev => ({ ...prev, loading: false }));
+    }
+  }, [proyecto.id, activeCWAId]);
 
+  // Carga inicial y cuando cambia el filtro
+  useEffect(() => {
     fetchStats();
-    // Recargar cada vez que se abre el sidebar o cambia el proyecto
-    // (Podrías agregar un intervalo aquí si quisieras tiempo real estricto)
-  }, [proyecto.id]);
+  }, [fetchStats]);
 
-  // --- VERSIÓN COLAPSADA (ICONOS) ---
+  // --- RENDERIZADO ---
+  
   if (!isExpanded) {
     return (
       <div className="w-20 bg-white border-r-2 border-hatch-gray flex flex-col items-center py-6 gap-4 shadow-lg z-20">
@@ -96,16 +109,13 @@ function DashboardSidebar({ proyecto, selectedSection, setSelectedSection, isExp
     );
   }
 
-  // --- VERSIÓN EXPANDIDA (MENÚ COMPLETO) ---
   return (
     <div className="w-72 bg-white border-r-2 border-hatch-gray flex flex-col overflow-hidden shadow-xl z-20">
       
-      {/* Header Sidebar */}
       <div className="p-5 border-b-2 border-hatch-gray bg-gray-50">
         <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Navegación</h2>
       </div>
 
-      {/* Scrollable Content */}
       <div className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
         
         <SidebarItem 
@@ -133,13 +143,27 @@ function DashboardSidebar({ proyecto, selectedSection, setSelectedSection, isExp
         />
 
         {/* STATS CARD - AWP METRICS */}
-        <div className="mt-6 mx-1 p-4 bg-gray-50 rounded-xl border border-gray-200 shadow-inner">
+        <div className="mt-6 mx-1 p-4 bg-gray-50 rounded-xl border border-gray-200 shadow-inner relative overflow-hidden">
+          {/* Loading Overlay pequeño si está cargando */}
+          {stats.loading && <div className="absolute inset-0 bg-white/50 flex items-center justify-center z-10"><div className="w-4 h-4 border-2 border-hatch-orange border-t-transparent rounded-full animate-spin"></div></div>}
+          
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold text-gray-500 uppercase">Métricas AWP</span>
-            <span className="text-[10px] bg-white px-2 py-0.5 rounded border border-gray-200 text-gray-400 font-mono">Total</span>
+            <span className="text-xs font-bold text-gray-500 uppercase">
+                {activeCWAId ? 'Métricas Área' : 'Métricas Globales'}
+            </span>
+            
+            {/* ✅ BOTÓN REFRESH CONECTADO */}
+            <button 
+                onClick={fetchStats} 
+                className="text-gray-400 hover:text-hatch-orange transition-colors p-1 rounded hover:bg-gray-100"
+                title="Actualizar métricas ahora"
+            >
+                <svg className={`w-3.5 h-3.5 ${stats.loading ? 'animate-spin text-hatch-orange' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+            </button>
           </div>
           
-          {/* Grid de Métricas */}
           <div className="grid grid-cols-2 gap-2">
             <StatBox label="CWA" count={stats.cwas} color="bg-blue-50 text-blue-800 border-blue-200" />
             <StatBox label="CWP" count={stats.cwps} color="bg-green-50 text-green-800 border-green-200" />
@@ -148,13 +172,11 @@ function DashboardSidebar({ proyecto, selectedSection, setSelectedSection, isExp
           <div className="h-px bg-gray-200 my-3"></div>
           
           <div className="grid grid-cols-3 gap-1.5">
-            {/* Colores HATCH / AWP Standard */}
             <StatBox label="EWP" count={stats.ewps} color="bg-purple-50 text-purple-800 border-purple-200" size="sm" />
             <StatBox label="PWP" count={stats.pwps} color="bg-teal-50 text-teal-800 border-teal-200" size="sm" />
             <StatBox label="IWP" count={stats.iwps} color="bg-orange-50 text-orange-800 border-orange-200" size="sm" />
           </div>
 
-          {/* Entregables Totales */}
           <div className="mt-3 pt-2 border-t border-gray-200 flex justify-between items-center">
              <span className="text-[10px] font-bold text-gray-500 uppercase">Entregables Totales</span>
              <span className="text-sm font-bold text-hatch-blue">{stats.items}</span>
@@ -173,7 +195,6 @@ function DashboardSidebar({ proyecto, selectedSection, setSelectedSection, isExp
 
       </div>
 
-      {/* Footer */}
       <div className="p-4 border-t-2 border-hatch-gray bg-gray-50 text-[10px] text-gray-400 text-center">
         <p>ID de Proyecto: <strong className="text-hatch-blue">{proyecto.id}</strong></p>
         <p className="mt-1 text-hatch-orange font-bold">HATCH AWP</p>
@@ -182,8 +203,7 @@ function DashboardSidebar({ proyecto, selectedSection, setSelectedSection, isExp
   );
 }
 
-// --- SUBCOMPONENTES ---
-
+// ... (SidebarIcon, SidebarItem, StatBox SE MANTIENEN IGUAL) ...
 function SidebarIcon({ icon, label, active, onClick }) {
   return (
     <button
