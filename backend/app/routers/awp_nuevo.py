@@ -183,7 +183,6 @@ def get_jerarquia_global(proyecto_id: int, db: Session = Depends(get_db)):
 # 3. HERRAMIENTAS DE DATOS (RESET & EXPORT)
 # ============================================================================
 
-# ✅ ENDPOINT DE LIMPIEZA TOTAL DE ITEMS
 @router.delete("/proyectos/{proyecto_id}/items-reset")
 def delete_all_items_project(proyecto_id: int, db: Session = Depends(get_db)):
     try:
@@ -205,7 +204,7 @@ def delete_all_items_project(proyecto_id: int, db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(500, f"Error borrando items: {str(e)}")
 
-# ✅ EXPORTACIÓN CSV FINAL (CON DESC, SIN N/A METADATA, SORTED, IDS REALES)
+# ✅ EXPORTACIÓN CSV FINAL (CON METADATA EN LINKS)
 @router.get("/exportar-csv/{proyecto_id}")
 def exportar_csv_proyecto(proyecto_id: int, db: Session = Depends(get_db)):
     proyecto = crud.get_proyecto(db, proyecto_id)
@@ -220,8 +219,7 @@ def exportar_csv_proyecto(proyecto_id: int, db: Session = Depends(get_db)):
         for cwa in pp.cwas:
             prefijo = "DWP" if cwa.es_transversal else "CWA"
             codigo_area_formateado = f"{prefijo}-{cwa.codigo}"
-            
-            # Valores numéricos para ordenamiento
+
             sort_prio = cwa.prioridad if cwa.prioridad is not None else 99999
 
             cwa_data = {
@@ -247,9 +245,10 @@ def exportar_csv_proyecto(proyecto_id: int, db: Session = Depends(get_db)):
                     "_sort_seq": sort_seq
                 }
                 
-                # ✅ Metadata visible siempre
+                # ✅ Metadata visible siempre (incluso para DWP/Links)
                 for meta_name in meta_names:
-                    cwp_data[meta_name] = cwp.metadata_json.get(meta_name, "") if cwp.metadata_json else ""
+                    val = cwp.metadata_json.get(meta_name, "") if cwp.metadata_json else ""
+                    cwp_data[meta_name] = val 
 
                 if not cwp.paquetes:
                     data_rows.append(cwp_data)
@@ -270,23 +269,36 @@ def exportar_csv_proyecto(proyecto_id: int, db: Session = Depends(get_db)):
                         continue
 
                     for item in pkg.items:
-                        row = {
-                            **pkg_data,
-                            # ✅ ID REAL DE LA BASE DE DATOS (5 DÍGITOS VISUALES)
-                            "ID_Item": str(item.id).zfill(5), 
-                            "Nombre_Item": item.nombre
-                        }
+                        # ✅ LÓGICA DE LINK:
+                        is_linked = item.source_item_id is not None
+                        
+                        # ID a mostrar: ID Origen si es link, ID propio si es nativo
+                        display_id = item.source_item_id if is_linked else item.id
+                        final_id_str = str(display_id).zfill(5)
+
+                        tipo_origen = "Vinculado de otra área" if is_linked else "Nativo"
+
+                        row = pkg_data.copy()
+                        
+                        # ✅ YA NO BORRAMOS LOS DATOS PADRE
+                        # La metadata del paquete actual (donde vive el link) se mantiene visible.
+
+                        row.update({
+                            "ID_Item": final_id_str, 
+                            "Nombre_Item": item.nombre,
+                            "Tipo_Origen": tipo_origen
+                        })
+                        
                         data_rows.append(row)
 
     df = pd.DataFrame(data_rows)
     
-    # ✅ ORDENAMIENTO
     if not df.empty:
         df.sort_values(by=["_sort_prio", "_sort_seq"], ascending=[True, True], inplace=True)
     
     fixed_cols = ["CWA", "Descripcion_Area", "Prioridad_Area", "CWP", "Descripcion_CWP", "Secuencia_CWP"]
     fixed_cols += meta_names
-    fixed_cols += ["Tipo_Paquete", "Codigo_Paquete", "Descripcion_Paquete", "Forecast_Inicio", "Forecast_Fin", "ID_Item", "Nombre_Item"]
+    fixed_cols += ["Tipo_Paquete", "Codigo_Paquete", "Descripcion_Paquete", "Forecast_Inicio", "Forecast_Fin", "ID_Item", "Nombre_Item", "Tipo_Origen"]
     
     for col in fixed_cols:
         if col not in df.columns:
