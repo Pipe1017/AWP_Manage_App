@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Stage, Layer, Group, Image, Rect, Circle, Line } from 'react-konva'; 
+import { Stage, Layer, Group, Image, Rect, Circle, Line, Star, RegularPolygon } from 'react-konva'; 
 import client from '../../../api/axios';
 import { jsPDF } from 'jspdf';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 const SERVER_URL = API_BASE.replace('/api/v1', '');
 
+// 🎨 PALETA DE COLORES
 const HATCH_COLORS = {
   primary: [ '#E67E22', '#2E86C1', '#27AE60', '#C0392B', '#8E44AD' ],
   secondary: [ '#F39C12', '#3498DB', '#2ECC71', '#E74C3C', '#9B59B6' ],
@@ -14,6 +15,30 @@ const HATCH_COLORS = {
   warn: [ '#F1C40F', '#1ABC9C', '#E84393', '#2C2C54', '#474787' ]
 };
 const allColors = [...HATCH_COLORS.primary, ...HATCH_COLORS.secondary, ...HATCH_COLORS.dark, ...HATCH_COLORS.earth, ...HATCH_COLORS.warn];
+
+// 🛠️ ICONOS SVG PROFESIONALES
+const Icons = {
+  Pan: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>, // Usando icono de mover genérico o mano
+  Hand: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11.5V14m0-2.5v-6a1.5 1.5 0 113 0m-3 6a1.5 1.5 0 00-3 0v2a7.5 7.5 0 0015 0v-5a1.5 1.5 0 00-3 0m-6-3V11m0-5.5v-1a1.5 1.5 0 013 0v1m0 0V11m0-5.5a1.5 1.5 0 013 0v3m0 0V11" /></svg>,
+  Rect: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><rect x="3" y="3" width="18" height="18" rx="2" strokeWidth={2} /></svg>,
+  Circle: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="9" strokeWidth={2} /></svg>,
+  Poly: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2l10 6.5v7L12 22 2 15.5v-7L12 2z" /></svg>, // Hexágono rep
+  Ortho: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>, // Líneas rectas
+  Ruler: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>,
+  ZoomIn: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" /></svg>,
+  ZoomOut: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7" /></svg>,
+  Reset: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
+  Undo: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg>,
+  Trash: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>,
+  Clear: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>,
+  Image: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>,
+  PDF: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>,
+  Star: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" /></svg>,
+  Diamond: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4l-8 8 8 8 8-8-8-8z" /></svg>,
+  Triangle: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3l10 18H2L12 3z" /></svg>,
+  ChevronDown: () => <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" /></svg>,
+  Marker: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+};
 
 const useImageLoader = (src) => {
   const [image, setImage] = useState(null);
@@ -32,41 +57,87 @@ const useImageLoader = (src) => {
 
 function Toolbar({ activeTool, setActiveTool, color, setColor, onZoom, onReset, onClearAll, onDeleteSelected, hasSelection, onUndo, canUndo, onExportPNG, onExportPDF }) { 
   const [showColorPicker, setShowColorPicker] = useState(false);
+  const [showIconPicker, setShowIconPicker] = useState(false);
   
-  const tools = [
-    { id: 'pan', name: 'Mover', icon: '✋' },
-    { id: 'rect', name: 'Rectángulo', icon: '▭' },
-    { id: 'circle', name: 'Círculo', icon: '●' },
-    { id: 'polygon', name: 'Libre', icon: '⚡' },     
-    { id: 'ortho', name: 'Ortogonal', icon: '📐' },   
+  const drawTools = [
+    { id: 'pan', name: 'Mover', icon: <Icons.Hand /> },
+    { id: 'rect', name: 'Rectángulo', icon: <Icons.Rect /> },
+    { id: 'circle', name: 'Círculo', icon: <Icons.Circle /> },
+    { id: 'polygon', name: 'Libre', icon: <Icons.Poly /> },     
+    { id: 'ortho', name: 'Ortogonal', icon: <Icons.Ruler /> },   
+  ];
+
+  const iconTools = [
+    { id: 'star', name: 'Estrella', icon: <Icons.Star /> },
+    { id: 'diamond', name: 'Rombo', icon: <Icons.Diamond /> },
+    { id: 'triangle', name: 'Triángulo', icon: <Icons.Triangle /> },
   ];
 
   return (
     <div className="p-2 border-b border-gray-600 flex flex-wrap justify-between items-center gap-2" style={{ backgroundColor: '#333333' }}>
       
-      <div className="flex items-center gap-1 bg-black/20 p-1 rounded-lg border border-gray-600">
-        {tools.map(tool => (
-          <button
-            key={tool.id}
-            onClick={() => setActiveTool(tool.id)}
-            title={tool.name}
-            className={`px-3 py-2 rounded text-sm font-medium transition-all flex items-center gap-2 ${
-              activeTool === tool.id 
-                ? 'bg-hatch-orange text-white shadow-md' 
-                : 'text-gray-300 hover:bg-gray-600 hover:text-white'
-            }`}
-          >
-            <span>{tool.icon}</span>
-            <span className="hidden md:inline">{tool.name}</span>
-          </button>
-        ))}
+      <div className="flex items-center gap-3">
+        {/* GRUPO 1: DIBUJO */}
+        <div className="flex items-center gap-1 bg-black/20 p-1 rounded-lg border border-gray-600">
+            {drawTools.map(tool => (
+            <button
+                key={tool.id}
+                onClick={() => setActiveTool(tool.id)}
+                title={tool.name}
+                className={`px-3 py-2 rounded text-xs font-bold transition-all flex items-center gap-2 ${
+                activeTool === tool.id 
+                    ? 'bg-hatch-orange text-white shadow-md' 
+                    : 'text-gray-300 hover:bg-gray-600 hover:text-white'
+                }`}
+            >
+                <span>{tool.icon}</span>
+                <span className="hidden xl:inline">{tool.name}</span>
+            </button>
+            ))}
+        </div>
+
+        {/* GRUPO 2: MARCADORES */}
+        <div className="relative">
+             <button 
+                onClick={() => setShowIconPicker(!showIconPicker)} 
+                className={`flex items-center gap-2 px-3 py-2 rounded border transition-colors text-xs font-bold ${
+                    ['star', 'diamond', 'triangle'].includes(activeTool) 
+                    ? 'bg-blue-600 text-white border-blue-400' 
+                    : 'bg-gray-700 hover:bg-gray-600 text-gray-200 border-gray-600'
+                }`}
+                title="Marcadores para DWP/Transversales"
+            >
+                <Icons.Marker />
+                <span className="hidden sm:inline">Marcadores</span>
+                <Icons.ChevronDown />
+            </button>
+            
+            {showIconPicker && (
+                <div className="absolute left-0 top-full mt-2 p-2 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 w-36 animate-in fade-in zoom-in duration-200 flex flex-col gap-1">
+                    <p className="text-[9px] font-bold text-gray-400 uppercase mb-1 px-1">Insertar:</p>
+                    {iconTools.map(tool => (
+                        <button
+                            key={tool.id}
+                            onClick={() => { setActiveTool(tool.id); setShowIconPicker(false); }}
+                            className={`flex items-center gap-2 px-2 py-1.5 rounded text-xs hover:bg-gray-100 w-full text-left ${activeTool === tool.id ? 'bg-blue-50 text-blue-700 font-bold' : 'text-gray-700'}`}
+                        >
+                            <span className="text-gray-600">{tool.icon}</span> {tool.name}
+                        </button>
+                    ))}
+                </div>
+            )}
+        </div>
       </div>
 
+      {/* ACCIONES */}
       <div className="flex items-center gap-3">
+        
+        {/* Color Picker */}
         <div className="relative">
           <button onClick={() => setShowColorPicker(!showColorPicker)} className="flex items-center gap-2 px-3 py-1.5 bg-gray-600 hover:bg-gray-500 rounded border border-gray-500 transition-colors" title="Color">
-            <div className="w-5 h-5 rounded-full border-2 border-white shadow-sm" style={{ backgroundColor: color }} />
-            <span className="text-xs text-gray-200 hidden sm:inline">Color</span><span className="text-gray-400 text-[10px]">▼</span>
+            <div className="w-4 h-4 rounded-full border border-white shadow-sm" style={{ backgroundColor: color }} />
+            <span className="text-xs text-gray-200 font-medium hidden sm:inline">Color</span>
+            <Icons.ChevronDown />
           </button>
           {showColorPicker && (
             <div className="absolute right-0 top-full mt-2 p-3 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 w-64 animate-in fade-in zoom-in duration-200">
@@ -77,25 +148,29 @@ function Toolbar({ activeTool, setActiveTool, color, setColor, onZoom, onReset, 
           )}
         </div>
 
-        <div className="h-6 w-px bg-gray-500"></div>
+        <div className="h-6 w-px bg-gray-600"></div>
 
-        <div className="flex bg-gray-700 rounded border border-gray-600">
-            <button onClick={onExportPNG} className="px-3 py-1.5 hover:bg-gray-600 text-gray-200 text-xs font-bold border-r border-gray-600 flex gap-1 items-center" title="Imagen PNG"><span>📷</span> PNG</button>
-            <button onClick={onExportPDF} className="px-3 py-1.5 hover:bg-gray-600 text-hatch-orange text-xs font-bold flex gap-1 items-center" title="Documento PDF"><span>📄</span> PDF</button>
+        <div className="flex bg-gray-700 rounded border border-gray-600 overflow-hidden">
+            <button onClick={onExportPNG} className="px-3 py-1.5 hover:bg-gray-600 text-gray-200 text-xs font-bold border-r border-gray-600 flex gap-1 items-center" title="Imagen PNG">
+               <Icons.Image /> PNG
+            </button>
+            <button onClick={onExportPDF} className="px-3 py-1.5 hover:bg-gray-600 text-hatch-orange text-xs font-bold flex gap-1 items-center" title="Documento PDF">
+               <Icons.PDF /> PDF
+            </button>
         </div>
 
-        <div className="h-6 w-px bg-gray-500"></div>
+        <div className="h-6 w-px bg-gray-600"></div>
 
         <div className="flex items-center gap-1">
-            <button onClick={() => onZoom(1.2)} className="p-2 bg-gray-600 text-gray-300 hover:text-white hover:bg-gray-500 rounded" title="Acercar">➕</button>
-            <button onClick={() => onZoom(0.8)} className="p-2 bg-gray-600 text-gray-300 hover:text-white hover:bg-gray-500 rounded" title="Alejar">➖</button>
-            <button onClick={onReset} className="p-2 bg-gray-600 text-gray-300 hover:text-white hover:bg-gray-500 rounded" title="Resetear">⟲</button>
+            <button onClick={() => onZoom(1.2)} className="p-2 bg-gray-700 text-gray-300 hover:text-white hover:bg-gray-600 rounded" title="Acercar"><Icons.ZoomIn /></button>
+            <button onClick={() => onZoom(0.8)} className="p-2 bg-gray-700 text-gray-300 hover:text-white hover:bg-gray-600 rounded" title="Alejar"><Icons.ZoomOut /></button>
+            <button onClick={onReset} className="p-2 bg-gray-700 text-gray-300 hover:text-white hover:bg-gray-600 rounded" title="Resetear"><Icons.Reset /></button>
         </div>
 
         <div className="flex items-center gap-1 ml-2">
-            {onUndo && <button onClick={onUndo} className={`p-2 rounded ${canUndo ? 'text-white hover:bg-gray-600' : 'text-gray-600 cursor-not-allowed'}`} title="Deshacer">↶</button>}
-            {onDeleteSelected && <button onClick={onDeleteSelected} disabled={!hasSelection} className={`p-2 rounded ${hasSelection ? 'text-red-400 hover:bg-gray-700' : 'text-gray-600 cursor-not-allowed'}`} title="Borrar">🗑️</button>}
-            {onClearAll && <button onClick={onClearAll} className="p-2 text-red-400 hover:text-red-200 hover:bg-red-900/30 rounded" title="Limpiar Todo">☠️</button>}
+            {onUndo && <button onClick={onUndo} className={`p-2 rounded ${canUndo ? 'text-white hover:bg-gray-600' : 'text-gray-600 cursor-not-allowed'}`} title="Deshacer"><Icons.Undo /></button>}
+            {onDeleteSelected && <button onClick={onDeleteSelected} disabled={!hasSelection} className={`p-2 rounded ${hasSelection ? 'text-red-400 hover:bg-gray-700' : 'text-gray-600 cursor-not-allowed'}`} title="Borrar"><Icons.Trash /></button>}
+            {onClearAll && <button onClick={onClearAll} className="p-2 text-red-400 hover:text-red-200 hover:bg-red-900/30 rounded" title="Limpiar Todo"><Icons.Clear /></button>}
         </div>
       </div>
     </div>
@@ -168,8 +243,6 @@ function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShape
   }, [plotPlan?.id, plotPlan?.cwas]);
 
   useEffect(() => {
-    // Cuando cambia la selección externa (activeCWAId), seleccionamos UNA forma para activar los botones
-    // pero en el renderizado iluminaremos TODAS las que coincidan con ese ID.
     if (activeCWAId) {
         const shapeToSelect = shapes.find(s => s.cwaId === activeCWAId);
         setSelectedShapeKey(shapeToSelect ? shapeToSelect.key : null);
@@ -243,6 +316,19 @@ function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShape
         }
       }
     }
+
+    if (['star', 'diamond', 'triangle'].includes(activeTool)) {
+        const defaultSize = 40 / scaleRatio; 
+        handleSaveShape({ 
+            type: activeTool, 
+            color: currentColor, 
+            x: pos.x, 
+            y: pos.y, 
+            width: defaultSize, 
+            height: defaultSize,
+            radius: defaultSize / 2 
+        });
+    }
   };
 
   const handleMouseMove = (e) => {
@@ -259,8 +345,13 @@ function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShape
         setCursorPos({ x: guideX, y: guideY });
     }
     if (isDrawing && activeTool !== 'pan') {
-        if (activeTool === 'rect') setNewShape({ ...newShape, width: pos.x - startPoint.current.x, height: pos.y - startPoint.current.y });
-        if (activeTool === 'circle') setNewShape({ ...newShape, radius: Math.hypot(pos.x - startPoint.current.x, pos.y - startPoint.current.y) });
+        if (activeTool === 'rect') {
+            setNewShape({ ...newShape, width: pos.x - startPoint.current.x, height: pos.y - startPoint.current.y });
+        }
+        if (activeTool === 'circle') {
+            const radius = Math.hypot(pos.x - startPoint.current.x, pos.y - startPoint.current.y);
+            setNewShape({ ...newShape, radius });
+        }
     }
   };
 
@@ -274,12 +365,19 @@ function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShape
 
   const handleSaveShape = async (finalShape) => {
     if (!cwaToAssociate) { alert("⚠️ Selecciona un CWA arriba para asignar esta área."); setPolygonPoints([]); setIsDrawingPolygon(false); return; }
-    let shapeData = {};
-    const typeToSend = (finalShape.type === 'ortho' || finalShape.type === 'polygon') ? 'polygon' : finalShape.type;
     
-    if (typeToSend === 'polygon') shapeData = { points: finalShape.points, color: finalShape.color, type: 'polygon' };
-    else if (typeToSend === 'rect') shapeData = { x: finalShape.x, y: finalShape.y, width: finalShape.width, height: finalShape.height, color: finalShape.color, type: 'rect' };
-    else if (typeToSend === 'circle') shapeData = { x: finalShape.x, y: finalShape.y, radius: finalShape.radius, color: finalShape.color, type: 'circle' };
+    let shapeData = { ...finalShape };
+    delete shapeData.key;
+
+    if (finalShape.type === 'polygon') {
+        shapeData = { points: finalShape.points, color: finalShape.color, type: 'polygon' };
+    } else if (finalShape.type === 'rect') {
+        shapeData = { x: finalShape.x, y: finalShape.y, width: finalShape.width, height: finalShape.height, color: finalShape.color, type: 'rect' };
+    } else if (finalShape.type === 'circle') {
+        shapeData = { x: finalShape.x, y: finalShape.y, radius: finalShape.radius, color: finalShape.color, type: 'circle' };
+    } else {
+        shapeData = { x: finalShape.x, y: finalShape.y, radius: finalShape.radius, color: finalShape.color, type: finalShape.type };
+    }
     
     const existingShapes = shapes.filter(s => s.cwaId === cwaToAssociate.id).map(s => {
         const { key, cwaId, codigo, nombre, ...rest } = s;
@@ -291,7 +389,7 @@ function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShape
     try {
       saveToHistory(); 
       const formData = new FormData();
-      formData.append('shape_type', typeToSend); 
+      formData.append('shape_type', 'multi'); 
       formData.append('shape_data', JSON.stringify(newShapeList));
 
       await client.put(
@@ -301,7 +399,7 @@ function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShape
       
       if (onShapeSaved) onShapeSaved(cwaToAssociate.id, null);
       
-      const newShapeVisual = { ...finalShape, type: typeToSend, key: Date.now(), ...shapeData, codigo: cwaToAssociate.codigo, nombre: cwaToAssociate.nombre, cwaId: cwaToAssociate.id };
+      const newShapeVisual = { ...shapeData, key: Date.now(), codigo: cwaToAssociate.codigo, nombre: cwaToAssociate.nombre, cwaId: cwaToAssociate.id };
       setShapes(prev => [...prev, newShapeVisual]);
 
     } catch (error) { alert(`Error al guardar geometría: ${error.message}`); }
@@ -325,11 +423,8 @@ function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShape
             });
 
         const formData = new FormData();
-        
-        // ✅ CORRECCIÓN CRÍTICA: Si la lista queda vacía, enviamos string vacío como tipo
-        const newType = remainingShapesForCWA.length > 0 ? 'multi' : '';
+        const newType = remainingShapesForCWA.length > 0 ? 'multi' : ''; // 🔥 CLAVE PARA EL CHECK/X
         formData.append('shape_type', newType); 
-        
         formData.append('shape_data', JSON.stringify(remainingShapesForCWA));
 
         await client.put(
@@ -350,10 +445,6 @@ function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShape
       if(!confirm('⚠️ ¿ESTÁS SEGURO? Esto borrará TODOS los dibujos de este plano.')) return;
       saveToHistory();
       try {
-        // Para limpiar todo, tendríamos que iterar sobre todos los CWA IDs presentes en shapes
-        // y limpiar su geometría. Dado que no tenemos un endpoint "clear all geometry for plan",
-        // borramos localmente y asumimos que el usuario guardará o limpiará individualmente si es necesario,
-        // o iteramos:
         const uniqueCWAIds = [...new Set(shapes.map(s => s.cwaId))];
         for (const cwaId of uniqueCWAIds) {
              const formData = new FormData();
@@ -364,7 +455,6 @@ function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShape
                 formData
             );
         }
-        
         setShapes([]); setSelectedShapeKey(null);
         if (onShapeSaved) onShapeSaved(null, null); 
       } catch (err) { alert("Error limpiando: " + err.message); }
@@ -409,7 +499,6 @@ function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShape
       <div ref={containerRef} className="w-full relative flex-1 overflow-hidden cursor-crosshair" style={{ backgroundColor: '#262626' }}>
         {!image && <div className="flex items-center justify-center h-full text-white">⏳ Cargando plano...</div>}
         
-        {/* Tooltip */}
         {tooltip.visible && (
             <div className="absolute z-50 bg-black/90 text-white px-3 py-2 rounded-lg shadow-xl border border-gray-600 pointer-events-none transform -translate-x-1/2 -translate-y-full" style={{ top: tooltip.y, left: tooltip.x }}>
                 <p className="text-xs font-bold text-hatch-orange">{tooltip.content.codigo}</p>
@@ -423,16 +512,13 @@ function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShape
               <Group x={groupX} y={groupY} scaleX={scaleRatio} scaleY={scaleRatio}>
                 <Image image={image} x={0} y={0} width={image.width} height={image.height} listening={false} />
                 
-                {/* FORMAS */}
                 {shapes.map(shape => {
-                  // ✅ LOGICA DE HIGHLIGHT GRUPAL
                   const isActivated = activeCWAId === shape.cwaId;
                   const isSel = shape.key === selectedShapeKey;
                   const isHighlighted = isSel || isActivated;
 
                   const props = { 
                     fill: `${shape.color}60`, 
-                    // Cyan si seleccionado directo, Amarillo si es parte del grupo activo, color normal si no
                     stroke: isSel ? '#00FFFF' : (isActivated ? '#FFFF00' : shape.color), 
                     strokeWidth: isHighlighted ? (dynamicStroke * 2.5) : dynamicStroke, 
                     shadowColor: isHighlighted ? 'black' : null,
@@ -449,10 +535,14 @@ function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShape
                   if(shape.type==='rect') return <Rect key={shape.key} {...props} x={shape.x} y={shape.y} width={shape.width} height={shape.height} />;
                   if(shape.type==='circle') return <Circle key={shape.key} {...props} x={shape.x} y={shape.y} radius={shape.radius} />;
                   if(shape.type==='polygon' || shape.type==='ortho') return <Line key={shape.key} {...props} points={shape.points} closed />;
+                  
+                  if(shape.type==='star') return <Star key={shape.key} {...props} x={shape.x} y={shape.y} numPoints={5} innerRadius={shape.radius/2} outerRadius={shape.radius} />;
+                  if(shape.type==='diamond') return <RegularPolygon key={shape.key} {...props} x={shape.x} y={shape.y} sides={4} radius={shape.radius} />;
+                  if(shape.type==='triangle') return <RegularPolygon key={shape.key} {...props} x={shape.x} y={shape.y} sides={3} radius={shape.radius} />;
+
                   return null;
                 })}
 
-                {/* DIBUJOS TEMPORALES */}
                 {newShape && activeTool === 'rect' && <Rect {...newShape} fill={`${newShape.color}40`} stroke={newShape.color} strokeWidth={dynamicStroke} />}
                 {newShape && activeTool === 'circle' && <Circle {...newShape} fill={`${newShape.color}40`} stroke={newShape.color} strokeWidth={dynamicStroke} />}
                 {isDrawingPolygon && polygonPoints.length > 0 && (<><Line points={polygonPoints} stroke={currentColor} strokeWidth={dynamicStroke} />{cursorPos && <Line points={[polygonPoints[polygonPoints.length - 2], polygonPoints[polygonPoints.length - 1], cursorPos.x, cursorPos.y]} stroke={currentColor} strokeWidth={dynamicStroke} dash={[dynamicStroke * 2, dynamicStroke * 2]} opacity={0.7} />}{polygonPoints.map((_, i) => { if(i % 2 !== 0) return null; return <Circle key={i} x={polygonPoints[i]} y={polygonPoints[i+1]} radius={dynamicStroke * 1.5} fill="white" stroke={currentColor} strokeWidth={1} /> })}</>)}
@@ -465,4 +555,4 @@ function PlotPlan({ plotPlan, cwaToAssociate, activeCWAId, onShapeSaved, onShape
   );
 }
 
-export default PlotPlan;
+export default PlotPlan; 

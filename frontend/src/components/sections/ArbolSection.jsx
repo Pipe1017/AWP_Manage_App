@@ -8,48 +8,99 @@ import ReactFlow, {
   Controls,
   MiniMap,
   ReactFlowProvider,
-  getNodesBounds,
-  MarkerType // Para flechas si queremos
+  getNodesBounds
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { toPng } from 'html-to-image';
 import { jsPDF } from 'jspdf';
-import client from '../../api/axios.js';
+import client from '../../api/axios';
 
 // --- CONFIGURACIÓN DE TAMAÑOS ---
-const NODE_WIDTH = 260;
-const NODE_HEIGHT = 80;
-const GAP_X = 50;  // Espacio horizontal entre columnas de áreas
-const GAP_Y = 60;  // Espacio vertical entre nodos
+const NODE_WIDTH = 280;
+const GAP_X = 40;   // Espacio horizontal entre columnas (Áreas)
+const GAP_Y = 60;   // Espacio vertical entre niveles
 
-// --- ESTILOS DE NODOS ---
+// --- ICONOS SVG (PROFESIONALES) ---
+const Icons = {
+  Project: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>,
+  CWA: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>,
+  CWP: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>,
+  EWP: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
+  PWP: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>,
+  IWP: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>,
+  Item: () => <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+};
+
+// --- ESTILOS DE TARJETAS (NODOS) ---
 const getNodeStyle = (type) => {
   const baseStyle = {
-    border: '1px solid #555',
-    padding: '10px',
+    padding: 0, // Control total del padding interno
     borderRadius: '6px',
-    fontSize: '12px',
     width: NODE_WIDTH,
-    color: '#fff',
-    fontWeight: 'normal',
-    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.2)',
     fontFamily: 'ui-sans-serif, system-ui, sans-serif',
     textAlign: 'left',
-    whiteSpace: 'pre-wrap',
-    lineHeight: '1.3',
+    border: '1px solid rgba(0,0,0,0.1)',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+    background: '#fff',
+    color: '#333',
   };
 
+  // Bordes de color según tipo
   switch (type) {
-    case 'PROYECTO': return { ...baseStyle, background: '#1A252F', borderColor: '#000', borderBottom: '4px solid #E67E22', fontSize: '14px', fontWeight: 'bold', textAlign: 'center' }; 
-    case 'CWA': return { ...baseStyle, background: '#2980B9', borderColor: '#1F618D', borderLeft: '4px solid white' }; 
-    case 'CWP': return { ...baseStyle, background: '#27AE60', borderColor: '#196F3D' }; 
-    case 'EWP': return { ...baseStyle, background: '#8E44AD', borderColor: '#6C3483' }; 
-    case 'PWP': return { ...baseStyle, background: '#16A085', borderColor: '#117A65' }; 
-    case 'IWP': return { ...baseStyle, background: '#E67E22', borderColor: '#BA4A00', color: '#fff' }; 
-    case 'ITEM': return { ...baseStyle, background: '#ECF0F1', color: '#333', borderColor: '#BDC3C7', width: NODE_WIDTH - 20, fontSize: '10px' }; 
-    default: return { ...baseStyle, background: '#95A5A6', color: '#000' };
+    case 'PROYECTO': return { ...baseStyle, borderTop: '4px solid #1A252F' }; 
+    case 'CWA': return { ...baseStyle, borderTop: '4px solid #2980B9' }; 
+    case 'CWP': return { ...baseStyle, borderTop: '4px solid #27AE60' }; 
+    case 'EWP': return { ...baseStyle, borderLeft: '4px solid #8E44AD' }; 
+    case 'PWP': return { ...baseStyle, borderLeft: '4px solid #16A085' }; 
+    case 'IWP': return { ...baseStyle, borderLeft: '4px solid #E67E22' }; 
+    case 'ITEM': return { ...baseStyle, width: NODE_WIDTH - 20, fontSize: '11px', border: '1px dashed #BDC3C7' }; 
+    default: return baseStyle;
   }
 };
+
+// --- COMPONENTE DE CONTENIDO DE NODO (JSX) ---
+// Esto es lo que va dentro de data.label
+const NodeContent = ({ type, code, name, meta }) => {
+  let Icon = Icons.Project;
+  let bgColor = 'bg-gray-100';
+  let textColor = 'text-gray-700';
+  
+  if(type === 'CWA') { Icon = Icons.CWA; bgColor = 'bg-blue-50'; textColor = 'text-blue-800'; }
+  if(type === 'CWP') { Icon = Icons.CWP; bgColor = 'bg-green-50'; textColor = 'text-green-800'; }
+  if(type === 'EWP') { Icon = Icons.EWP; bgColor = 'bg-purple-50'; textColor = 'text-purple-800'; }
+  if(type === 'PWP') { Icon = Icons.PWP; bgColor = 'bg-teal-50'; textColor = 'text-teal-800'; }
+  if(type === 'IWP') { Icon = Icons.IWP; bgColor = 'bg-orange-50'; textColor = 'text-orange-800'; }
+  if(type === 'ITEM') { Icon = Icons.Item; }
+
+  return (
+    <div className="flex flex-col h-full">
+        {/* Header del Nodo */}
+        <div className={`flex items-center gap-2 p-2 ${type === 'ITEM' ? '' : 'border-b border-gray-100'} ${bgColor}`}>
+            <div className={`p-1 rounded bg-white ${textColor}`}>
+                <Icon />
+            </div>
+            <div className="flex-1 min-w-0">
+                <div className={`font-bold text-xs truncate ${textColor}`}>{code}</div>
+                {type === 'ITEM' && <div className="text-[10px] text-gray-500 truncate">{name}</div>}
+            </div>
+            {/* Metadatos en esquina (Prio/Seq) */}
+            {meta && (
+                <div className="text-[9px] font-mono font-bold px-1.5 py-0.5 bg-white/60 rounded border border-black/5 text-gray-600 whitespace-nowrap">
+                    {meta}
+                </div>
+            )}
+        </div>
+        
+        {/* Cuerpo del Nodo (Nombre) */}
+        {type !== 'ITEM' && (
+            <div className="p-2 text-xs text-gray-600 leading-snug break-words">
+                {name}
+            </div>
+        )}
+    </div>
+  );
+};
+
 
 function ArbolFlow({ proyecto }) {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
@@ -69,33 +120,35 @@ function ArbolFlow({ proyecto }) {
             const nodesList = [];
             const edgesList = [];
             
-            // --- 1. NODO PROYECTO (RAÍZ) ---
-            // Lo creamos temporalmente en 0,0. Luego lo centraremos.
+            // --- 1. NODO PROYECTO ---
             const rootId = `PROY-${proyecto.id}`;
             
-            // --- 2. PROCESAR COLUMNAS (CWA -> Vertical) ---
-            // Vamos a calcular la posición X de cada columna basada en su índice
+            // --- 2. ALGORITMO DE LAYOUT HÍBRIDO ---
+            // Horizontal para Áreas, Vertical para hijos
             
-            let currentX = 0; // Posición X actual
             const columnWidth = NODE_WIDTH + GAP_X;
 
-            data.cwas?.forEach((cwa, index) => {
-                // Coordenada X para esta columna (Área)
+            // Ordenar CWAs por prioridad numérica para el gráfico
+            const sortedCwas = (data.cwas || []).sort((a, b) => (a.prioridad || 9999) - (b.prioridad || 9999));
+
+            sortedCwas.forEach((cwa, index) => {
+                // Coordenada X fija para esta columna (Área)
                 const cwaX = index * columnWidth;
-                let currentY = GAP_Y * 2; // Empezamos un poco abajo del proyecto
+                let currentY = GAP_Y * 2; 
 
                 // NODO CWA
                 const cwaId = `CWA-${cwa.id}`;
                 nodesList.push({
                     id: cwaId,
-                    data: { label: `📍 CWA: ${cwa.codigo}\n${cwa.nombre}` },
+                    // ✅ USAMOS JSX EN LA ETIQUETA
+                    data: { label: <NodeContent type="CWA" code={cwa.codigo} name={cwa.nombre} meta={`Prio: ${cwa.prioridad ?? '-'}`} /> },
                     position: { x: cwaX, y: currentY },
                     style: getNodeStyle('CWA'),
                     sourcePosition: 'bottom',
                     targetPosition: 'top'
                 });
 
-                // Conexión Proyecto -> CWA
+                // Conexión Root -> CWA
                 edgesList.push({ 
                     id: `e-${rootId}-${cwaId}`, 
                     source: rootId, 
@@ -104,22 +157,22 @@ function ArbolFlow({ proyecto }) {
                     style: { stroke: '#2980B9', strokeWidth: 2 } 
                 });
 
-                currentY += NODE_HEIGHT + GAP_Y; // Bajar Y
+                currentY += 100; // Altura nodo + gap
 
-                // NODOS CWP (Apilados verticalmente bajo el CWA)
-                cwa.cwps?.forEach((cwp) => {
+                // CWPS (Vertical debajo de su CWA)
+                const sortedCwps = (cwa.cwps || []).sort((a, b) => (a.secuencia || 0) - (b.secuencia || 0));
+                
+                sortedCwps.forEach((cwp) => {
                     const cwpId = `CWP-${cwp.id}`;
                     nodesList.push({
                         id: cwpId,
-                        data: { label: `📦 CWP: ${cwp.codigo}\n${cwp.nombre}` },
-                        position: { x: cwaX, y: currentY }, // Misma X que el CWA
+                        data: { label: <NodeContent type="CWP" code={cwp.codigo} name={cwp.nombre} meta={`Seq: ${cwp.secuencia ?? '-'}`} /> },
+                        position: { x: cwaX, y: currentY }, // Misma X
                         style: getNodeStyle('CWP'),
                         sourcePosition: 'bottom',
                         targetPosition: 'top'
                     });
 
-                    // Conexión CWA -> CWP (O CWP anterior -> CWP actual si quisiéramos cadena, pero mejor jerárquico)
-                    // Para jerarquía visual limpia: CWA -> CWP
                     edgesList.push({ 
                         id: `e-${cwaId}-${cwpId}`, 
                         source: cwaId, 
@@ -128,20 +181,15 @@ function ArbolFlow({ proyecto }) {
                         style: { stroke: '#27AE60', strokeWidth: 1.5 } 
                     });
 
-                    currentY += NODE_HEIGHT + GAP_Y; // Bajar Y
+                    currentY += 100;
 
-                    // NODOS PAQUETES (Apilados bajo el CWP)
+                    // PAQUETES (Vertical debajo de su CWP)
                     cwp.paquetes?.forEach((pkg) => {
                         const pkgId = `PKG-${pkg.id}`;
-                        let icon = '📄';
-                        if (pkg.tipo === 'EWP') icon = '📐';
-                        if (pkg.tipo === 'PWP') icon = '🛒';
-                        if (pkg.tipo === 'IWP') icon = '🔧';
-
                         nodesList.push({
                             id: pkgId,
-                            data: { label: `${icon} ${pkg.tipo}: ${pkg.codigo}\n${pkg.nombre}` },
-                            position: { x: cwaX + 20, y: currentY }, // Un poco indentado
+                            data: { label: <NodeContent type={pkg.tipo} code={pkg.codigo} name={pkg.nombre} /> },
+                            position: { x: cwaX + 20, y: currentY }, // Indentado
                             style: getNodeStyle(pkg.tipo),
                             sourcePosition: 'bottom',
                             targetPosition: 'top'
@@ -155,50 +203,49 @@ function ArbolFlow({ proyecto }) {
                             style: { stroke: '#BDC3C7' } 
                         });
 
-                        currentY += NODE_HEIGHT + GAP_Y; // Bajar Y
+                        currentY += 90; // Altura nodo + gap
 
-                        // NODOS ITEMS (Opcional)
+                        // ITEMS
                         if (showItems) {
                             pkg.items?.forEach(item => {
                                 const itemId = `ITEM-${item.id}`;
                                 nodesList.push({
                                     id: itemId,
-                                    data: { label: `📝 ${item.nombre}` },
-                                    position: { x: cwaX + 40, y: currentY }, // Más indentado
+                                    data: { label: <NodeContent type="ITEM" code={`ID:${item.id}`} name={item.nombre} /> },
+                                    position: { x: cwaX + 40, y: currentY },
                                     style: getNodeStyle('ITEM'),
-                                    sourcePosition: 'bottom',
-                                    targetPosition: 'top'
+                                    sourcePosition: 'top', 
+                                    targetPosition: 'top' // Truco para listas
                                 });
                                 edgesList.push({ 
                                     id: `e-${pkgId}-${itemId}`, 
                                     source: pkgId, 
                                     target: itemId, 
                                     type: 'smoothstep', 
-                                    style: { stroke: '#BDC3C7', strokeDasharray: '5 5' } 
+                                    style: { stroke: '#BDC3C7', strokeDasharray: '4 4' } 
                                 });
-                                currentY += (NODE_HEIGHT * 0.6) + (GAP_Y * 0.5); // Items más compactos
+                                currentY += 50;
                             });
                         }
                     });
+                    
+                    // Espacio extra entre CWPs
+                    currentY += 20;
                 });
-                
-                // Guardamos el ancho máximo alcanzado
-                currentX = cwaX;
             });
 
             // --- 3. CENTRAR EL PROYECTO ---
-            // El proyecto va en el centro geométrico de todas las columnas de CWA
-            // Ancho total ocupado = (N-1) * Spacing
-            const totalWidth = (data.cwas.length - 1) * columnWidth;
-            const projectX = totalWidth / 2;
+            const totalWidth = (sortedCwas.length - 1) * columnWidth;
+            // Si no hay CWAs, centrar en 0
+            const projectX = sortedCwas.length > 0 ? totalWidth / 2 : 0;
 
             nodesList.unshift({
                 id: rootId,
-                data: { label: `🏗️ PROYECTO\n${proyecto.nombre}` },
-                position: { x: projectX, y: 0 }, // Centrado arriba
+                data: { label: <NodeContent type="PROYECTO" code="PROYECTO" name={proyecto.nombre} /> },
+                position: { x: projectX, y: 0 },
                 style: getNodeStyle('PROYECTO'),
                 sourcePosition: 'bottom',
-                targetPosition: 'bottom' // Para que las líneas salgan hacia abajo
+                targetPosition: 'bottom'
             });
 
             setNodes(nodesList);
@@ -208,7 +255,7 @@ function ArbolFlow({ proyecto }) {
     };
 
     fetchData();
-  }, [proyecto.id, showItems, setNodes, setEdges]); // Reacciona a showItems
+  }, [proyecto.id, showItems, setNodes, setEdges]);
 
   const downloadImage = useCallback((format = 'png') => {
     if (typeof getNodesBounds !== 'function') return;
@@ -221,7 +268,7 @@ function ArbolFlow({ proyecto }) {
     const imageWidth = nodesBounds.width + 100; 
     const imageHeight = nodesBounds.height + 100;
     const transform = `translate(${-nodesBounds.x + 50}px, ${-nodesBounds.y + 50}px) scale(1)`;
-    const options = { backgroundColor: '#ffffff', width: imageWidth, height: imageHeight, style: { width: imageWidth, height: imageHeight, transform: transform } };
+    const options = { backgroundColor: '#f9fafb', width: imageWidth, height: imageHeight, style: { width: imageWidth, height: imageHeight, transform: transform } };
 
     if (format === 'png') {
       toPng(viewportElement, options).then((dataUrl) => {
@@ -236,16 +283,14 @@ function ArbolFlow({ proyecto }) {
     }
   }, [nodes, proyecto.nombre]);
 
-  if (loading) return <div className="p-10 text-center text-hatch-blue">Generando diagrama...</div>;
+  if (loading) return <div className="p-10 text-center">Cargando...</div>;
 
   return (
     <div className="h-full w-full bg-gray-50 relative">
         <div className="absolute top-4 right-4 z-10 flex gap-2 bg-white/90 backdrop-blur p-2 rounded-lg shadow-lg border border-gray-200 items-center">
-            
             <button onClick={() => setShowItems(!showItems)} className={`px-3 py-1.5 text-xs font-bold rounded shadow transition-all mr-2 border ${showItems ? 'bg-blue-100 text-blue-700 border-blue-300' : 'bg-white text-gray-600 border-gray-300'}`}>
                 {showItems ? 'Ocultar Items' : 'Mostrar Items'}
             </button>
-
             <span className="text-gray-300 mx-1">|</span>
             <button onClick={() => downloadImage('png')} className="px-3 py-1.5 bg-hatch-blue hover:bg-hatch-blue-light text-white text-xs font-bold rounded shadow">📷</button>
             <button onClick={() => downloadImage('pdf')} className="px-3 py-1.5 bg-hatch-orange hover:bg-hatch-orange-dark text-white text-xs font-bold rounded shadow">📄</button>
@@ -257,25 +302,14 @@ function ArbolFlow({ proyecto }) {
             onNodesChange={onNodesChange} 
             onEdgesChange={onEdgesChange} 
             onInit={setRfInstance} 
-            connectionLineType={ConnectionLineType.SmoothStep} // Líneas ortogonales suaves
+            connectionLineType={ConnectionLineType.SmoothStep} // Líneas ortogonales elegantes
             fitView 
             minZoom={0.1} 
             className="bg-gray-50"
         >
-            <Background color="#BDC3C7" gap={30} size={1} />
+            <Background color="#E5E7EB" gap={40} size={1} />
             <Controls />
             <MiniMap nodeColor={(n) => n.style?.background || '#fff'} style={{ height: 150 }} />
-            <Panel position="bottom-left" className="bg-white/90 p-3 rounded shadow-lg border border-gray-200 text-xs w-48">
-                <div className="font-bold mb-2 text-hatch-blue border-b pb-1">Leyenda</div>
-                <div className="flex flex-col gap-1.5">
-                    <div className="flex items-center gap-2"><div className="w-4 h-4 bg-[#1A252F] rounded border border-gray-600"></div> Proyecto</div>
-                    <div className="flex items-center gap-2"><div className="w-4 h-4 bg-[#2980B9] rounded border border-blue-800"></div> CWA</div>
-                    <div className="flex items-center gap-2"><div className="w-4 h-4 bg-[#27AE60] rounded border border-green-800"></div> CWP</div>
-                    <div className="flex items-center gap-2"><div className="w-4 h-4 bg-[#8E44AD] rounded border border-purple-800"></div> EWP</div>
-                    <div className="flex items-center gap-2"><div className="w-4 h-4 bg-[#16A085] rounded border border-teal-800"></div> PWP</div>
-                    <div className="flex items-center gap-2"><div className="w-4 h-4 bg-[#E67E22] rounded border border-orange-800"></div> IWP</div>
-                </div>
-            </Panel>
         </ReactFlow>
     </div>
   );
