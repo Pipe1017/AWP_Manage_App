@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from datetime import date
 
+# ... (MANTENER BASES SIMPLES, DISCIPLINA IGUAL) ...
 class DisciplinaBase(BaseModel):
     nombre: str
     codigo: str
@@ -12,14 +13,19 @@ class DisciplinaResponse(DisciplinaBase):
     proyecto_id: int
     class Config: from_attributes = True
 
+# ============================================================================
+# 2. ESTRUCTURA AWP (CWA, CWP)
+# ============================================================================
+
+# --- CWA (ÁREA) ---
 class CWACreate(BaseModel):
     nombre: str
     codigo: str
     descripcion: Optional[str] = None
     es_transversal: Optional[bool] = False
     shape_type: Optional[str] = None
-    shape_data: Optional[Dict[str, Any]] = None
-    # ✅ Default 0 para Prioridad
+    # ✅ CAMBIO: Usamos Any para permitir listas de geometrías
+    shape_data: Optional[Any] = None 
     prioridad: Optional[int] = 0
 
 class CWAUpdate(BaseModel):
@@ -29,6 +35,7 @@ class CWAUpdate(BaseModel):
     es_transversal: Optional[bool] = None
     prioridad: Optional[int] = None
 
+# --- CWP ---
 class CWPCreate(BaseModel):
     nombre: str
     descripcion: Optional[str] = None
@@ -65,10 +72,14 @@ class CWAResponse(BaseModel):
     es_transversal: bool
     plot_plan_id: int
     shape_type: Optional[str]
-    shape_data: Optional[Dict[str, Any]]
+    # ✅ CAMBIO: Usamos Any aquí también
+    shape_data: Optional[Any] = None 
     prioridad: Optional[int]
     cwps: List[CWPResponse] = []
     class Config: from_attributes = True
+
+# ... (MANTENER EL RESTO DE SCHEMAS IGUAL QUE ANTES: PlotPlan, TipoEntregable, Proyecto, Paquete, Item...) ...
+# Copia el resto del archivo original aquí abajo para no perderlo.
 
 class PlotPlanCreate(BaseModel):
     nombre: str
