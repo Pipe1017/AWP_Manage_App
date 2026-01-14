@@ -86,18 +86,22 @@ class CWP(Base):
     nombre = Column(String, nullable=False)
     codigo = Column(String(50), index=True)
     descripcion = Column(Text, nullable=True)
+    
+    # 1. Definición de las claves foráneas (Columnas reales en BD)
     cwa_id = Column(Integer, ForeignKey("cwa.id"))
     disciplina_id = Column(Integer, ForeignKey("disciplinas.id"))
-    cwa = Column(Integer, ForeignKey("cwa.id"))  # ✅ Debe ser 'cwa_id'
-    disciplina = Column(Integer, ForeignKey("disciplinas.id"))
+
+    # 2. Definición de las Relaciones (Objetos de Python)
+    # CAMBIA ESTAS DOS LINEAS:
+    cwa = relationship("CWA", back_populates="cwps")
+    disciplina = relationship("Disciplina")
+    
     paquetes = relationship("Paquete", back_populates="cwp", cascade="all, delete-orphan")
     
     secuencia = Column(Integer, default=0)
     duracion_dias = Column(Integer, nullable=True)
     fecha_inicio_prevista = Column(Date, nullable=True)
     fecha_fin_prevista = Column(Date, nullable=True)
-    
-    # ❌ ELIMINADO: Forecasts ya no están aquí
     
     porcentaje_completitud = Column(Float, default=0.0)
     estado = Column(String(20), default="NO_INICIADO")
