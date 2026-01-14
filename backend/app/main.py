@@ -1,5 +1,3 @@
-# backend/app/main.py
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -16,10 +14,23 @@ app = FastAPI(
     version="2.0.0"
 )
 
-# Configuración de CORS
+# ==========================================
+# 🛡️ CONFIGURACIÓN DE CORS (ESPECÍFICA)
+# ==========================================
+# Definimos explícitamente quién puede conectarse.
+# El "Origin" es la dirección del FRONTEND (Puerto 3000).
+
+origins = [
+    "http://localhost:3000",       # Para desarrollo local en tu Mac
+    "http://127.0.0.1:3000",       # Alternativa local
+    "http://192.168.1.4:3000",     # ✅ TU IP DE CASA (Frontend)
+    # Si despliegas en la empresa, agrega aquí esa IP:
+    "http://10.92.12.84:3000",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # En producción cambiar por la IP del frontend
+    allow_origins=origins,     # Usamos la lista explícita en lugar de regex
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -31,44 +42,20 @@ app.add_middleware(
 
 # 1. Obtener ruta absoluta del directorio actual (en Docker es /app)
 BASE_DIR = os.getcwd()
-print(f"📂 [Main] BASE_DIR: {BASE_DIR}")
 
 # 2. Definir ruta absoluta de uploads
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
-print(f"📂 [Main] UPLOAD_DIR: {UPLOAD_DIR}")
 
 # 3. Crear la carpeta si no existe
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-# 4. Verificar que existe y listar contenido
-if os.path.exists(UPLOAD_DIR):
-    print(f"✅ [Main] Directorio {UPLOAD_DIR} existe")
-    try:
-        contents = os.listdir(UPLOAD_DIR)
-        print(f"📁 [Main] Contenido de uploads: {contents}")
-        
-        # Listar cada proyecto
-        for item in contents:
-            item_path = os.path.join(UPLOAD_DIR, item)
-            if os.path.isdir(item_path):
-                files = os.listdir(item_path)
-                print(f"   📁 {item}: {files}")
-    except Exception as e:
-        print(f"❌ [Main] Error listando contenido: {e}")
-else:
-    print(f"⚠️ [Main] Directorio {UPLOAD_DIR} NO existe, creándolo...")
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
-
 print(f"📂 [Main] Montando uploads desde: {UPLOAD_DIR}")
 
-# 5. Montar la ruta para que sea accesible vía web
-try:
-    app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
-    print(f"✅ [Main] StaticFiles montado exitosamente en /uploads")
-except Exception as e:
-    print(f"❌ [Main] Error montando StaticFiles: {e}")
+# 4. Montar la ruta para que sea accesible vía web
+app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 # ==========================================
+
 # Registrar routers
 app.include_router(proyectos.router, prefix="/api/v1")
 app.include_router(awp.router, prefix="/api/v1")
@@ -80,6 +67,5 @@ def read_root():
         "message": "AWP Manager API",
         "version": "2.0.0",
         "status": "running",
-        "upload_dir_configured": UPLOAD_DIR,
-        "upload_dir_exists": os.path.exists(UPLOAD_DIR)
+        "upload_dir_configured": UPLOAD_DIR
     }

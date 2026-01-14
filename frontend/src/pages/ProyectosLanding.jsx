@@ -1,322 +1,251 @@
 // frontend/src/pages/ProyectosLanding.jsx
-
 import React, { useState } from 'react';
-import client from '../api/axios';
 import HatchLogo from '../components/common/HatchLogo';
+import client from '../api/axios';
 
 function ProyectosLanding({ proyectos, onSelectProyecto, onAddProyecto, error }) {
-  const [modalCreate, setModalCreate] = useState(false);
-  const [modalEdit, setModalEdit] = useState(false);
-  const [editingProyecto, setEditingProyecto] = useState(null);
-  const [formData, setFormData] = useState({ nombre: '', descripcion: '' });
-  const [loading, setLoading] = useState(false);
+  const [nombreProyecto, setNombreProyecto] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
+  const [filtro, setFiltro] = useState("");
+  
+  // Estado para edición
+  const [editingId, setEditingId] = useState(null);
+  const [editName, setEditName] = useState("");
 
-  const handleCreateProyecto = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
-    try {
-      await onAddProyecto(formData.nombre);
-      setModalCreate(false);
-      setFormData({ nombre: '', descripcion: '' });
-    } catch (error) {
-      alert('Error: ' + (error.response?.data?.detail || error.message));
-    } finally {
-      setLoading(false);
-    }
+    if (!nombreProyecto.trim()) return;
+    setIsCreating(true);
+    await onAddProyecto(nombreProyecto);
+    setNombreProyecto("");
+    setIsCreating(false);
   };
 
-  const openEditModal = (proyecto) => {
-    setEditingProyecto(proyecto);
-    setFormData({ nombre: proyecto.nombre, descripcion: proyecto.descripcion || '' });
-    setModalEdit(true);
+  const handleStartEdit = (e, p) => {
+    e.stopPropagation();
+    setEditingId(p.id);
+    setEditName(p.nombre);
   };
 
-  const handleUpdateProyecto = async (e) => {
-    e.preventDefault();
-    setLoading(true);
+  const handleSaveEdit = async (e) => {
+    e.stopPropagation();
+    if (!editName.trim()) return;
     try {
-      await client.put(`/proyectos/${editingProyecto.id}`, formData);
-      setModalEdit(false);
-      setFormData({ nombre: '', descripcion: '' });
-      setEditingProyecto(null);
-      alert('✅ Proyecto actualizado exitosamente');
+      await client.put(`/proyectos/${editingId}`, { nombre: editName });
       window.location.reload();
-    } catch (error) {
-      alert('Error: ' + (error.response?.data?.detail || error.message));
-    } finally {
-      setLoading(false);
+    } catch (err) {
+      alert("Error editando proyecto");
     }
   };
 
-  const handleDeleteProyecto = async (proyectoId, nombreProyecto) => {
-    const confirmacion = window.prompt(
-      `⚠️ ADVERTENCIA: Esta acción eliminará PERMANENTEMENTE el proyecto "${nombreProyecto}" y TODA su información:\n\n` +
-      `• Todos los Plot Plans\n` +
-      `• Todas las Áreas (CWA)\n` +
-      `• Todos los CWPs\n` +
-      `• Todos los Paquetes e Items\n` +
-      `• Todas las configuraciones\n\n` +
-      `Esta acción NO SE PUEDE DESHACER.\n\n` +
-      `Para confirmar, escribe el nombre del proyecto: "${nombreProyecto}"`
-    );
+  const handleCancelEdit = (e) => {
+    e.stopPropagation();
+    setEditingId(null);
+  };
 
-    if (confirmacion !== nombreProyecto) {
-      if (confirmacion !== null) {
-        alert('❌ Nombre incorrecto. Eliminación cancelada.');
-      }
-      return;
-    }
-
-    setLoading(true);
+  const handleDelete = async (e, id) => {
+    e.stopPropagation();
+    if (!confirm("⚠️ ¿Estás seguro? Se borrará TODO el proyecto:\n- Planos\n- Áreas (CWAs)\n- Paquetes (CWPs/EWPs/PWPs)\n- Items\n\nEsta acción no se puede deshacer.")) return;
+    
     try {
-      await client.delete(`/proyectos/${proyectoId}`);
-      alert('✅ Proyecto eliminado exitosamente');
+      await client.delete(`/proyectos/${id}`);
       window.location.reload();
-    } catch (error) {
-      alert('Error: ' + (error.response?.data?.detail || error.message));
-    } finally {
-      setLoading(false);
+    } catch (err) {
+      alert("Error eliminando proyecto");
     }
   };
+
+  const proyectosFiltrados = proyectos.filter(p =>
+    p.nombre.toLowerCase().includes(filtro.toLowerCase())
+  );
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* Header */}
-      <div className="bg-gradient-hatch text-white py-8 px-6 shadow-lg">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-          {/* Logo y Título */}
-          <div className="flex flex-col">
-            <HatchLogo variant="full" className="h-16 w-auto object-contain mb-1" style={{ minWidth: '150px' }} />
-            <p className="text-white/90 text-sm font-medium">Advanced Work Packaging</p>
+    <div className="bg-gray-50 text-hatch-blue min-h-screen flex flex-col">
+      
+      {/* --- HEADER --- */}
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-6">
+            {/* ✅ CAMBIO AQUÍ: Logo más grande (h-16) */}
+            <HatchLogo className="h-16" variant="full" />
+            
+            <div className="h-12 w-px bg-gray-300"></div>
+            
+            <div>
+              {/* ✅ CAMBIO AQUÍ: Título más grande para balancear */}
+              <h1 className="text-2xl font-bold text-hatch-blue tracking-tight">AWP Manager</h1>
+              <p className="text-xs text-gray-500 uppercase tracking-wider font-semibold">Construction Workspace</p>
+            </div>
           </div>
-
-          {/* Botón Nuevo Proyecto */}
-          <button 
-            onClick={() => setModalCreate(true)}
-            className="bg-white hover:shadow-xl text-hatch-blue px-6 py-3 rounded-lg font-bold transition-all flex items-center gap-2 whitespace-nowrap"
-          >
-            <span className="text-xl">➕</span> Nuevo Proyecto
-          </button>
+          <div className="flex items-center gap-6">
+            <div className="text-right hidden md:block">
+              <p className="text-xs text-gray-400 font-semibold uppercase">Proyectos Activos</p>
+              <p className="text-2xl font-bold text-hatch-orange leading-none">{proyectos.length}</p>
+            </div>
+            <div className="h-12 w-12 rounded-full bg-gradient-hatch flex items-center justify-center text-white font-bold shadow-lg text-lg">
+              U
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Content */}
-      <div className="max-w-7xl mx-auto px-6 py-12">
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold text-hatch-blue mb-2">Mis Proyectos</h2>
-          <p className="text-gray-600">Selecciona un proyecto para gestionar su estructura AWP</p>
-        </div>
-
+      {/* --- MAIN CONTENT --- */}
+      <div className="flex-1 max-w-7xl mx-auto px-6 py-10 w-full">
+        
         {error && (
-          <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded-r">
-            <p className="text-red-700">{error}</p>
+          <div className="mb-8 p-4 bg-red-50 border-l-4 border-red-500 rounded-r shadow-sm flex items-center gap-3 text-red-700">
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div>
+              <p className="font-bold">Error de Conexión</p>
+              <p className="text-sm">{error}</p>
+            </div>
           </div>
         )}
 
-        {proyectos.length === 0 ? (
-          <div className="text-center py-16">
-            <div className="text-6xl mb-4">📋</div>
-            <p className="text-gray-500 text-lg mb-4">No tienes proyectos creados</p>
-            <button 
-              onClick={() => setModalCreate(true)}
-              className="bg-gradient-orange hover:shadow-lg text-white px-6 py-3 rounded-lg font-medium transition-all"
-            >
-              Crear tu primer proyecto
-            </button>
+        {/* FORMULARIO CREACIÓN */}
+        <div className="mb-10 bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+          <div className="p-1 bg-gradient-orange"></div>
+          <div className="p-8 flex flex-col md:flex-row items-center gap-6">
+            <div className="md:w-1/3">
+              <h2 className="text-2xl font-bold text-hatch-blue mb-2">Nuevo Proyecto</h2>
+              <p className="text-gray-500 text-sm">Crea un nuevo espacio de trabajo para gestionar planos, áreas y paquetes de construcción.</p>
+            </div>
+            <form onSubmit={handleSubmit} className="flex-1 w-full flex gap-4">
+              <div className="flex-1 relative">
+                <input
+                  type="text"
+                  value={nombreProyecto}
+                  onChange={(e) => setNombreProyecto(e.target.value)}
+                  placeholder="Ej: Refinería Planta B - Fase 2"
+                  className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-xl text-hatch-blue placeholder-gray-400 focus:outline-none focus:border-hatch-orange focus:bg-white focus:ring-4 focus:ring-orange-100 transition-all font-medium"
+                  disabled={isCreating}
+                />
+                <svg className="w-6 h-6 text-gray-400 absolute left-4 top-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                </svg>
+              </div>
+              <button
+                type="submit"
+                disabled={isCreating || !nombreProyecto.trim()}
+                className="px-8 py-4 bg-hatch-blue hover:bg-hatch-blue-dark text-white font-bold rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center gap-2"
+              >
+                {isCreating ? (
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <span>+ Crear</span>
+                )}
+              </button>
+            </form>
           </div>
-        ) : (
+        </div>
+
+        {/* LISTA DE PROYECTOS */}
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+            <span className="w-2 h-8 bg-hatch-orange rounded-full"></span>
+            Mis Proyectos
+          </h2>
+          
+          {proyectos.length > 0 && (
+            <div className="relative">
+              <input
+                type="text"
+                value={filtro}
+                onChange={(e) => setFiltro(e.target.value)}
+                placeholder="Filtrar proyectos..."
+                className="pl-9 pr-4 py-2 rounded-lg border border-gray-300 text-sm w-64 focus:outline-none focus:border-hatch-blue focus:ring-1 focus:ring-hatch-blue"
+              />
+              <svg className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+          )}
+        </div>
+
+        {proyectosFiltrados.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {proyectos.map(proyecto => {
-              const totalCWAs = proyecto.plot_plans?.reduce((sum, pp) => sum + (pp.cwas?.length || 0), 0) || 0;
-              const totalCWPs = proyecto.plot_plans?.reduce((sum, pp) => 
-                sum + (pp.cwas?.reduce((s, c) => s + (c.cwps?.length || 0), 0) || 0), 0) || 0;
-
-              return (
-                <div 
-                  key={proyecto.id} 
-                  className="bg-white border-2 border-hatch-gray rounded-xl p-6 hover:border-hatch-orange hover:shadow-xl transition-all cursor-pointer group relative"
-                >
-                  {/* Botones de Acción */}
-                  <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openEditModal(proyecto);
-                      }}
-                      className="bg-white hover:bg-hatch-gray text-hatch-blue p-2 rounded-lg border-2 border-hatch-gray hover:border-hatch-orange transition-all shadow-sm"
-                      title="Editar proyecto"
-                    >
-                      ✏️
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteProyecto(proyecto.id, proyecto.nombre);
-                      }}
-                      className="bg-white hover:bg-red-50 text-red-600 p-2 rounded-lg border-2 border-red-300 hover:border-red-500 transition-all shadow-sm"
-                      title="Eliminar proyecto"
-                    >
-                      🗑️
-                    </button>
-                  </div>
-
-                  <div onClick={() => onSelectProyecto(proyecto)}>
-                    <div className="flex items-start gap-3 mb-4">
-                      <div className="bg-gradient-orange text-white w-12 h-12 rounded-lg flex items-center justify-center text-2xl font-bold flex-shrink-0">
-                        {proyecto.nombre.charAt(0).toUpperCase()}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-xl font-bold text-hatch-blue mb-1 truncate pr-16">
-                          {proyecto.nombre}
-                        </h3>
-                        {proyecto.descripcion && (
-                          <p className="text-sm text-gray-600 line-clamp-2">{proyecto.descripcion}</p>
-                        )}
-                      </div>
+            {proyectosFiltrados.map(proyecto => (
+              <div
+                key={proyecto.id}
+                onClick={() => onSelectProyecto(proyecto)}
+                className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-xl hover:border-hatch-orange/30 transition-all cursor-pointer flex flex-col h-full overflow-hidden group"
+              >
+                {/* Card Header */}
+                <div className="p-5 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white group-hover:from-orange-50/30 group-hover:to-white transition-colors">
+                  {editingId === proyecto.id ? (
+                    <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                      <input 
+                        value={editName} 
+                        onChange={e => setEditName(e.target.value)}
+                        className="flex-1 px-2 py-1 border-2 border-blue-400 rounded text-lg font-bold text-hatch-blue outline-none"
+                        autoFocus
+                      />
+                      <button onClick={handleSaveEdit} className="p-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200" title="Guardar">✓</button>
+                      <button onClick={handleCancelEdit} className="p-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200" title="Cancelar">✕</button>
                     </div>
-
-                    <div className="border-t-2 border-hatch-gray pt-4 space-y-2">
-                      <div className="flex justify-between items-center text-sm">
-                        <span className="text-gray-600">📍 Áreas (CWA)</span>
-                        <span className="font-bold text-hatch-orange">{totalCWAs}</span>
-                      </div>
-                      <div className="flex justify-between items-center text-sm">
-                        <span className="text-gray-600">📦 Paquetes CWP</span>
-                        <span className="font-bold text-blue-600">{totalCWPs}</span>
-                      </div>
-                      <div className="flex justify-between items-center text-sm">
-                        <span className="text-gray-600">🎨 Plot Plans</span>
-                        <span className="font-bold text-teal-600">{proyecto.plot_plans?.length || 0}</span>
-                      </div>
+                  ) : (
+                    <div className="flex justify-between items-start">
+                      <h3 className="text-lg font-bold text-hatch-blue line-clamp-1" title={proyecto.nombre}>
+                        {proyecto.nombre}
+                      </h3>
+                      <span className="text-xs font-mono text-gray-400 bg-gray-100 px-2 py-1 rounded">ID: {proyecto.id}</span>
                     </div>
+                  )}
+                  <p className="text-xs text-gray-500 mt-1">Última actualización: Hoy</p>
+                </div>
 
-                    <div className="mt-4 pt-4 border-t-2 border-hatch-gray">
-                      <button className="w-full bg-gradient-orange text-white py-2 rounded-lg font-medium hover:shadow-lg transition-all group-hover:scale-105">
-                        Abrir Proyecto →
-                      </button>
+                {/* Card Body (Stats) */}
+                <div className="p-5 flex-1">
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="p-2 rounded-lg bg-gray-50 group-hover:bg-white border border-transparent group-hover:border-gray-100 transition-all">
+                      <p className="text-2xl font-bold text-hatch-orange">{proyecto.disciplinas?.length || 0}</p>
+                      <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Discip</p>
+                    </div>
+                    <div className="p-2 rounded-lg bg-gray-50 group-hover:bg-white border border-transparent group-hover:border-gray-100 transition-all">
+                      <p className="text-2xl font-bold text-hatch-blue">{proyecto.plot_plans?.length || 0}</p>
+                      <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Planos</p>
+                    </div>
+                    <div className="p-2 rounded-lg bg-gray-50 group-hover:bg-white border border-transparent group-hover:border-gray-100 transition-all">
+                      <p className="text-2xl font-bold text-blue-400">
+                        {proyecto.plot_plans?.reduce((sum, pp) => sum + (pp.cwas?.length || 0), 0) || 0}
+                      </p>
+                      <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">CWAs</p>
                     </div>
                   </div>
                 </div>
-              );
-            })}
+
+                {/* Card Footer (Actions) - Siempre visible pero discreto */}
+                <div className="px-5 py-3 bg-gray-50 border-t border-gray-100 flex justify-end gap-2 opacity-80 group-hover:opacity-100 transition-opacity">
+                  <button 
+                    onClick={(e) => handleStartEdit(e, proyecto)}
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-gray-600 hover:text-hatch-blue hover:bg-white border border-transparent hover:border-gray-200 rounded-md transition-all"
+                  >
+                    ✏️ Editar
+                  </button>
+                  <div className="w-px bg-gray-300 h-6 self-center mx-1"></div>
+                  <button 
+                    onClick={(e) => handleDelete(e, proyecto.id)}
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-gray-400 hover:text-red-600 hover:bg-red-50 border border-transparent hover:border-red-100 rounded-md transition-all"
+                  >
+                    🗑️ Borrar
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-20 bg-white border-2 border-dashed border-gray-200 rounded-2xl">
+            <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+              <svg className="w-10 h-10 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              </svg>
+            </div>
+            <p className="text-xl font-bold text-gray-400">No hay proyectos aún</p>
+            <p className="text-gray-400 mt-2">Usa el panel superior para crear el primero</p>
           </div>
         )}
-      </div>
-
-      {/* Modal Crear Proyecto */}
-      {modalCreate && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm p-4">
-          <div className="bg-white w-full max-w-md p-6 rounded-2xl border-2 border-hatch-gray shadow-2xl">
-            <h3 className="text-hatch-blue font-bold mb-4 text-xl flex items-center gap-2">
-              <span className="text-hatch-orange">➕</span>
-              Nuevo Proyecto
-            </h3>
-            <form onSubmit={handleCreateProyecto} className="space-y-4">
-              <div>
-                <label className="block text-xs text-gray-600 mb-1 font-semibold">Nombre del Proyecto *</label>
-                <input 
-                  className="w-full bg-white border-2 border-hatch-gray rounded px-3 py-2 focus:border-hatch-orange outline-none"
-                  value={formData.nombre}
-                  onChange={e => setFormData({...formData, nombre: e.target.value})}
-                  placeholder="Ej: Planta Industrial XYZ"
-                  required
-                  autoFocus
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-gray-600 mb-1 font-semibold">Descripción (Opcional)</label>
-                <textarea 
-                  className="w-full bg-white border-2 border-hatch-gray rounded px-3 py-2 focus:border-hatch-orange outline-none resize-none"
-                  value={formData.descripcion}
-                  onChange={e => setFormData({...formData, descripcion: e.target.value})}
-                  placeholder="Breve descripción del proyecto..."
-                  rows={3}
-                />
-              </div>
-              <div className="flex justify-end gap-3 pt-4 border-t-2 border-hatch-gray">
-                <button 
-                  type="button"
-                  onClick={() => {
-                    setModalCreate(false);
-                    setFormData({ nombre: '', descripcion: '' });
-                  }}
-                  className="text-gray-600 hover:text-hatch-blue px-4 py-2 transition-colors font-medium"
-                  disabled={loading}
-                >
-                  Cancelar
-                </button>
-                <button 
-                  type="submit"
-                  disabled={loading}
-                  className="bg-gradient-orange hover:shadow-lg text-white px-6 py-2 rounded-lg font-bold transition-all disabled:opacity-50"
-                >
-                  {loading ? 'Creando...' : 'Crear Proyecto'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Editar Proyecto */}
-      {modalEdit && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm p-4">
-          <div className="bg-white w-full max-w-md p-6 rounded-2xl border-2 border-hatch-gray shadow-2xl">
-            <h3 className="text-hatch-blue font-bold mb-4 text-xl flex items-center gap-2">
-              <span className="text-hatch-orange">✏️</span>
-              Editar Proyecto
-            </h3>
-            <form onSubmit={handleUpdateProyecto} className="space-y-4">
-              <div>
-                <label className="block text-xs text-gray-600 mb-1 font-semibold">Nombre del Proyecto *</label>
-                <input 
-                  className="w-full bg-white border-2 border-hatch-gray rounded px-3 py-2 focus:border-hatch-orange outline-none"
-                  value={formData.nombre}
-                  onChange={e => setFormData({...formData, nombre: e.target.value})}
-                  placeholder="Ej: Planta Industrial XYZ"
-                  required
-                  autoFocus
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-gray-600 mb-1 font-semibold">Descripción (Opcional)</label>
-                <textarea 
-                  className="w-full bg-white border-2 border-hatch-gray rounded px-3 py-2 focus:border-hatch-orange outline-none resize-none"
-                  value={formData.descripcion}
-                  onChange={e => setFormData({...formData, descripcion: e.target.value})}
-                  placeholder="Breve descripción del proyecto..."
-                  rows={3}
-                />
-              </div>
-              <div className="flex justify-end gap-3 pt-4 border-t-2 border-hatch-gray">
-                <button 
-                  type="button"
-                  onClick={() => {
-                    setModalEdit(false);
-                    setFormData({ nombre: '', descripcion: '' });
-                    setEditingProyecto(null);
-                  }}
-                  className="text-gray-600 hover:text-hatch-blue px-4 py-2 transition-colors font-medium"
-                  disabled={loading}
-                >
-                  Cancelar
-                </button>
-                <button 
-                  type="submit"
-                  disabled={loading}
-                  className="bg-gradient-orange hover:shadow-lg text-white px-6 py-2 rounded-lg font-bold transition-all disabled:opacity-50"
-                >
-                  {loading ? 'Guardando...' : 'Guardar Cambios'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Footer */}
-      <div className="border-t-2 border-hatch-gray py-6 text-center text-gray-600 text-sm">
-        <p>PROTOTYPE BY <span className="text-hatch-orange font-bold">HATCH</span></p>
       </div>
     </div>
   );

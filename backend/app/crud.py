@@ -1,12 +1,10 @@
-# backend/app/crud.py
-
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from . import models, schemas
 from datetime import datetime
 
 # ============================================================================
-# PROYECTOS Y CONFIG
+# PROYECTOS (CRUD COMPLETO)
 # ============================================================================
 
 def get_proyecto(db: Session, proyecto_id: int):
@@ -25,6 +23,33 @@ def create_proyecto(db: Session, proyecto: schemas.ProyectoCreate):
     db.refresh(db_proyecto)
     return db_proyecto
 
+def update_proyecto(db: Session, proyecto_id: int, proyecto_update: schemas.ProyectoCreate):
+    db_proyecto = get_proyecto(db, proyecto_id)
+    if not db_proyecto:
+        return None
+    
+    if proyecto_update.nombre:
+        db_proyecto.nombre = proyecto_update.nombre
+    if proyecto_update.descripcion:
+        db_proyecto.descripcion = proyecto_update.descripcion
+    
+    db.commit()
+    db.refresh(db_proyecto)
+    return db_proyecto
+
+def delete_proyecto(db: Session, proyecto_id: int):
+    db_proyecto = get_proyecto(db, proyecto_id)
+    if not db_proyecto:
+        return False
+    
+    db.delete(db_proyecto)
+    db.commit()
+    return True
+
+# ============================================================================
+# DISCIPLINAS (CRUD COMPLETO)
+# ============================================================================
+
 def create_disciplina(db: Session, disciplina: schemas.DisciplinaCreate, proyecto_id: int):
     db_disciplina = models.Disciplina(**disciplina.model_dump(), proyecto_id=proyecto_id)
     db.add(db_disciplina)
@@ -37,6 +62,30 @@ def get_disciplina(db: Session, disciplina_id: int):
 
 def get_disciplinas_por_proyecto(db: Session, proyecto_id: int):
     return db.query(models.Disciplina).filter(models.Disciplina.proyecto_id == proyecto_id).all()
+
+def update_disciplina(db: Session, disciplina_id: int, disciplina_update: schemas.DisciplinaCreate):
+    db_disc = db.query(models.Disciplina).filter(models.Disciplina.id == disciplina_id).first()
+    if not db_disc: return None
+    
+    db_disc.nombre = disciplina_update.nombre
+    db_disc.codigo = disciplina_update.codigo
+    # Si tuvieras descripción en el schema:
+    # if disciplina_update.descripcion: db_disc.descripcion = disciplina_update.descripcion
+    
+    db.commit()
+    db.refresh(db_disc)
+    return db_disc
+
+def delete_disciplina(db: Session, disciplina_id: int):
+    db_disc = db.query(models.Disciplina).filter(models.Disciplina.id == disciplina_id).first()
+    if not db_disc: return False
+    db.delete(db_disc)
+    db.commit()
+    return True
+
+# ============================================================================
+# TIPOS DE ENTREGABLE
+# ============================================================================
 
 def create_tipo_entregable(db: Session, tipo: schemas.TipoEntregableCreate, disciplina_id: int = None):
     db_tipo = models.TipoEntregable(
@@ -114,7 +163,51 @@ def get_cwps_por_cwa(db: Session, cwa_id: int):
     return db.query(models.CWP).filter(models.CWP.cwa_id == cwa_id).all()
 
 # ============================================================================
-# 🚀 JERARQUÍA COMPLETA
+# METADATOS (CRUD EXTRA)
+# ============================================================================
+
+# ✅ NUEVO: Update Metadata con Migración de Datos
+def update_columna_metadata(db: Session, columna_id: int, columna_update: schemas.ColumnaCreate):
+    db_col = db.query(models.CWPColumnaMetadata).filter(models.CWPColumnaMetadata.id == columna_id).first()
+    if not db_col:
+        return None
+    
+    old_name = db_col.nombre
+    new_name = columna_update.nombre
+    
+    # 1. Actualizar la definición de la columna
+    db_col.nombre = new_name
+    db_col.tipo_dato = columna_update.tipo_dato
+    db_col.opciones_json = columna_update.opciones
+    
+    # 2. MIGRACIÓN INTELIGENTE: Si el nombre cambió, actualizar los datos en los CWPs
+    if old_name != new_name:
+        cwps = db.query(models.CWP).join(models.CWA).join(models.PlotPlan).filter(
+            models.PlotPlan.proyecto_id == db_col.proyecto_id
+        ).all()
+        
+        for cwp in cwps:
+            if cwp.metadata_json and old_name in cwp.metadata_json:
+                # Crear copia mutable del dict
+                new_meta = dict(cwp.metadata_json)
+                # Mover el valor a la nueva llave
+                new_meta[new_name] = new_meta.pop(old_name)
+                # Guardar
+                cwp.metadata_json = new_meta
+                
+    db.commit()
+    db.refresh(db_col)
+    return db_col
+
+def delete_columna_metadata(db: Session, columna_id: int):
+    col = db.query(models.CWPColumnaMetadata).filter(models.CWPColumnaMetadata.id == columna_id).first()
+    if not col: return False
+    db.delete(col)
+    db.commit()
+    return True
+
+# ============================================================================
+# JERARQUÍA COMPLETA (CORREGIDA - SIN BUG DE PRIORIDAD)
 # ============================================================================
 
 def obtener_jerarquia_completa(db: Session, plot_plan_id: int):
@@ -134,13 +227,13 @@ def obtener_jerarquia_completa(db: Session, plot_plan_id: int):
             "nombre": cwa.nombre,
             "codigo": cwa.codigo,
             "es_transversal": cwa.es_transversal,
+            "prioridad": cwa.prioridad, # ✅ Correcto: Prioridad es del CWA
             "cwps": []
         }
         
         cwps = get_cwps_por_cwa(db, cwa.id)
         
         for cwp in cwps:
-            # ✅ Obtenemos metadata_json de la BD
             cwp_data = {
                 "id": cwp.id,
                 "nombre": cwp.nombre,
@@ -149,11 +242,11 @@ def obtener_jerarquia_completa(db: Session, plot_plan_id: int):
                 "duracion_dias": cwp.duracion_dias,
                 "estado": cwp.estado,
                 "porcentaje_completitud": cwp.porcentaje_completitud,
-                "prioridad": cwp.prioridad,
+                # 🔴 ELIMINADO: "prioridad": cwp.prioridad (Esto causaba el crash)
                 "secuencia": cwp.secuencia,
                 "fecha_inicio_prevista": str(cwp.fecha_inicio_prevista) if cwp.fecha_inicio_prevista else None,
                 "fecha_fin_prevista": str(cwp.fecha_fin_prevista) if cwp.fecha_fin_prevista else None,
-                "metadata_json": cwp.metadata_json, # Asegúrate de que models.CWP tenga este campo
+                "metadata_json": cwp.metadata_json,
                 "disciplina_id": cwp.disciplina_id,
                 "paquetes": []
             }
@@ -165,13 +258,7 @@ def obtener_jerarquia_completa(db: Session, plot_plan_id: int):
                     "id": paquete.id,
                     "codigo": paquete.codigo,
                     "nombre": paquete.nombre,
-                    "descripcion": paquete.descripcion,
                     "tipo": paquete.tipo,
-                    "responsable": paquete.responsable,
-                    "estado": paquete.estado,
-                    "porcentaje_completitud": paquete.porcentaje_completitud,
-                    "metadata_json": paquete.metadata_json,
-                    "cwp_id": paquete.cwp_id,
                     "items": []
                 }
                 

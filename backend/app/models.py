@@ -1,6 +1,4 @@
-# backend/app/models.py
-
-from sqlalchemy import Column, Integer, String, ForeignKey, JSON, Text, Date, Float, Boolean, DateTime
+from sqlalchemy import Column, Integer, String, ForeignKey, JSON, Text, Date, Float, Boolean, DateTime, UniqueConstraint
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from .database import Base
@@ -17,6 +15,7 @@ class Proyecto(Base):
     fecha_inicio = Column(Date, nullable=True)
     fecha_fin = Column(Date, nullable=True)
     
+    # Cascade delete asegura que si borras proyecto, se borra TODO lo de abajo
     plot_plans = relationship("PlotPlan", back_populates="proyecto", cascade="all, delete-orphan")
     disciplinas = relationship("Disciplina", back_populates="proyecto", cascade="all, delete-orphan")
     columnas_metadata = relationship("CWPColumnaMetadata", backref="proyecto", cascade="all, delete-orphan")
@@ -64,12 +63,12 @@ class CWA(Base):
     __tablename__ = "cwa"
     id = Column(Integer, primary_key=True, index=True)
     nombre = Column(String, nullable=False)
-    codigo = Column(String(20), unique=True, index=True)
+    codigo = Column(String(20), index=True) 
     descripcion = Column(Text, nullable=True)
     es_transversal = Column(Boolean, default=False)
     
-    # ✅ PRIORIDAD A NIVEL DE ÁREA
-    prioridad = Column(String(20), default="MEDIA") 
+    # ✅ CAMBIO 1: Prioridad ahora es Entero (para ordenar 1, 2, 3...)
+    prioridad = Column(Integer, default=99) 
     
     plot_plan_id = Column(Integer, ForeignKey("plot_plans.id"))
     plot_plan = relationship("PlotPlan", back_populates="cwas")
@@ -77,11 +76,15 @@ class CWA(Base):
     shape_type = Column(String(15), nullable=True)
     shape_data = Column(JSON, nullable=True)
 
+    __table_args__ = (
+        UniqueConstraint('codigo', 'plot_plan_id', name='_cwa_codigo_plot_uc'),
+    )
+
 class CWP(Base):
     __tablename__ = "cwp"
     id = Column(Integer, primary_key=True, index=True)
     nombre = Column(String, nullable=False)
-    codigo = Column(String(50), unique=True, index=True)
+    codigo = Column(String(50), index=True)
     descripcion = Column(Text, nullable=True)
     cwa_id = Column(Integer, ForeignKey("cwa.id"))
     disciplina_id = Column(Integer, ForeignKey("disciplinas.id"))
@@ -89,15 +92,12 @@ class CWP(Base):
     disciplina = Column(Integer, ForeignKey("disciplinas.id"))
     paquetes = relationship("Paquete", back_populates="cwp", cascade="all, delete-orphan")
     
-    # ✅ Gestión de Construcción
     secuencia = Column(Integer, default=0)
     duracion_dias = Column(Integer, nullable=True)
     fecha_inicio_prevista = Column(Date, nullable=True)
     fecha_fin_prevista = Column(Date, nullable=True)
     
-    # ✅ Forecast Dinámico
-    forecast_inicio = Column(Date, nullable=True)
-    forecast_fin = Column(Date, nullable=True)
+    # ❌ ELIMINADO: Forecasts ya no están aquí
     
     porcentaje_completitud = Column(Float, default=0.0)
     estado = Column(String(20), default="NO_INICIADO")
@@ -105,17 +105,26 @@ class CWP(Base):
     restricciones_json = Column(JSON, nullable=True)
     metadata_json = Column(JSON, nullable=True)
 
+    __table_args__ = (
+        UniqueConstraint('codigo', 'cwa_id', name='_cwp_codigo_cwa_uc'),
+    )
+
 class Paquete(Base):
     __tablename__ = "paquetes"
     id = Column(Integer, primary_key=True, index=True)
     nombre = Column(String, nullable=False)
-    codigo = Column(String(100), unique=True, index=True)
+    codigo = Column(String(100), index=True)
     descripcion = Column(Text, nullable=True)
     tipo = Column(String(10), nullable=False)
     responsable = Column(String(20), nullable=False)
     cwp_id = Column(Integer, ForeignKey("cwp.id"))
     cwp = relationship("CWP", back_populates="paquetes")
     items = relationship("Item", back_populates="paquete", cascade="all, delete-orphan")
+    
+    # ✅ NUEVO: Forecasts ahora viven aquí (EWP, IWP, PWP)
+    forecast_inicio = Column(Date, nullable=True)
+    forecast_fin = Column(Date, nullable=True)
+    
     fecha_inicio_prevista = Column(Date, nullable=True)
     fecha_fin_prevista = Column(Date, nullable=True)
     porcentaje_completitud = Column(Float, default=0.0)
@@ -129,20 +138,14 @@ class Item(Base):
     id = Column(Integer, primary_key=True, index=True)
     nombre = Column(String, nullable=False)
     descripcion = Column(Text, nullable=True)
-    
-    # Tipo opcional para permitir creación rápida
     tipo_entregable_id = Column(Integer, ForeignKey("tipos_entregables.id"), nullable=True)
     tipo_entregable = relationship("TipoEntregable", back_populates="items")
-    
     paquete_id = Column(Integer, ForeignKey("paquetes.id"))
     paquete = relationship("Paquete", back_populates="items")
-    
-    # Vinculación
     source_item_id = Column(Integer, ForeignKey("items.id"), nullable=True)
     source_item = relationship("Item", remote_side=[id], backref="linked_items")
     
-    # ✅ Forecast Item
-    forecast_fin = Column(Date, nullable=True)
+    # ❌ ELIMINADO: forecast_fin ya no está aquí
     
     version = Column(Integer, default=1)
     estado = Column(String(20), default="NO_INICIADO")
@@ -153,10 +156,6 @@ class Item(Base):
     metadata_json = Column(JSON, nullable=True)
     fecha_creacion = Column(DateTime, default=datetime.utcnow)
     fecha_actualizacion = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-# ============================================================================
-# 3. METADATOS CUSTOM
-# ============================================================================
 
 class CWPColumnaMetadata(Base):
     __tablename__ = "cwp_columnas_metadata"

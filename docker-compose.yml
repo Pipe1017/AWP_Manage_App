@@ -14,8 +14,7 @@ services:
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      # Si tienes un script inicial, déjalo, si no, puedes comentar esta línea:
-      # - ./.docker/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./.docker/db/init.sql:/docker-entrypoint-initdb.d/init.sql
 
   # 2. Backend (FastAPI)
   backend:
@@ -27,8 +26,6 @@ services:
       - "8000:8000"
     volumes:
       - ./backend:/app
-      # 🔥 IMPORTANTE: Esto evita que se borren las fotos al reiniciar Docker
-      # Crea manualmente una carpeta llamada "backend_uploads" junto a este archivo
       - ./backend_uploads:/app/uploads
     depends_on:
       - db
@@ -41,8 +38,6 @@ services:
     build:
       context: ./frontend
     ports:
-      # Nota: Estás mapeando el puerto interno 5173 al externo 3000.
-      # Tendrás que entrar a http://localhost:3000
       - "3000:5173"
     volumes:
       - ./frontend:/app
@@ -50,10 +45,12 @@ services:
     depends_on:
       - backend
     environment:
-      # 🔥 IMPORTANTE PARA MAC: Hace que los cambios de código se vean al instante
       - CHOKIDAR_USEPOLLING=true
-      # Configuración de red centralizada
-      - VITE_API_URL=http://localhost:8000/api/v1
+      # 🚨 AQUÍ ESTÁ EL CAMBIO CRÍTICO:
+      # Cambiamos 'localhost' por tu IP de red local para que el celular sepa dónde buscar.
+      #- VITE_API_URL=http://172.28.118.13:8000/api/v1 #RED WIFI HATCH
+      #- VITE_API_URL=http://10.92.12.84:8000/api/v1 #RED LOCAL HATCH
+      - VITE_API_URL=http://192.168.1.2:8000/api/v1 #RED CASA
 
 volumes:
   postgres_data:

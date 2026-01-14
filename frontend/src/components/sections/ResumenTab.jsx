@@ -1,64 +1,137 @@
-// frontend/src/components/sections/ResumenTab.jsx
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import client from '../../api/axios';
 
 import PlotPlan from '../modules/plotplan/PlotPlan';
 import AWPTableConsolidada from '../modules/awp/AWPTableConsolidada';
 import UploadPlotPlanForm from '../modules/upload/UploadPlotPlanForm';
 
-function ResumenTab({ proyecto, onProyectoUpdate }) {
+// ... (COMPONENTES DE SELECTOR IGUAL QUE ANTES) ...
+function CWASelector({ cwas, selectedCWA, onSelect }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const filteredCWAs = cwas.filter(c => 
+    c.nombre.toLowerCase().includes(search.toLowerCase()) || 
+    c.codigo.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div className="relative w-64" ref={containerRef}>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className={`w-full px-3 py-2 text-xs font-medium bg-white border-2 rounded-lg flex items-center justify-between transition-all min-h-[40px] h-auto ${
+          selectedCWA 
+            ? 'border-green-400 text-green-800 bg-green-50' 
+            : 'border-hatch-gray text-gray-600 hover:border-hatch-orange'
+        }`}
+      >
+        <span className="whitespace-normal break-words text-left flex-1 mr-2 leading-tight">
+          {selectedCWA 
+            ? `${selectedCWA.codigo} - ${selectedCWA.nombre}` 
+            : "-- Seleccionar Área --"}
+        </span>
+        <span className="text-gray-400 flex-shrink-0">▼</span>
+      </button>
+
+      {isOpen && (
+        <div className="absolute top-full left-0 mt-1 w-80 bg-white border-2 border-hatch-gray rounded-lg shadow-xl z-[100] overflow-hidden flex flex-col max-h-96">
+          <div className="p-2 border-b border-gray-100 bg-gray-50">
+            <input
+              type="text"
+              placeholder="🔍 Buscar área..."
+              className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:border-hatch-orange"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              autoFocus
+            />
+          </div>
+          <div className="overflow-y-auto flex-1">
+            {filteredCWAs.length > 0 ? (
+              filteredCWAs.map(cwa => {
+                const hasGeo = cwa.shape_type || (cwa.shape_data && Object.keys(cwa.shape_data).length > 0);
+                return (
+                  <div
+                    key={cwa.id}
+                    onClick={() => {
+                      onSelect(cwa);
+                      setIsOpen(false);
+                      setSearch("");
+                    }}
+                    className={`px-3 py-2 text-xs cursor-pointer border-b border-gray-50 hover:bg-blue-50 flex items-start justify-between gap-2 ${
+                      selectedCWA?.id === cwa.id ? 'bg-blue-50' : 'text-gray-700'
+                    }`}
+                  >
+                    <div className="flex flex-col flex-1">
+                      <span className={`font-mono font-bold text-[10px] ${selectedCWA?.id === cwa.id ? 'text-hatch-blue' : 'text-gray-500'}`}>
+                        {cwa.codigo}
+                      </span>
+                      <span className={`whitespace-normal break-words leading-tight ${selectedCWA?.id === cwa.id ? 'font-bold text-hatch-blue' : ''}`}>
+                        {cwa.nombre}
+                      </span>
+                    </div>
+                    <div className="flex items-center self-center flex-shrink-0" title={hasGeo ? "Geometría dibujada" : "Sin dibujo"}>
+                      {hasGeo ? (<span className="text-green-500 text-xs">✅</span>) : (<span className="text-red-300 text-xs opacity-50">❌</span>)}
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="p-4 text-center text-gray-400 text-xs italic">
+                No se encontraron áreas
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ✅ AHORA RECIBE GLOBALFILTERCWA y SETGLOBALFILTERCWA
+function ResumenTab({ proyecto, onProyectoUpdate, globalFilterCWA, setGlobalFilterCWA }) {
   const [selectedPlotPlanId, setSelectedPlotPlanId] = useState(null);
   const [selectedCWA, setSelectedCWA] = useState(null);
-  const [filteredCWAId, setFilteredCWAId] = useState(null);
   const [isLoadingPlotPlan, setIsLoadingPlotPlan] = useState(false);
-  const [showUploadForm, setShowUploadForm] = useState(false); // ✅ NUEVO: Control de visibilidad
 
-  // ✅ DEBUG
-  console.log("🔍 ResumenTab - Proyecto recibido:", {
-    id: proyecto?.id,
-    nombre: proyecto?.nombre,
-    plot_plans_count: proyecto?.plot_plans?.length
-  });
-
-  // Inicializar con el primer plot plan si existe
   useEffect(() => {
     if (proyecto.plot_plans && proyecto.plot_plans.length > 0 && !selectedPlotPlanId) {
       setSelectedPlotPlanId(proyecto.plot_plans[0].id);
-      setShowUploadForm(false); // ✅ Ocultar formulario si hay plot plans
     }
-  }, [proyecto.plot_plans, selectedPlotPlanId]);
+  }, [proyecto.plot_plans]);
 
-  // Función para recargar todo el proyecto desde el servidor
   const recargarProyecto = async () => {
     try {
-      console.log("🔄 Recargando proyecto completo...");
       const response = await client.get(`/proyectos/${proyecto.id}`);
       onProyectoUpdate(response.data);
-      console.log("✅ Proyecto recargado");
     } catch (err) {
       console.error("❌ Error recargando proyecto:", err);
     }
   };
 
-  // Cargar detalles del plot plan cuando se selecciona (incluye CWAs y geometrías)
   useEffect(() => {
     if (!selectedPlotPlanId) return;
     
     let isMounted = true;
-    
     const loadPlotPlanWithCWAs = async () => {
       try {
         setIsLoadingPlotPlan(true);
-        console.log(`🔄 Cargando detalles del plot plan ${selectedPlotPlanId}...`);
-        
         const response = await client.get(
           `/proyectos/${proyecto.id}/plot_plans/${selectedPlotPlanId}`
         );
         
         if (!isMounted) return;
         
-        // Actualizamos solo este plot plan dentro de la estructura del proyecto
         const updatedPlotPlans = (proyecto.plot_plans || []).map(pp =>
           pp.id === selectedPlotPlanId ? response.data : pp
         );
@@ -68,104 +141,60 @@ function ResumenTab({ proyecto, onProyectoUpdate }) {
           plot_plans: updatedPlotPlans
         });
         
-        // Reseteamos selecciones
         setSelectedCWA(null);
+        setGlobalFilterCWA(null); // ✅ Usar setter global
         setIsLoadingPlotPlan(false);
         
       } catch (err) {
-        if (isMounted) {
-          console.error("Error cargando Plot Plan:", err);
-          setIsLoadingPlotPlan(false);
-        }
+        if (isMounted) setIsLoadingPlotPlan(false);
       }
     };
-    
     loadPlotPlanWithCWAs();
-    
-    return () => {
-      isMounted = false;
-    };
+    return () => { isMounted = false; };
   }, [selectedPlotPlanId]);
 
-  // Obtener el objeto del plan seleccionado
   const currentPlotPlan = proyecto.plot_plans?.find(pp => pp.id === selectedPlotPlanId);
 
   // --- HANDLERS ---
 
-  // ✅ CORREGIDO: Handler cuando se sube un nuevo Plot Plan
   const handlePlotPlanUploaded = async (nuevoPlotPlan) => {
-    console.log("📥 Plot Plan subido:", nuevoPlotPlan);
-    
-    try {
-      // Recargar proyecto completo desde el servidor
-      const response = await client.get(`/proyectos/${proyecto.id}`);
-      onProyectoUpdate(response.data);
-      
-      // Seleccionar automáticamente el nuevo plot plan
-      if (nuevoPlotPlan && nuevoPlotPlan.id) {
-        setSelectedPlotPlanId(nuevoPlotPlan.id);
-        console.log("✅ Plot Plan seleccionado:", nuevoPlotPlan.nombre);
-      }
-      
-      // ✅ Ocultar formulario después de subir
-      setShowUploadForm(false);
-      
-      console.log("✅ Proyecto recargado exitosamente");
-    } catch (err) {
-      console.error("❌ Error recargando proyecto:", err);
-      alert("Error recargando el proyecto");
-    }
+    const planosActuales = proyecto.plot_plans || [];
+    const proyectoActualizado = { ...proyecto, plot_plans: [...planosActuales, nuevoPlotPlan] };
+    onProyectoUpdate(proyectoActualizado);
+    setSelectedPlotPlanId(nuevoPlotPlan.id);
+    await recargarProyecto();
   };
 
   const handleShapeSaved = async (cwaId, updatedCWA) => {
-    console.log("✅ Forma guardada, recargando datos...");
     try {
-      const response = await client.get(
-        `/proyectos/${proyecto.id}/plot_plans/${selectedPlotPlanId}`
-      );
-      
-      const updatedPlotPlans = proyecto.plot_plans.map(pp =>
-        pp.id === selectedPlotPlanId ? response.data : pp
-      );
-      
-      onProyectoUpdate({
-        ...proyecto,
-        plot_plans: updatedPlotPlans
-      });
-    } catch (err) {
-      console.error("❌ Error actualizando tras guardar forma:", err);
-    }
-  };
-
-  const handleCWACreada = async () => {
-    console.log("✅ CWA creada, actualizando...");
-    try {
-      const response = await client.get(
-        `/proyectos/${proyecto.id}/plot_plans/${selectedPlotPlanId}`
-      );
-      const updatedPlotPlans = proyecto.plot_plans.map(pp =>
-        pp.id === selectedPlotPlanId ? response.data : pp
-      );
+      const response = await client.get(`/proyectos/${proyecto.id}/plot_plans/${selectedPlotPlanId}`);
+      const updatedPlotPlans = proyecto.plot_plans.map(pp => pp.id === selectedPlotPlanId ? response.data : pp);
       onProyectoUpdate({ ...proyecto, plot_plans: updatedPlotPlans });
-    } catch (err) { 
-      console.error(err); 
-    }
+    } catch (err) { console.error(err); }
   };
 
   const handlePlotPlanChange = (newId) => {
-    console.log(`🔄 Cambiando a plot plan ${newId}`);
     setSelectedCWA(null);
-    setFilteredCWAId(null);
+    setGlobalFilterCWA(null);
     setSelectedPlotPlanId(newId);
   };
 
+  const handleCWASelectFromDropdown = (cwa) => {
+    console.log("🔽 Seleccionado desde dropdown:", cwa.nombre);
+    setSelectedCWA(cwa);        
+    setGlobalFilterCWA(cwa.id); // ✅ Global
+  };
+
   const handleShapeClick = (cwaId) => {
-    console.log("🔍 Filtrar tabla por CWA:", cwaId);
-    setFilteredCWAId(cwaId);
+    console.log("📍 Click en figura CWA ID:", cwaId);
+    setGlobalFilterCWA(cwaId);  // ✅ Global
+    const cwa = currentPlotPlan?.cwas?.find(c => c.id === cwaId);
+    if (cwa) setSelectedCWA(cwa);
   };
 
   const handleClearFilter = () => {
-    setFilteredCWAId(null);
+    setGlobalFilterCWA(null);   // ✅ Global
+    setSelectedCWA(null);
   };
 
   const handleTableDataChange = async () => {
@@ -174,183 +203,83 @@ function ResumenTab({ proyecto, onProyectoUpdate }) {
 
   return (
     <div className="h-full flex flex-col overflow-hidden bg-white">
-      {/* --- Toolbar Superior --- */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-700 bg-white border-r-2 border-hatch-gray/50">
-        <div className="flex items-center gap-3">
-          <h2 className="text-lg font-semibold text-hatch-blue">Resumen General</h2>
-          {currentPlotPlan && (
-            <span className="px-3 py-1 bg-gradient-orange/20 border border-blue-500/50 rounded-full text-sm text-hatch-orange font-medium">
-              📍 {currentPlotPlan.nombre}
-            </span>
-          )}
-          {isLoadingPlotPlan && (
-            <span className="text-xs text-yellow-400 animate-pulse">⏳ Cargando...</span>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2">
-          {/* Selector de CWA (si hay plan seleccionado) */}
-          {currentPlotPlan && currentPlotPlan.cwas && currentPlotPlan.cwas.length > 0 && (
-            <div className="flex items-center gap-2 px-3 py-2 bg-hatch-gray/50 rounded-lg border border-gray-600">
-              <span className="text-xs text-hatch-blue font-medium">Asignar CWA:</span>
-              <select
-                value={selectedCWA?.id || ''}
-                onChange={(e) => {
-                  const id = Number(e.target.value);
-                  const cwa = currentPlotPlan.cwas.find(c => c.id === id);
-                  setSelectedCWA(cwa || null);
-                }}
-                className="px-2 py-1 bg-white border border-hatch-gray rounded text-xs text-hatch-blue"
-              >
-                <option value="">-- Seleccionar --</option>
-                {currentPlotPlan.cwas.map(cwa => (
-                  <option key={cwa.id} value={cwa.id}>
-                    {cwa.codigo} - {cwa.nombre}
-                  </option>
-                ))}
-              </select>
-              {selectedCWA && <span className="text-xs text-green-400">✓</span>}
-            </div>
-          )}
-
-          {/* ✅ NUEVO: Botón para agregar nuevo Plot Plan */}
-          {proyecto.plot_plans && proyecto.plot_plans.length > 0 && (
-            <button
-              onClick={() => setShowUploadForm(!showUploadForm)}
-              className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium flex items-center gap-2 transition-colors"
-              title="Agregar nuevo Plot Plan"
-            >
-              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              {showUploadForm ? 'Ocultar' : 'Nuevo Plano'}
-            </button>
-          )}
-
-          {/* Botón Recargar */}
-          <button
-            onClick={recargarProyecto}
-            className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-medium flex items-center gap-2 transition-colors"
-            title="Recargar datos"
-          >
-            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            Recargar
-          </button>
-
-          {/* Selector de Plot Plan */}
-          {proyecto.plot_plans && proyecto.plot_plans.length > 1 && (
-            <select
-              value={selectedPlotPlanId || ''}
-              onChange={(e) => handlePlotPlanChange(Number(e.target.value))}
-              className="px-3 py-2 bg-white border border-hatch-gray rounded-lg text-hatch-blue text-xs"
-              disabled={isLoadingPlotPlan}
-            >
-              {proyecto.plot_plans.map(pp => (
-                <option key={pp.id} value={pp.id}>{pp.nombre}</option>
-              ))}
-            </select>
-          )}
-        </div>
+      
+      <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-white">
+        <h2 className="text-lg font-semibold text-hatch-blue">Resumen General</h2>
+        <button onClick={recargarProyecto} className="px-3 py-2 bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 rounded-lg text-xs font-medium flex items-center gap-2 transition-colors">
+          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+          Sincronizar Datos
+        </button>
       </div>
 
-      {/* --- Contenido Principal --- */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto p-6 space-y-6">
         
-        {/* ✅ Sección de Subida - CONDICIONAL */}
-        {(showUploadForm || !proyecto.plot_plans || proyecto.plot_plans.length === 0) && (
-          <div className="p-6 border-b border-gray-700 bg-white border-r-2 border-hatch-gray/20">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-hatch-blue uppercase">
-                📤 {proyecto.plot_plans && proyecto.plot_plans.length > 0 ? 'Subir Nuevo Plano' : 'Subir Primer Plano'}
-              </h3>
-              {showUploadForm && proyecto.plot_plans && proyecto.plot_plans.length > 0 && (
-                <button
-                  onClick={() => setShowUploadForm(false)}
-                  className="text-xs text-gray-500 hover:text-gray-700"
-                >
-                  ✕ Cancelar
-                </button>
-              )}
-            </div>
-            <UploadPlotPlanForm
-              proyecto={proyecto}
-              onUploadSuccess={handlePlotPlanUploaded}
-            />
-          </div>
-        )}
+        <div className="bg-white border-2 border-dashed border-gray-300 rounded-lg p-4">
+            <UploadPlotPlanForm proyecto={proyecto} onUploadSuccess={handlePlotPlanUploaded} />
+        </div>
 
-        {/* Visualizador y Tabla */}
-        {currentPlotPlan ? (
-          <div className="p-6 space-y-6">
-            {/* Canvas del Plano */}
-            <div className="bg-white border-r-2 border-hatch-gray/30 border border-gray-700 rounded-lg overflow-hidden">
-              <div className="p-4 border-b border-gray-700 bg-white border-r-2 border-hatch-gray/50">
-                <h3 className="text-sm font-semibold text-hatch-blue uppercase">
-                  📐 Plot Plan Interactivo
-                </h3>
-                {selectedCWA ? (
-                  <p className="text-xs text-green-400 mt-1">
-                    ✓ CWA seleccionado: {selectedCWA.codigo} - {selectedCWA.nombre}
-                  </p>
-                ) : (
-                  <p className="text-xs text-yellow-400 mt-1">
-                    ⚠️ Selecciona un CWA arriba para asignar áreas dibujadas
-                  </p>
-                )}
-              </div>
-              
-              <div className="p-4">
+        <div className="bg-white border-2 border-hatch-gray rounded-lg shadow-sm relative z-10">
+          
+          <div className="p-4 border-b-2 border-hatch-gray bg-gray-50 flex flex-wrap items-center justify-start gap-8 rounded-t-lg">
+            <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-hatch-blue uppercase mr-2">📐 Plot Plan Interactivo</h3>
+                {proyecto.plot_plans && proyecto.plot_plans.length > 0 ? (
+                    <select value={selectedPlotPlanId || ''} onChange={(e) => handlePlotPlanChange(Number(e.target.value))} className="px-3 py-1.5 bg-white border-2 border-hatch-gray rounded-lg text-hatch-blue text-xs font-medium focus:border-hatch-orange outline-none" disabled={isLoadingPlotPlan}>
+                        {proyecto.plot_plans.map(pp => <option key={pp.id} value={pp.id}>📍 {pp.nombre}</option>)}
+                    </select>
+                ) : <span className="text-xs text-red-400">Sin planos</span>}
+                {isLoadingPlotPlan && <span className="text-xs text-gray-400 animate-pulse">Cargando...</span>}
+            </div>
+
+            <div className="flex items-center gap-3 bg-white px-3 py-1 rounded-lg border border-gray-200 shadow-sm relative z-20">
+                <span className="text-xs font-bold text-gray-500">Asignar Área:</span>
+                {currentPlotPlan && currentPlotPlan.cwas && currentPlotPlan.cwas.length > 0 ? (
+                    <CWASelector 
+                      cwas={currentPlotPlan.cwas} 
+                      selectedCWA={selectedCWA}
+                      onSelect={handleCWASelectFromDropdown}
+                    />
+                ) : <span className="text-xs text-gray-400 italic px-2">No hay CWAs creados</span>}
+                {selectedCWA && <span className="text-green-500 text-xs font-bold">✓ Listo</span>}
+            </div>
+          </div>
+          
+          <div className="p-4 bg-gray-900 rounded-b-lg">
+            {currentPlotPlan ? (
                 <PlotPlan
                   key={`plotplan-${selectedPlotPlanId}`}
                   plotPlan={currentPlotPlan}
                   cwaToAssociate={selectedCWA}
+                  activeCWAId={globalFilterCWA} // ✅ Recibe estado global
                   onShapeSaved={handleShapeSaved}
                   onShapeClick={handleShapeClick}
                 />
-              </div>
-            </div>
+            ) : (
+                <div className="h-64 flex flex-col items-center justify-center text-gray-400"><p>Selecciona o sube un plano para comenzar</p></div>
+            )}
+          </div>
+        </div>
 
-            {/* Tabla AWP */}
-            <div className="bg-white border-r-2 border-hatch-gray/30 border border-gray-700 rounded-lg overflow-hidden">
-              <div className="p-4 border-b border-gray-700 bg-white border-r-2 border-hatch-gray/50 flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-hatch-blue uppercase">
-                  📋 Estructura AWP Consolidada
-                </h3>
-                {filteredCWAId && (
-                  <button
-                    onClick={handleClearFilter}
-                    className="px-3 py-1 bg-gradient-orange/20 border border-blue-500/50 text-hatch-orange rounded text-xs hover:bg-gradient-orange/30 flex items-center gap-2"
-                  >
-                    <span>🔍 Filtro activo</span>
-                    <span>✕</span>
-                  </button>
-                )}
-              </div>
-              
-              <div className="p-4">
-                <AWPTableConsolidada
-                  key={`awptable-${selectedPlotPlanId}-${filteredCWAId}`}
-                  plotPlanId={selectedPlotPlanId}
-                  proyecto={proyecto}
-                  filteredCWAId={filteredCWAId}
-                  onDataChange={handleTableDataChange}
-                />
-              </div>
-            </div>
+        <div className="bg-white border-2 border-hatch-gray rounded-lg overflow-hidden shadow-sm z-0">
+          <div className="p-3 border-b-2 border-hatch-gray bg-gray-50 flex items-center justify-between">
+            <h3 className="text-sm font-bold text-hatch-blue uppercase">📋 Tabla de Control</h3>
+            {globalFilterCWA && (
+              <button onClick={handleClearFilter} className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded border border-yellow-300 text-xs flex items-center gap-2 hover:bg-yellow-200 transition-colors">
+                <span>🔍 Filtro Activo: <strong>{selectedCWA?.codigo || "ID "+globalFilterCWA}</strong></span>
+                <span className="font-bold ml-1">✕</span>
+              </button>
+            )}
           </div>
-        ) : (
-          <div className="flex items-center justify-center h-96">
-            <div className="text-center text-hatch-blue">
-              <svg className="w-16 h-16 mx-auto mb-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-              </svg>
-              <p>No hay plot plans disponibles</p>
-              <p className="text-sm text-gray-500 mt-2">Sube uno usando el formulario de arriba</p>
-            </div>
+          <div className="p-0">
+            <AWPTableConsolidada
+              key={`awptable-${selectedPlotPlanId}-${globalFilterCWA}`}
+              plotPlanId={selectedPlotPlanId}
+              proyecto={proyecto}
+              filteredCWAId={globalFilterCWA} // ✅ Recibe estado global
+              onDataChange={handleTableDataChange}
+            />
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
