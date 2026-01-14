@@ -25,7 +25,7 @@ origins = [
     "http://127.0.0.1:3000",       # Alternativa local
     "http://192.168.1.4:3000",     # ✅ TU IP DE CASA (Frontend)
     # Si despliegas en la empresa, agrega aquí esa IP:
-    "http://10.92.12.69:3000",
+    "http://10.92.12.84:3000",
 ]
 
 app.add_middleware(

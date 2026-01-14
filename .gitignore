@@ -1,9 +1,12 @@
+# --- MANTENER ESTO (Archivos del sistema/basura) ---
 __pycache__/
 *.pyc
-backend_uploads/
-*.jpg
-*.png
-*.pdf
 node_modules/
-.env
 .DS_Store
+
+# --- COMENTADO O BORRADO PARA QUE SÍ SE SUBA ---
+# backend_uploads/  <-- Al quitar esto, se subirán tus archivos
+# *.jpg
+# *.png
+# *.pdf
+# .env              <-- Habilítalo si quieres compartir tu config
